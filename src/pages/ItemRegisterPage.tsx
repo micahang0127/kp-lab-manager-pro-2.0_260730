@@ -1,10 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import type {
-  ColumnDef,
-  PaginationState,
-  RowSelectionState,
-  SortingState,
-} from '@tanstack/react-table'
+import type { ColumnDef, PaginationState, SortingState } from '@tanstack/react-table'
 import { useState } from 'react'
 
 import type { Item } from '../api/item'
@@ -62,7 +57,6 @@ export function ItemRegisterPage() {
   const [pagination, setPagination] = useState<PaginationState>({ pageIndex: 0, pageSize: 50 })
   const [globalFilter, setGlobalFilter] = useState('')
   const [sorting, setSorting] = useState<SortingState>([])
-  const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['items', pagination, globalFilter, sorting],
