@@ -1,0 +1,73 @@
+import type { ApiResponse } from '.'
+import { api } from '.'
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+export const DEVICE_TYPE_WEB = 'WEB' as const
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+export interface SignupRequest {
+  email: string
+  password: string
+  name: string
+}
+
+export interface LoginRequest {
+  email: string
+  password: string
+  deviceType: string
+}
+
+export interface LoginData {
+  type: 'T' | 'O'
+  token?: string
+}
+
+export interface OtpLoginRequest {
+  email: string
+  otpCode: string
+  deviceType: string
+}
+
+export interface OtpLoginData {
+  token: string
+}
+
+export interface ChangePasswordRequest {
+  currentPassword: string
+  newPassword: string
+}
+
+// ─── API ─────────────────────────────────────────────────────────────────────
+
+/** 회원가입 */
+export const signup = (body: SignupRequest): Promise<ApiResponse<boolean>> =>
+  api.post('/auth/signup', body)
+
+/** 로그인 — 인증 불필요(skipAuth), KPMFP 헤더로 핑거프린트 전송 */
+export const login = (
+  body: LoginRequest,
+  fingerprint: string | null
+): Promise<ApiResponse<LoginData>> =>
+  api.post<LoginData>('/user/login', body, {
+    skipAuth: true,
+    extraHeaders: fingerprint ? { KPMFP: fingerprint } : undefined,
+  })
+
+/** OTP 로그인 — 인증 불필요(skipAuth), KPMFP 헤더 선택적 전송 */
+export const otpLogin = (
+  body: OtpLoginRequest,
+  fingerprint: string | null
+): Promise<ApiResponse<OtpLoginData>> =>
+  api.post<OtpLoginData>('/user/otplogin', body, {
+    skipAuth: true,
+    extraHeaders: fingerprint ? { KPMFP: fingerprint } : undefined,
+  })
+
+/** 회원탈퇴 */
+export const withdraw = (): Promise<ApiResponse<boolean>> => api.delete('/auth/withdraw')
+
+/** 비밀번호 변경 */
+export const changePassword = (body: ChangePasswordRequest): Promise<ApiResponse<boolean>> =>
+  api.patch('/auth/password', body)

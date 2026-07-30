@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>kp-lab-manager-pro</title>
+
+    <!-- Security Headers (기본 설정) -->
+    <!--
+      프로덕션 배포 시 서버(nginx, CloudFront 등)에서 다음 헤더를 추가해야 함:
+      - Strict-Transport-Security
+      - X-Frame-Options
+      - X-Content-Type-Options
+      - Referrer-Policy
+      - Permissions-Policy
+
+      개발 환경에서는 메타 태그로 설정, 프로덕션에서는 서버 헤더 권장
+    -->
+    <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+    <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin" />
+    <meta http-equiv="X-Frame-Options" content="DENY" />
+
+    <!--
+      Content-Security-Policy (CSP)
+      주의: 개발 환경에서 Vite HMR이 차단될 수 있으므로 프로덕션에서만 적용 권장
+      프로덕션 배포 시 서버에서 CSP 헤더로 설정하거나 아래 메타 태그 활성화
+    -->
+    <!--
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="
+        default-src 'self';
+        script-src 'self';
+        style-src 'self' 'unsafe-inline';
+        connect-src 'self' https://api.iamport.kr https://cdn.portone.io;
+        frame-src 'none';
+        object-src 'none';
+        base-uri 'self';
+        form-action 'self'
+      "
+    />
+    -->
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

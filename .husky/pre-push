@@ -1,0 +1,22 @@
+#!/bin/sh
+
+echo "🚀 Running final CI checks before push..."
+echo ""
+
+pnpm ci:check
+
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "❌ CI checks failed! Cannot push."
+  echo ""
+  echo "💡 Common fixes:"
+  echo "   - Code style: pnpm format"
+  echo "   - Linting issues: pnpm lint:fix"
+  echo "   - Type errors: Check the errors above"
+  echo "   - Test failures: pnpm test"
+  echo "   - Build errors: pnpm build"
+  exit 1
+fi
+
+echo ""
+echo "✅ All CI checks passed! Ready to push."

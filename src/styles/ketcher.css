@@ -1,0 +1,16 @@
+/* Ketcher 3D 팝업 클리핑 방지 */
+.ketcher-3d-viewer,
+.modal-container,
+[class*='modal'],
+[class*='3d'] {
+  position: relative;
+  overflow: visible !important;
+}
+
+/* 3D 팝업 윈도우 최적화 */
+.ketcher-modal,
+.viewer-modal {
+  max-height: 90vh;
+  max-width: 90vw;
+  overflow: auto;
+}
