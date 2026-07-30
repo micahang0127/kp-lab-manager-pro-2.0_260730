@@ -1,0 +1,13 @@
+/// <reference types="vite/client" />
+
+interface ImportMetaEnv {
+  readonly VITE_API_BASE_URL: string
+  readonly VITE_KETCHER_ASSETS_URL: string
+  readonly VITE_PORTONE_STORE_ID: string
+  readonly VITE_PORTONE_CHANNEL_KEY: string
+  readonly VITE_TURNSTILE_SITE_KEY: string
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv
+}

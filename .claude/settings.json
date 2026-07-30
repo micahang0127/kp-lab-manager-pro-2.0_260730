@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(pnpm type-check)",
+      "Bash(pnpm lint)",
+      "Bash(pnpm lint:fix)",
+      "Bash(pnpm test)",
+      "Bash(pnpm test:*)",
+      "Bash(pnpm test --run)",
+      "Bash(pnpm test --run *)",
+      "Bash(pnpm format)",
+      "Bash(pnpm format:check)",
+      "Bash(pnpm build)",
+      "Bash(pnpm build:*)",
+      "Bash(pnpm dev)",
+      "Bash(pnpm ci:check)",
+      "Bash(pnpm ci:check:fix)",
+      "Bash(pnpm audit*)",
+      "Bash(pnpm install)",
+      "Bash(git status)",
+      "Bash(git status *)",
+      "Bash(git diff)",
+      "Bash(git diff *)",
+      "Bash(git log)",
+      "Bash(git log *)",
+      "Bash(git add src/*)",
+      "Bash(git add CLAUDE.md)",
+      "Bash(git add .claude/*)",
+      "Bash(git add .github/*)",
+      "Bash(git commit -m *)",
+      "Bash(git commit -m * -m *)",
+      "Bash(git branch)",
+      "Bash(git branch *)",
+      "Bash(git checkout *)"
+    ],
+    "deny": [
+      "Bash(npm install*)",
+      "Bash(npm run*)",
+      "Bash(npm i*)",
+      "Bash(yarn*)",
+      "Bash(npx*)",
+      "Bash(rm -rf*)",
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git push --force-with-lease*)",
+      "Bash(git reset --hard*)",
+      "Bash(git branch -D*)",
+      "Bash(git clean*)",
+      "Bash(git checkout -- *)",
+      "Bash(git tag -d*)",
+      "Bash(gh pr merge*)",
+      "Bash(gh pr create --base main*)",
+      "Bash(gh pr create --base master*)",
+      "Bash(gh pr create --base release*)",
+      "Bash(gh release*)",
+      "Bash(pnpm publish*)",
+      "Edit(.env)",
+      "Edit(.env.local)",
+      "Edit(.env.production)",
+      "Write(.env*)",
+      "Edit(pnpm-lock.yaml)",
+      "Edit(package-lock.json)",
+      "Edit(.husky/**)",
+      "Write(.husky/**)",
+      "Edit(.github/workflows/**)",
+      "Write(.github/workflows/**)",
+      "Write(dist/**)",
+      "Write(node_modules/**)",
+      "Edit(src/routeTree.gen.ts)",
+      "Write(src/routeTree.gen.ts)"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pnpm type-check 2>&1 | tail -15 && git diff --stat HEAD 2>/dev/null && echo '' && echo '다음 단계 권장: /verify-impl 또는 pnpm ci:check'"
+          }
+        ]
+      }
+    ]
+  }
+}

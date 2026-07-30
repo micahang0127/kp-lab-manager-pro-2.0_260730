@@ -1,0 +1,413 @@
+## [미사용] 사용 시, Test 필요, PR (dev -> main) 생성 해도 Gihub Action이 실행되지 않느 이슈 있음  26..03.16
+
+name: PR Main & Coverage
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  test:
+    # 소스 브랜치가 반드시 dev 브랜치여야 함
+    if: github.head_ref == 'dev'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Verify Node and pnpm versions
+        run: |
+          NODE_VERSION=$(node -v | cut -d'v' -f2)
+          PNPM_VERSION=$(pnpm -v)
+          echo "✅ Node.js: $NODE_VERSION"
+          echo "✅ pnpm: $PNPM_VERSION"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Security Audit
+        id: audit
+        run: |
+          set -o pipefail
+          pnpm audit --audit-level=high 2>&1 | tee /tmp/audit_output.txt
+          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Check Formatting
+        id: format
+        run: |
+          set -o pipefail
+          pnpm format:check 2>&1 | tee /tmp/format_output.txt
+          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Run linter
+        id: lint
+        run: |
+          set -o pipefail
+          pnpm lint 2>&1 | tee /tmp/lint_output.txt
+          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Run Unit Tests
+        id: unit_test
+        run: |
+          set -o pipefail
+          pnpm test:coverage --run 2>&1 | tee /tmp/test_output.txt
+          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Generate Allure Report
+        if: always() && steps.unit_test.outcome != 'skipped'
+        run: |
+          # allure-commandline을 사용하여 결과를 리포트로 변환
+          npx allure generate allure-results -o allure-report --clean
+
+      - name: Extract Coverage Summary
+        if: always() && steps.unit_test.outcome != 'skipped'
+        id: coverage_data
+        run: |
+          if [ -f "coverage/coverage-summary.json" ]; then
+            PCT=$(jq -r '.total.statements.pct' coverage/coverage-summary.json)
+            LINES=$(jq -r '.total.lines.pct' coverage/coverage-summary.json)
+            BRANCH=$(jq -r '.total.branches.pct' coverage/coverage-summary.json)
+            FUNCS=$(jq -r '.total.functions.pct' coverage/coverage-summary.json)
+            echo "pct=$PCT" >> $GITHUB_OUTPUT
+            echo "lines=$LINES" >> $GITHUB_OUTPUT
+            echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+            echo "funcs=$FUNCS" >> $GITHUB_OUTPUT
+            
+            # 커버리지 수준에 따른 색상 결정 (Discord용)
+            if (( $(echo "$PCT > 80" | bc -l) )); then COLOR=3066993; # Green
+            elif (( $(echo "$PCT > 50" | bc -l) )); then COLOR=15105570; # Orange
+            else COLOR=15158332; # Red
+            fi
+            echo "color=$COLOR" >> $GITHUB_OUTPUT
+          else
+            echo "pct=0" >> $GITHUB_OUTPUT
+            echo "color=15158332" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Prepare Report for Deployment
+        if: always() && steps.unit_test.outcome != 'skipped'
+        run: |
+          mkdir -p public-report
+          # Allure 리포트
+          if [ -d "allure-report" ]; then cp -r allure-report/* public-report/; fi
+          # 커버리지 상세 (HTML)
+          mkdir -p public-report/coverage
+          if [ -d "coverage" ]; then cp -r coverage/* public-report/coverage/; fi
+
+      - name: Deploy to GitHub Pages (PR Preview)
+        if: always() && steps.unit_test.outcome != 'skipped'
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./public-report
+          destination_dir: pr/main/${{ github.event.pull_request.number }}
+          keep_files: true
+
+      - name: Set Report URL
+        if: always() && steps.unit_test.outcome != 'skipped'
+        run: |
+          # 저장소 이름의 대소문자를 유지하여 URL 생성 (GitHub Pages는 대소문자 구분)
+          REPORT_URL="https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/pr/main/${{ github.event.pull_request.number }}/"
+          echo "REPORT_URL=$REPORT_URL" >> $GITHUB_ENV
+
+      - name: Build project
+        id: build
+        run: |
+          set -o pipefail
+          pnpm build 2>&1 | tee /tmp/build_output.txt
+          echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: Set PR variables
+        run: |
+          echo "PR_NUMBER=${{ github.event.pull_request.number }}" >> $GITHUB_ENV
+          echo "PR_URL=${{ github.event.pull_request.html_url }}" >> $GITHUB_ENV
+          echo "BRANCH_NAME=${{ github.event.pull_request.head.ref }}" >> $GITHUB_ENV
+          echo "PR_TITLE<<EOF" >> $GITHUB_ENV
+          echo "${{ github.event.pull_request.title }}" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Comment on PR (Failure)
+        if: |
+          steps.audit.outcome == 'failure' ||
+          steps.format.outcome == 'failure' ||
+          steps.lint.outcome == 'failure' ||
+          steps.unit_test.outcome == 'failure' ||
+          steps.build.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const results = {
+              'Security Audit': '${{ steps.audit.outcome }}',
+              'Formatting': '${{ steps.format.outcome }}',
+              'Linting': '${{ steps.lint.outcome }}',
+              'Unit Test': '${{ steps.unit_test.outcome }}',
+              'Build': '${{ steps.build.outcome }}'
+            };
+
+            let failedChecks = [];
+            Object.entries(results).forEach(([check, outcome]) => {
+              if (outcome === 'failure') {
+                failedChecks.push(`| ${check} | ❌ Failed |`);
+              } else {
+                failedChecks.push(`| ${check} | ✅ Success |`);
+              }
+            });
+
+            const comment = `## ❌ [MAIN] PR 검사 실패
+
+            메인 브랜치로의 머지 검사가 실패하여 PR이 자동으로 닫혔습니다. 상세 리포트를 확인하여 수정해주세요.
+
+            | 항목 | 상태 |
+            |------|------|
+            ${failedChecks.join('\n')}
+
+            ### 📊 리포트 확인
+            - [✅ 테스트 UI 리포트](${{ env.REPORT_URL }})
+            - [📈 커버리지 상세](${{ env.REPORT_URL }}coverage/)
+            - [🛠 Actions 로그](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+            **Coverage 요약:** ${{ steps.coverage_data.outputs.pct }}% (Lines: ${{ steps.coverage_data.outputs.lines }}%)
+            `;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ github.event.pull_request.number }},
+              body: comment
+            });
+
+      - name: Close PR (Failure)
+        if: |
+          steps.audit.outcome == 'failure' ||
+          steps.format.outcome == 'failure' ||
+          steps.lint.outcome == 'failure' ||
+          steps.unit_test.outcome == 'failure' ||
+          steps.build.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            await github.rest.pulls.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: ${{ github.event.pull_request.number }},
+              state: 'closed'
+            });
+
+      - name: Discord 알림 (실패)
+        if: |
+          steps.audit.outcome == 'failure' ||
+          steps.format.outcome == 'failure' ||
+          steps.lint.outcome == 'failure' ||
+          steps.unit_test.outcome == 'failure' ||
+          steps.build.outcome == 'failure'
+        run: |
+          AUDIT_STATUS="${{ steps.audit.outcome == 'failure' && '❌ 실패' || '✅ 성공' }}"
+          FORMAT_STATUS="${{ steps.format.outcome == 'failure' && '❌ 실패' || '✅ 성공' }}"
+          LINT_STATUS="${{ steps.lint.outcome == 'failure' && '❌ 실패' || '✅ 성공' }}"
+          TEST_STATUS="${{ steps.unit_test.outcome == 'failure' && '❌ 실패' || '✅ 성공' }}"
+          BUILD_STATUS="${{ steps.build.outcome == 'failure' && '❌ 실패' || '✅ 성공' }}"
+
+          COV_DETAIL="Statements: ${{ steps.coverage_data.outputs.pct }}%\nBranches: ${{ steps.coverage_data.outputs.branch }}%\nFunctions: ${{ steps.coverage_data.outputs.funcs }}%\nLines: ${{ steps.coverage_data.outputs.lines }}%"
+
+          FIELDS=$(jq -n \
+            --arg branch "${{ env.BRANCH_NAME }}" \
+            --arg pr_title "[#${{ env.PR_NUMBER }}] ${{ env.PR_TITLE }}" \
+            --arg pr_url "${{ env.PR_URL }}" \
+            --arg actor "${{ github.actor }}" \
+            --arg audit  "$AUDIT_STATUS" \
+            --arg format "$FORMAT_STATUS" \
+            --arg lint  "$LINT_STATUS" \
+            --arg test  "$TEST_STATUS" \
+            --arg build "$BUILD_STATUS" \
+            --arg cov   "$COV_DETAIL" \
+            --arg report_url "${{ env.REPORT_URL }}" \
+            '[
+              {"name": "브랜치",  "value": $branch, "inline": true},
+              {"name": "PR",      "value": ("[" + $pr_title + "](" + $pr_url + ")"), "inline": true},
+              {"name": "작성자",  "value": $actor,  "inline": true},
+              {"name": "Format",  "value": $format, "inline": true},
+              {"name": "Lint",    "value": $lint,   "inline": true},
+              {"name": "Test",    "value": $test,   "inline": true},
+              {"name": "Security Audit", "value": $audit, "inline": true},
+              {"name": "Build",   "value": $build,  "inline": true},
+              {"name": "Allure 리포트", "value": ("[결과 보기](" + $report_url + ")"), "inline": true},
+              {"name": "커버리지 상세", "value": $cov, "inline": false}
+            ]')
+
+          if [ "${{ steps.audit.outcome }}" = "failure" ] && [ -s "/tmp/audit_output.txt" ]; then
+            MSG=$(tail -c 500 "/tmp/audit_output.txt")
+            FIELDS=$(echo "$FIELDS" | jq --arg msg "$MSG" '. + [{"name": "Security Audit 에러 요약", "value": ("```\n" + $msg + "\n```"), "inline": false}]')
+          fi
+
+          if [ "${{ steps.format.outcome }}" = "failure" ] && [ -s "/tmp/format_output.txt" ]; then
+            MSG=$(tail -c 500 "/tmp/format_output.txt")
+            FIELDS=$(echo "$FIELDS" | jq --arg msg "$MSG" '. + [{"name": "Format 에러 요약", "value": ("```\n" + $msg + "\n```"), "inline": false}]')
+          fi
+
+          if [ "${{ steps.lint.outcome }}" = "failure" ] && [ -s "/tmp/lint_output.txt" ]; then
+            MSG=$(tail -c 500 "/tmp/lint_output.txt")
+            FIELDS=$(echo "$FIELDS" | jq --arg msg "$MSG" '. + [{"name": "Lint 에러 요약", "value": ("```\n" + $msg + "\n```"), "inline": false}]')
+          fi
+
+          if [ "${{ steps.unit_test.outcome }}" = "failure" ] && [ -s "/tmp/test_output.txt" ]; then
+            MSG=$(tail -c 500 "/tmp/test_output.txt")
+            FIELDS=$(echo "$FIELDS" | jq --arg msg "$MSG" '. + [{"name": "Test 에러 요약", "value": ("```\n" + $msg + "\n```"), "inline": false}]')
+          fi
+
+          if [ "${{ steps.build.outcome }}" = "failure" ] && [ -s "/tmp/build_output.txt" ]; then
+            MSG=$(tail -c 500 "/tmp/build_output.txt")
+            FIELDS=$(echo "$FIELDS" | jq --arg msg "$MSG" '. + [{"name": "Build 에러 요약", "value": ("```\n" + $msg + "\n```"), "inline": false}]')
+          fi
+
+          PAYLOAD=$(jq -n \
+            --argjson fields "$FIELDS" \
+            --arg pr_title "${{ env.PR_TITLE }}" \
+            --arg url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            '{
+              "embeds": [{
+                "title": "🚨 [LAB-MANAGER-FRONT] [MAIN 배포 실패] \($pr_title)",
+                "description": "메인 브랜치 머지 테스트가 실패하여 PR이 자동으로 닫혔습니다.",
+                "color": 15158332,
+                "fields": $fields,
+                "url": $url
+              }]
+            }')
+
+          curl -X POST -H "Content-Type: application/json" -d "$PAYLOAD" ${{ secrets.DISCORD_PR_URL }}
+
+      - name: Comment on PR (Success)
+        if: |
+          steps.audit.outcome == 'success' &&
+          steps.format.outcome == 'success' &&
+          steps.lint.outcome == 'success' &&
+          steps.unit_test.outcome == 'success' &&
+          steps.build.outcome == 'success'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const comment = `## ✅ [MAIN] 모든 검사 통과
+
+            메인 브랜치 배포를 위한 모든 테스트와 빌드가 성공했습니다! 자동으로 머지됩니다.
+
+            ### 📊 리포트 확인
+            - [✅ 테스트 UI 리포트](${{ env.REPORT_URL }})
+            - [📈 커버리지 상세](${{ env.REPORT_URL }}coverage/)
+
+            **Total Coverage:** ${{ steps.coverage_data.outputs.pct }}%
+            `;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: ${{ github.event.pull_request.number }},
+              body: comment
+            });
+
+      - name: Verify PR base is main
+        if: |
+          steps.audit.outcome == 'success' &&
+          steps.format.outcome == 'success' &&
+          steps.lint.outcome == 'success' &&
+          steps.unit_test.outcome == 'success' &&
+          steps.build.outcome == 'success'
+        run: |
+          PR_BASE=$(gh pr view "${{ github.event.pull_request.number }}" --json baseRefName --jq '.baseRefName')
+          if [ "$PR_BASE" != "main" ]; then
+            echo "❌ Error: PR base is $PR_BASE, not main"
+            exit 1
+          fi
+          echo "✅ PR base is main"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Auto merge PR to main (Success)
+        if: |
+          steps.audit.outcome == 'success' &&
+          steps.format.outcome == 'success' &&
+          steps.lint.outcome == 'success' &&
+          steps.unit_test.outcome == 'success' &&
+          steps.build.outcome == 'success'
+        run: gh pr merge "${{ github.event.pull_request.number }}" --squash --delete-branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Discord 알림 (성공)
+        if: |
+          steps.audit.outcome == 'success' &&
+          steps.format.outcome == 'success' &&
+          steps.lint.outcome == 'success' &&
+          steps.unit_test.outcome == 'success' &&
+          steps.build.outcome == 'success'
+        run: |
+          COV_DETAIL="Statements: ${{ steps.coverage_data.outputs.pct }}%\nBranches: ${{ steps.coverage_data.outputs.branch }}%\nFunctions: ${{ steps.coverage_data.outputs.funcs }}%\nLines: ${{ steps.coverage_data.outputs.lines }}%"
+
+          FIELDS=$(jq -n \
+            --arg branch "${{ env.BRANCH_NAME }}" \
+            --arg pr_title "[#${{ env.PR_NUMBER }}] ${{ env.PR_TITLE }}" \
+            --arg pr_url "${{ env.PR_URL }}" \
+            --arg actor "${{ github.actor }}" \
+            --arg cov   "$COV_DETAIL" \
+            --arg report_url "${{ env.REPORT_URL }}" \
+            '[
+              {"name": "브랜치",  "value": $branch, "inline": true},
+              {"name": "PR",      "value": ("[" + $pr_title + "](" + $pr_url + ")"), "inline": true},
+              {"name": "작성자",  "value": $actor,  "inline": true},
+              {"name": "Format",  "value": "✅ 성공", "inline": true},
+              {"name": "Lint",    "value": "✅ 성공", "inline": true},
+              {"name": "Test",    "value": "✅ 성공", "inline": true},
+              {"name": "Build",   "value": "✅ 성공", "inline": true},
+              {"name": "Security Audit", "value": "✅ 성공", "inline": true},
+              {"name": "Allure 리포트", "value": ("[결과 보기](" + $report_url + ")"), "inline": true},
+              {"name": "커버리지 상세", "value": $cov, "inline": false}
+            ]')
+
+          PAYLOAD=$(jq -n \
+            --argjson fields "$FIELDS" \
+            --arg pure_title "${{ env.PR_TITLE }}" \
+            --arg color "${{ steps.coverage_data.outputs.color }}" \
+            --arg url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            '{
+              "embeds": [{
+                "title": "🚀 [LAB-MANAGER-FRONT] [MAIN 배포 성공] \($pure_title)",
+                "description": "모든 검사를 통과하여 main 브랜치로 머지 및 배포 준비가 완료되었습니다.",
+                "color": ($color | tonumber),
+                "fields": $fields,
+                "url": $url
+              }]
+            }')
+
+          curl -X POST -H "Content-Type: application/json" -d "$PAYLOAD" ${{ secrets.DISCORD_PR_URL }}
+
+      - name: Fail workflow if checks failed
+        if: |
+          steps.audit.outcome == 'failure' ||
+          steps.format.outcome == 'failure' ||
+          steps.lint.outcome == 'failure' ||
+          steps.unit_test.outcome == 'failure' ||
+          steps.build.outcome == 'failure'
+        run: exit 1

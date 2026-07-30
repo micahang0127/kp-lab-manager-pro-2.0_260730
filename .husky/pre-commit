@@ -1,0 +1,38 @@
+#!/bin/sh
+
+echo "🔍 Checking code style, types, and tests..."
+
+# 1. lint-staged로 Staging 파일들만 포맷팅 & 린트 수정 (빠른 처리)
+echo ""
+echo "📋 Auto-fixing staged files with Prettier and ESLint..."
+npx lint-staged
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "❌ Auto-fix failed!"
+  exit 1
+fi
+
+# 2. 타입 체크
+echo ""
+echo "📋 Checking TypeScript types..."
+pnpm type-check
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "❌ TypeScript errors found!"
+  echo "💡 Fix: Check the errors above and fix them manually"
+  exit 1
+fi
+
+# 3. 최종 린트 검사 (자동 수정 후 남은 에러 확인)
+echo ""
+echo "📋 Running final ESLint check..."
+pnpm lint
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "❌ Linting errors found that couldn't be auto-fixed!"
+  echo "💡 Fix: Check the errors above and fix them manually"
+  exit 1
+fi
+
+echo ""
+echo "✅ All pre-commit checks passed!"

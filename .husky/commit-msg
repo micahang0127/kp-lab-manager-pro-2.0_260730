@@ -1,0 +1,26 @@
+#!/usr/bin/env sh
+# ============================================
+# commit-msg 훅: 커밋 메시지 검증
+# ============================================
+#
+# 포맷 규칙:
+#   type: description [refs #123]
+#   - type: feat, update, fix, docs, style, refactor, test, chore (소문자 필수)
+#   - description: 필수 (빈 메시지 불가)
+#   - refs: 선택사항 (레드마인 이슈 번호)
+#
+# 성공 예시:
+#   ✅ feat: 로그인 기능 추가
+#   ✅ test: 테스트 진행함
+#   ✅ fix: 버그 수정 refs #123
+#
+# 실패 예시:
+#   ❌ Feat: 대문자 사용
+#   ❌ awesome: 허용되지 않는 타입
+#   ❌ feat: (설명 없음)
+#
+# TODO: Windows pnpm 환경 안정화 후 commitlint 활성화
+# 현재는 커밋 메시지 포맷 검증이 disabled 상태입니다.
+# 커밋 메시지는 위 규칙을 수동으로 준수해주세요.
+
+exit 0
