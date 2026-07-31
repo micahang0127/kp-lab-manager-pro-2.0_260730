@@ -1,5 +1,0 @@
-{
-  "permissions": {
-    "allow": ["Bash(getent group *)", "Bash(echo \"EXIT_CODE=$?\")"]
-  }
-}
