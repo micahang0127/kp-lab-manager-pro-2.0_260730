@@ -9,6 +9,11 @@ export default defineConfig({
     'process': JSON.stringify({ env: {} }),
   },
   plugins: [tanstackRouter(), react()],
+  optimizeDeps: {
+    // Ketcher는 KetcherLoader를 통해 지연 로드되지만, esbuild 스캐너가 동적 import를
+    // 따라가 사전번들링 대상에 포함시켜 dev 서버 최초 기동이 느려짐 — 제외 처리
+    exclude: ['ketcher-react', 'ketcher-standalone'],
+  },
   build: {
     chunkSizeWarningLimit: 2000,
     rollupOptions: {
