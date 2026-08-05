@@ -1,0 +1,51 @@
+name: PR Main Guard
+
+# main 브랜치에는 dev 브랜치에서만 PR을 생성할 수 있도록 제한한다.
+# GitHub은 PR 생성 자체를 막는 기능이 없으므로, 생성/갱신 시점에 감지해서 즉시 닫는 방식으로 처리한다.
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - edited
+      - synchronize
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  guard:
+    if: github.head_ref != 'dev'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Comment and close invalid PR
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const headRef = context.payload.pull_request.head.ref;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `## 🚫 잘못된 소스 브랜치의 PR
+
+              \`main\` 브랜치로는 \`dev\` 브랜치에서 생성한 PR만 허용됩니다.
+
+              현재 소스 브랜치: \`${headRef}\`
+
+              \`dev\` 브랜치를 통해 다시 PR을 생성해주세요. 이 PR은 자동으로 닫힙니다.`,
+            });
+
+            await github.rest.pulls.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+              state: 'closed',
+            });
