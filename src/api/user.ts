@@ -11,6 +11,18 @@ export interface SignupRequest {
   email: string
   password: string
   name: string
+  phoneNumber: string
+  agreeTerms: boolean
+  agreePrivacy: boolean
+  agreeMarketingEmail: boolean
+  agreeMarketingSms: boolean
+  // [NOTE] 사업자등록 정보 (사업자등록증 파일은 전송하지 않음)
+  corporateName: string
+  representativeName: string
+  businessRegistrationNumber: string
+  businessAddress: string
+  businessType: string // 업태
+  businessItem: string // 업종
 }
 
 export interface LoginRequest {
@@ -41,9 +53,9 @@ export interface ChangePasswordRequest {
 
 // ─── API ─────────────────────────────────────────────────────────────────────
 
-/** 회원가입 */
+/** 회원가입 (개인정보 + 사업자등록 정보 텍스트 필드. 사업자등록증 파일은 전송하지 않음) — 인증 불필요(skipAuth) */
 export const signup = (body: SignupRequest): Promise<ApiResponse<boolean>> =>
-  api.post('/auth/signup', body)
+  api.post('/auth/signup', body, { skipAuth: true })
 
 /** 로그인 — 인증 불필요(skipAuth), KPMFP 헤더로 핑거프린트 전송 */
 export const login = (

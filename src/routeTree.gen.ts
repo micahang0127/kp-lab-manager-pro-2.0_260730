@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as RegisterRouteImport } from './routes/register'
 import { Route as MainRouteImport } from './routes/main'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as IndexRouteImport } from './routes/index'
@@ -23,6 +24,11 @@ import { Route as ItemsIncomingPendingRouteImport } from './routes/items/incomin
 import { Route as InstitutionLocationRouteImport } from './routes/institution/location'
 import { Route as InstitutionInfoRouteImport } from './routes/institution/info'
 
+const RegisterRoute = RegisterRouteImport.update({
+  id: '/register',
+  path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MainRoute = MainRouteImport.update({
   id: '/main',
   path: '/main',
@@ -93,6 +99,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/main': typeof MainRoute
+  '/register': typeof RegisterRoute
   '/institution/info': typeof InstitutionInfoRoute
   '/institution/location': typeof InstitutionLocationRoute
   '/items/incoming-pending': typeof ItemsIncomingPendingRoute
@@ -108,6 +115,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/main': typeof MainRoute
+  '/register': typeof RegisterRoute
   '/institution/info': typeof InstitutionInfoRoute
   '/institution/location': typeof InstitutionLocationRoute
   '/items/incoming-pending': typeof ItemsIncomingPendingRoute
@@ -124,6 +132,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/main': typeof MainRoute
+  '/register': typeof RegisterRoute
   '/institution/info': typeof InstitutionInfoRoute
   '/institution/location': typeof InstitutionLocationRoute
   '/items/incoming-pending': typeof ItemsIncomingPendingRoute
@@ -141,6 +150,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/main'
+    | '/register'
     | '/institution/info'
     | '/institution/location'
     | '/items/incoming-pending'
@@ -156,6 +166,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/main'
+    | '/register'
     | '/institution/info'
     | '/institution/location'
     | '/items/incoming-pending'
@@ -171,6 +182,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/main'
+    | '/register'
     | '/institution/info'
     | '/institution/location'
     | '/items/incoming-pending'
@@ -187,6 +199,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoginRoute: typeof LoginRoute
   MainRoute: typeof MainRoute
+  RegisterRoute: typeof RegisterRoute
   InstitutionInfoRoute: typeof InstitutionInfoRoute
   InstitutionLocationRoute: typeof InstitutionLocationRoute
   ItemsIncomingPendingRoute: typeof ItemsIncomingPendingRoute
@@ -201,6 +214,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/register': {
+      id: '/register'
+      path: '/register'
+      fullPath: '/register'
+      preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/main': {
       id: '/main'
       path: '/main'
@@ -299,6 +319,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoginRoute: LoginRoute,
   MainRoute: MainRoute,
+  RegisterRoute: RegisterRoute,
   InstitutionInfoRoute: InstitutionInfoRoute,
   InstitutionLocationRoute: InstitutionLocationRoute,
   ItemsIncomingPendingRoute: ItemsIncomingPendingRoute,

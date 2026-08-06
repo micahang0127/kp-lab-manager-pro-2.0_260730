@@ -145,9 +145,56 @@ describe('signup API', () => {
       email: 'newuser@test.com',
       password: 'password123',
       name: '새사용자',
+      phoneNumber: '010-1234-5678',
+      agreeTerms: true,
+      agreePrivacy: true,
+      agreeMarketingEmail: false,
+      agreeMarketingSms: false,
+      corporateName: '(주)케이피랩',
+      representativeName: '홍길동',
+      businessRegistrationNumber: '123-45-67890',
+      businessAddress: '서울 강남구 테헤란로 1',
+      businessType: '제조업',
+      businessItem: '화학제품',
     })
     expect(result.statusCode).toBe(200)
     expect(result.data).toBe(true)
+  })
+
+  it('사업자등록 정보 필드가 요청 body에 포함된다', async () => {
+    let capturedBody: Record<string, unknown> | null = null
+    server.use(
+      http.post('*/auth/signup', async ({ request }) => {
+        capturedBody = (await request.json()) as Record<string, unknown>
+        return HttpResponse.json({ statusCode: 200, data: true, error: [] })
+      })
+    )
+
+    await signup({
+      email: 'newuser@test.com',
+      password: 'password123',
+      name: '새사용자',
+      phoneNumber: '010-1234-5678',
+      agreeTerms: true,
+      agreePrivacy: true,
+      agreeMarketingEmail: false,
+      agreeMarketingSms: false,
+      corporateName: '(주)케이피랩',
+      representativeName: '홍길동',
+      businessRegistrationNumber: '123-45-67890',
+      businessAddress: '서울 강남구 테헤란로 1',
+      businessType: '제조업',
+      businessItem: '화학제품',
+    })
+
+    expect(capturedBody).toMatchObject({
+      corporateName: '(주)케이피랩',
+      representativeName: '홍길동',
+      businessRegistrationNumber: '123-45-67890',
+      businessAddress: '서울 강남구 테헤란로 1',
+      businessType: '제조업',
+      businessItem: '화학제품',
+    })
   })
 
   it('중복 이메일로 가입하면 에러를 던진다', async () => {
@@ -169,6 +216,17 @@ describe('signup API', () => {
         email: 'exists@test.com',
         password: 'password123',
         name: '사용자',
+        phoneNumber: '010-1234-5678',
+        agreeTerms: true,
+        agreePrivacy: true,
+        agreeMarketingEmail: false,
+        agreeMarketingSms: false,
+        corporateName: '(주)케이피랩',
+        representativeName: '홍길동',
+        businessRegistrationNumber: '123-45-67890',
+        businessAddress: '서울 강남구 테헤란로 1',
+        businessType: '제조업',
+        businessItem: '화학제품',
       })
     ).rejects.toThrow('이미 가입된 이메일입니다.')
   })
@@ -192,8 +250,48 @@ describe('signup API', () => {
         email: 'invalid-email',
         password: '123',
         name: '',
+        phoneNumber: '',
+        agreeTerms: false,
+        agreePrivacy: false,
+        agreeMarketingEmail: false,
+        agreeMarketingSms: false,
+        corporateName: '',
+        representativeName: '',
+        businessRegistrationNumber: '',
+        businessAddress: '',
+        businessType: '',
+        businessItem: '',
       })
     ).rejects.toThrow('입력값이 올바르지 않습니다.')
+  })
+
+  it('회원가입 요청에 Authorization 헤더가 포함되지 않는다', async () => {
+    sessionStorage.setItem('accessToken', 'existing-token')
+    let authHeader: string | null = null
+    server.use(
+      http.post('*/auth/signup', ({ request }) => {
+        authHeader = request.headers.get('Authorization')
+        return HttpResponse.json({ statusCode: 200, data: true, error: [] })
+      })
+    )
+
+    await signup({
+      email: 'newuser@test.com',
+      password: 'password123',
+      name: '새사용자',
+      phoneNumber: '010-1234-5678',
+      agreeTerms: true,
+      agreePrivacy: true,
+      agreeMarketingEmail: false,
+      agreeMarketingSms: false,
+      corporateName: '(주)케이피랩',
+      representativeName: '홍길동',
+      businessRegistrationNumber: '123-45-67890',
+      businessAddress: '서울 강남구 테헤란로 1',
+      businessType: '제조업',
+      businessItem: '화학제품',
+    })
+    expect(authHeader).toBeNull()
   })
 })
 

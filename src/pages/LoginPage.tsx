@@ -1,14 +1,13 @@
 import { Turnstile } from '@marsidev/react-turnstile'
-import * as PortOne from '@portone/browser-sdk/v2'
 import { useMutation } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { useEffect, useRef, useState } from 'react'
 
 import type { ApiResponse } from '../api'
-import { confirmIdentityVerification } from '../api/auth'
 // [TEMP] 26.07.27 백엔드 미연동 — 로그인/OTP API 연동 전까지 주석 처리. 연동 완료 시 주석 해제
 // import { DEVICE_TYPE_WEB, login, otpLogin } from '../api/user'
 import type { LoginData, OtpLoginData } from '../api/user'
+import { FormInput } from '../components/form'
 import { useAuthStore } from '../stores/authStore'
 import { getFingerprint } from '../utils/fingerprint'
 
@@ -47,11 +46,6 @@ export function LoginPage() {
   // OTP 입력 상태
   const [otpCode, setOtpCode] = useState('')
   const [timeLeft, setTimeLeft] = useState(0)
-
-  // 본인인증 상태
-  const [ivPending, setIvPending] = useState(false)
-  const [ivError, setIvError] = useState<string | null>(null)
-  const [ivSuccess, setIvSuccess] = useState(false)
 
   // 핑거프린트 (두 mutation 간 공유)
   const fingerprintRef = useRef<string | null>(null)
@@ -160,44 +154,6 @@ export function LoginPage() {
     otpMutation.mutate({ otpCode, email: step.email })
   }
 
-  const handleIdentityVerification = async () => {
-    setIvPending(true)
-    setIvError(null)
-    setIvSuccess(false)
-
-    const identityVerificationId = `identity-verification-${crypto.randomUUID()}`
-
-    const response = await PortOne.requestIdentityVerification({
-      storeId: import.meta.env.VITE_PORTONE_STORE_ID ?? '',
-      identityVerificationId,
-      channelKey: import.meta.env.VITE_PORTONE_CHANNEL_KEY ?? '',
-      popup: {
-        center: true,
-      },
-    })
-
-    if (response?.code !== undefined) {
-      setIvError(response.message ?? '본인인증에 실패했습니다.')
-      setIvPending(false)
-      return
-    }
-
-    try {
-      const res = await confirmIdentityVerification({ identityVerificationId })
-      if (res.statusCode === 200) {
-        setIvSuccess(true)
-        setIvError(null)
-      }
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : '본인인증 확인 중 오류가 발생했습니다.'
-      setIvError(errorMessage)
-      setIvSuccess(false)
-    } finally {
-      setIvPending(false)
-    }
-  }
-
   // ─── Render ───────────────────────────────────────────────────────────────────
 
   const credentialErrors = loginMutation.error instanceof Error ? [loginMutation.error.message] : []
@@ -222,32 +178,22 @@ export function LoginPage() {
           )}
           {/* 자격증명 폼 */}
           <form className="space-y-4" onSubmit={handleLoginSubmit}>
-            <div>
-              <label htmlFor="email" className="mb-1 block text-sm font-medium text-gray-700">
-                이메일
-              </label>
-              <input
-                id="email"
-                type="email"
-                required
-                value={form.email}
-                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="mb-1 block text-sm font-medium text-gray-700">
-                비밀번호
-              </label>
-              <input
-                id="password"
-                type="password"
-                required
-                value={form.password}
-                onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-                className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none"
-              />
-            </div>
+            <FormInput
+              id="email"
+              label="이메일"
+              type="email"
+              required
+              value={form.email}
+              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+            />
+            <FormInput
+              id="password"
+              label="비밀번호"
+              type="password"
+              required
+              value={form.password}
+              onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+            />
 
             {/* Turnstile 컴포넌트 */}
             <div>
@@ -282,38 +228,17 @@ export function LoginPage() {
             >
               {loginMutation.isPending ? '로그인 중...' : '로그인'}
             </button>
-          </form>
-          {/* 본인인증 피드백 */}
-          {ivError && (
-            <ul
-              role="alert"
-              className="mt-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-600"
+            {/* 회원가입 페이지 이동 */}
+            <button
+              type="button"
+              onClick={() => {
+                void navigate({ to: '/register' })
+              }}
+              className="w-full rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
             >
-              <li>{ivError}</li>
-            </ul>
-          )}
-          {ivSuccess && (
-            <p className="mt-4 rounded border border-green-200 bg-green-50 p-3 text-sm text-green-600">
-              본인인증이 완료되었습니다.
-            </p>
-          )}
-          {/* 구분선 */}
-          <div className="my-6 flex items-center gap-3">
-            <hr className="flex-1 border-gray-200" />
-            <span className="text-xs text-gray-400">또는</span>
-            <hr className="flex-1 border-gray-200" />
-          </div>
-          {/* 본인인증 버튼 */}
-          <button
-            type="button"
-            disabled={ivPending}
-            onClick={() => {
-              void handleIdentityVerification()
-            }}
-            className="w-full rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-          >
-            {ivPending ? '본인인증 중...' : '본인인증'}
-          </button>
+              회원가입
+            </button>
+          </form>
         </>
       ) : (
         <>
@@ -339,21 +264,16 @@ export function LoginPage() {
               {step.email}로 발송된 6자리 인증번호를 입력해주세요.
             </p>
 
-            <div>
-              <label htmlFor="otp-code" className="mb-1 block text-sm font-medium text-gray-700">
-                인증번호
-              </label>
-              <input
-                id="otp-code"
-                type="text"
-                inputMode="numeric"
-                maxLength={6}
-                required
-                value={otpCode}
-                onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                className="w-full rounded border border-gray-300 px-3 py-2 text-center text-sm font-mono tracking-widest focus:border-indigo-500 focus:outline-none"
-              />
-            </div>
+            <FormInput
+              id="otp-code"
+              label="인증번호"
+              inputMode="numeric"
+              maxLength={6}
+              required
+              value={otpCode}
+              onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+              inputClassName="text-center font-mono tracking-widest"
+            />
 
             {/* OTP 타이머 */}
             <div className="text-center text-sm text-gray-600">
