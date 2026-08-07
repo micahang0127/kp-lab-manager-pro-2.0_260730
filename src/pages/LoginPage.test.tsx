@@ -17,10 +17,6 @@ vi.mock('@tanstack/react-router', () => ({
   useNavigate: vi.fn(),
 }))
 
-vi.mock('@portone/browser-sdk/v2', () => ({
-  requestIdentityVerification: vi.fn(),
-}))
-
 vi.mock('../utils/fingerprint', () => ({
   getFingerprint: vi.fn().mockResolvedValue('mock-fingerprint-abc123'),
 }))
@@ -513,162 +509,15 @@ describe('LoginPage', () => {
   //   })
   // })
 
-  // ─── Identity Verification Tests ─────────────────────────────────────────────
+  // ─── Register Navigation Tests ───────────────────────────────────────────────
+  // 본인인증(핸드폰인증) 기능은 회원가입 페이지로 이동됨 — src/components/identityVerification 참고
 
-  describe('본인인증', () => {
-    it('본인인증 SDK 호출이 취소되면 에러를 표시한다', async () => {
-      const { requestIdentityVerification } = await import('@portone/browser-sdk/v2')
-      vi.mocked(requestIdentityVerification).mockResolvedValue({
-        code: 'USER_CANCELLED',
-        message: '사용자가 본인인증을 취소했습니다.',
-      } as any)
-
+  describe('회원가입 이동', () => {
+    it('회원가입 버튼을 클릭하면 /register로 이동한다', async () => {
       render(<LoginPage />)
-      await userEvent.click(screen.getByRole('button', { name: /본인인증/ }))
+      await userEvent.click(screen.getByRole('button', { name: /^회원가입$/ }))
 
-      expect(await screen.findByText(/사용자가 본인인증을 취소했습니다./)).toBeInTheDocument()
-      expect(screen.queryByRole('alert')).toBeInTheDocument()
+      expect(mockNavigate).toHaveBeenCalledWith({ to: '/register' })
     })
-
-    it('본인인증 SDK 호출 중 에러 메시지를 표시한다', async () => {
-      const { requestIdentityVerification } = await import('@portone/browser-sdk/v2')
-      vi.mocked(requestIdentityVerification).mockResolvedValue({
-        code: 'SDK_ERROR',
-        message: 'SDK 오류가 발생했습니다.',
-      } as any)
-
-      render(<LoginPage />)
-      await userEvent.click(screen.getByRole('button', { name: /본인인증/ }))
-
-      expect(await screen.findByText(/SDK 오류가 발생했습니다./)).toBeInTheDocument()
-    })
-
-    // [FUTURE WORK] 백엔드 연동 후 주석 해제
-    // it('본인인증 API 성공 시 성공 메시지를 표시한다', async () => {
-    //   const { requestIdentityVerification } = await import('@portone/browser-sdk/v2')
-    //   vi.mocked(requestIdentityVerification).mockResolvedValue({
-    //     identityVerificationId: 'iv-success-id',
-    //     transactionType: 'IDENTITY_VERIFICATION',
-    //     identityVerificationTxId: 'tx-id',
-    //   } as any)
-    //
-    //   server.use(
-    //     http.post('*/auth/identity-verification', () =>
-    //       HttpResponse.json({
-    //         statusCode: 200,
-    //         data: { identityVerificationId: 'iv-success-id' },
-    //         error: [],
-    //       })
-    //     )
-    //   )
-    //
-    //   render(<LoginPage />)
-    //   await userEvent.click(screen.getByRole('button', { name: /본인인증/ }))
-    //
-    //   expect(await screen.findByText(/본인인증이 완료되었습니다./)).toBeInTheDocument()
-    //   expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-    // })
-    //
-    // it('본인인증 버튼을 클릭하면 SDK를 호출한다', async () => {
-    //   const { requestIdentityVerification } = await import('@portone/browser-sdk/v2')
-    //   vi.mocked(requestIdentityVerification).mockResolvedValue({
-    //     identityVerificationId: 'iv-id',
-    //     transactionType: 'IDENTITY_VERIFICATION',
-    //     identityVerificationTxId: 'tx-id',
-    //   } as any)
-    //
-    //   server.use(
-    //     http.post('*/auth/identity-verification', () =>
-    //       HttpResponse.json({
-    //         statusCode: 200,
-    //         data: { identityVerificationId: 'iv-id' },
-    //         error: [],
-    //       })
-    //     )
-    //   )
-    //
-    //   render(<LoginPage />)
-    //   const ivButton = screen.getByRole('button', { name: /본인인증/ })
-    //
-    //   await userEvent.click(ivButton)
-    //
-    //   expect(requestIdentityVerification).toHaveBeenCalled()
-    //   // 대기하여 act 경고 방지
-    //   await screen.findByText(/본인인증이 완료되었습니다./)
-    // })
-    //
-    // it('본인인증 중에는 버튼이 disabled 상태다', async () => {
-    //   let resolveVerification: () => void = () => {}
-    //   const verificationPromise = new Promise<void>((resolve) => {
-    //     resolveVerification = resolve
-    //   })
-    //
-    //   const { requestIdentityVerification } = await import('@portone/browser-sdk/v2')
-    //   vi.mocked(requestIdentityVerification).mockImplementation(async () => {
-    //     await verificationPromise
-    //     return {
-    //       identityVerificationId: 'iv-id',
-    //       transactionType: 'IDENTITY_VERIFICATION',
-    //       identityVerificationTxId: 'tx-id',
-    //     } as any
-    //   })
-    //
-    //   server.use(
-    //     http.post('*/auth/identity-verification', () =>
-    //       HttpResponse.json({
-    //         statusCode: 200,
-    //         data: { identityVerificationId: 'iv-id' },
-    //         error: [],
-    //       })
-    //     )
-    //   )
-    //
-    //   render(<LoginPage />)
-    //   const ivButton = screen.getByRole('button', { name: /본인인증/ })
-    //
-    //   await userEvent.click(ivButton)
-    //
-    //   expect(ivButton).toBeDisabled()
-    //   expect(ivButton).toHaveTextContent(/본인인증 중/)
-    //
-    //   resolveVerification()
-    //   // 대기하여 act 경고 방지
-    //   await waitFor(() => expect(ivButton).not.toBeDisabled())
-    // })
-    //
-    // it('본인인증은 여러 번 시도할 수 있다', async () => {
-    //   const { requestIdentityVerification } = await import('@portone/browser-sdk/v2')
-    //
-    //   vi.mocked(requestIdentityVerification).mockResolvedValueOnce({
-    //     identityVerificationId: 'iv-success-1',
-    //     transactionType: 'IDENTITY_VERIFICATION',
-    //     identityVerificationTxId: 'tx-id',
-    //   } as any)
-    //
-    //   server.use(
-    //     http.post('*/auth/identity-verification', () =>
-    //       HttpResponse.json({
-    //         statusCode: 200,
-    //         data: { identityVerificationId: 'iv-success-1' },
-    //         error: [],
-    //       })
-    //     )
-    //   )
-    //
-    //   render(<LoginPage />)
-    //   const ivButton = screen.getByRole('button', { name: /본인인증/ })
-    //
-    //   await userEvent.click(ivButton)
-    //   expect(await screen.findByText(/본인인증이 완료되었습니다./)).toBeInTheDocument()
-    //
-    //   vi.mocked(requestIdentityVerification).mockResolvedValueOnce({
-    //     code: 'USER_CANCELLED',
-    //     message: '사용자가 취소했습니다.',
-    //   } as any)
-    //
-    //   await userEvent.click(ivButton)
-    //
-    //   expect(await screen.findByText(/사용자가 취소했습니다./)).toBeInTheDocument()
-    // })
   })
 })
