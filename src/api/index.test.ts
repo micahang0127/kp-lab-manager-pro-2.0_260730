@@ -90,10 +90,16 @@ describe('api client', () => {
     await expect(api.get('/test')).rejects.toThrow('잘못된 요청입니다.')
   })
 
-  it('네트워크 에러를 처리한다', async () => {
+  it('네트워크 에러 시 사용자 친화적인 공통 메시지로 대체한다', async () => {
     server.use(http.get('*/test', () => HttpResponse.error()))
 
-    await expect(api.get('/test')).rejects.toThrow()
+    await expect(api.get('/test')).rejects.toThrow('일시적인 오류가 발생했습니다.')
+  })
+
+  it('응답 본문이 JSON이 아니면 원본 파싱 에러 대신 공통 메시지를 던진다', async () => {
+    server.use(http.get('*/test', () => new HttpResponse('not-json', { status: 200 })))
+
+    await expect(api.get('/test')).rejects.toThrow('일시적인 오류가 발생했습니다.')
   })
 
   it('에러 배열이 비어있으면 기본 에러 메시지를 사용한다', async () => {

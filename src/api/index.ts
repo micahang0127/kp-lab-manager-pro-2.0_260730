@@ -94,10 +94,20 @@ async function request<T>(
     const errorMessage = json.error?.[0] || '알 수 없는 오류가 발생했습니다.'
     throw new ApiError(errorMessage, json.statusCode)
   } catch (err) {
-    if (err instanceof Error) {
+    // ApiError는 백엔드가 사용자에게 보여줄 목적으로 준 메시지이므로 그대로 전달한다.
+    if (err instanceof ApiError) {
       throw err
     }
-    throw new Error('네트워크 오류가 발생했습니다.')
+
+    // 그 외(JSON 파싱 실패, 네트워크 단절, 타임아웃 등)는 브라우저/런타임이 던진
+    // 원본 에러라서 사용자가 이해할 수 없다 — 콘솔에만 남기고 공통 문구로 대체한다.
+    console.error('[API] 요청 처리 중 오류:', err)
+
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      throw new Error('요청 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.')
+    }
+
+    throw new Error('일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요.')
   } finally {
     clearTimeout(timeoutId)
   }
