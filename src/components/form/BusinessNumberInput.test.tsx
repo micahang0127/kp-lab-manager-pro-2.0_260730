@@ -123,4 +123,20 @@ describe('BusinessNumberInput', () => {
 
     expect(screen.getByText('확인되었습니다.')).toHaveClass('text-green-600')
   })
+
+  it('required가 true이면 라벨 옆에 필수 표시가 렌더링된다', () => {
+    const { container } = render(
+      <BusinessNumberInput id="bizNo" label="사업자등록번호" value="" onChange={vi.fn()} required />
+    )
+
+    expect(container.querySelector('span')).toHaveTextContent('사업자등록번호*')
+  })
+
+  it('required가 없으면 필수 표시가 렌더링되지 않는다', () => {
+    const { container } = render(
+      <BusinessNumberInput id="bizNo" label="사업자등록번호" value="" onChange={vi.fn()} />
+    )
+
+    expect(container.querySelector('span')).not.toHaveTextContent('*')
+  })
 })

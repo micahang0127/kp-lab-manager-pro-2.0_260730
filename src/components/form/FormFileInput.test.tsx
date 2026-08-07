@@ -127,4 +127,22 @@ describe('FormFileInput', () => {
 
     expect(screen.queryByText(/필수 안내 문구/)).not.toBeInTheDocument()
   })
+
+  it('required가 true이면 라벨 옆에 필수 표시가 렌더링되고 label 접근성 텍스트는 그대로 유지된다', () => {
+    const { container } = render(
+      <FormFileInput id="license" label="사업자등록증" file={null} onChange={vi.fn()} required />
+    )
+
+    expect(screen.getByLabelText('사업자등록증')).toBeInTheDocument()
+    expect(container.querySelector('label')).toHaveTextContent('사업자등록증')
+    expect(container.textContent).toContain('*')
+  })
+
+  it('required가 없으면 필수 표시가 렌더링되지 않는다', () => {
+    const { container } = render(
+      <FormFileInput id="license" label="사업자등록증" file={null} onChange={vi.fn()} />
+    )
+
+    expect(container.textContent).not.toContain('*')
+  })
 })

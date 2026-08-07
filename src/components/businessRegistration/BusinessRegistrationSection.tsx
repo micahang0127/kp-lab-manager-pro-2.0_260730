@@ -35,6 +35,8 @@ interface BusinessRegistrationSectionProps {
   onChange: Dispatch<SetStateAction<BusinessRegistrationFormValue>>
   /** 섹션 상단 제목 (기본값 '사업자등록 정보') */
   title?: string
+  /** true면 mode와 무관하게 전체 필드를 잠근다 (예: 회원가입 요청 처리 중). 검증 안내 문구 표시 여부는 mode를 그대로 따른다 */
+  disabled?: boolean
 }
 
 // ─── Component ─────────────────────────────────────────────────────────────────
@@ -49,8 +51,9 @@ export function BusinessRegistrationSection({
   value,
   onChange,
   title = '사업자등록 정보',
+  disabled = false,
 }: BusinessRegistrationSectionProps) {
-  const disabled = mode === 'view'
+  const isDisabled = mode === 'view' || disabled
 
   // 사업자등록증 첨부파일 형식·용량 오류 안내. registrationFile은 유효한 파일만 저장되므로 별도 상태로 관리한다.
   const [fileError, setFileError] = useState<string | undefined>(undefined)
@@ -68,7 +71,7 @@ export function BusinessRegistrationSection({
         id="businessRegistrationFile"
         label="사업자등록증"
         required
-        disabled={disabled}
+        disabled={isDisabled}
         accept={BUSINESS_REGISTRATION_FILE_ACCEPT}
         file={value.registrationFile}
         onChange={(file) => {
@@ -92,7 +95,7 @@ export function BusinessRegistrationSection({
         id="corporateName"
         label="법인명"
         required
-        disabled={disabled}
+        disabled={isDisabled}
         maxLength={100}
         value={value.corporateName}
         onChange={(e) => onChange((v) => ({ ...v, corporateName: e.target.value }))}
@@ -102,7 +105,7 @@ export function BusinessRegistrationSection({
         id="representativeName"
         label="대표자명"
         required
-        disabled={disabled}
+        disabled={isDisabled}
         maxLength={50}
         value={value.representativeName}
         onChange={(e) => onChange((v) => ({ ...v, representativeName: e.target.value }))}
@@ -117,7 +120,7 @@ export function BusinessRegistrationSection({
         id="businessRegistrationNumber"
         label="사업자등록번호"
         required
-        disabled={disabled}
+        disabled={isDisabled}
         value={value.registrationNumber}
         onChange={(registrationNumber) => onChange((v) => ({ ...v, registrationNumber }))}
         message={
@@ -129,7 +132,7 @@ export function BusinessRegistrationSection({
         id="businessAddress"
         label="사업장 소재지"
         required
-        disabled={disabled}
+        disabled={isDisabled}
         address={value.address}
         onAddressChange={(address) => onChange((v) => ({ ...v, address }))}
         addressDetail={value.addressDetail}
@@ -140,7 +143,7 @@ export function BusinessRegistrationSection({
         id="businessType"
         label="업태"
         required
-        disabled={disabled}
+        disabled={isDisabled}
         maxLength={50}
         value={value.businessType}
         onChange={(e) => onChange((v) => ({ ...v, businessType: e.target.value }))}
@@ -150,7 +153,7 @@ export function BusinessRegistrationSection({
         id="businessItem"
         label="업종"
         required
-        disabled={disabled}
+        disabled={isDisabled}
         maxLength={50}
         value={value.businessItem}
         onChange={(e) => onChange((v) => ({ ...v, businessItem: e.target.value }))}

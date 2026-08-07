@@ -64,6 +64,7 @@ export function AddressField({
         aria-label="상세주소"
         placeholder="상세주소를 입력해주세요."
         disabled={disabled}
+        maxLength={100}
         value={addressDetail}
         onChange={(e) => onAddressDetailChange(e.target.value)}
         className={DETAIL_INPUT_CLASS_NAME}

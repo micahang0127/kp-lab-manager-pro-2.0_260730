@@ -59,9 +59,22 @@ const BUSINESS_LICENSE_FILE = new File(['dummy'], 'business-license.pdf', {
 })
 
 /** value/onChange를 컴포넌트 스스로 관리하도록 감싸는 테스트 하네스 (controlled 컴포넌트 검증용) */
-function Harness({ mode = 'create' }: { mode?: BusinessRegistrationMode }) {
+function Harness({
+  mode = 'create',
+  disabled,
+}: {
+  mode?: BusinessRegistrationMode
+  disabled?: boolean
+}) {
   const [value, setValue] = useState<BusinessRegistrationFormValue>(EMPTY_VALUE)
-  return <BusinessRegistrationSection mode={mode} value={value} onChange={setValue} />
+  return (
+    <BusinessRegistrationSection
+      mode={mode}
+      value={value}
+      onChange={setValue}
+      disabled={disabled}
+    />
+  )
 }
 
 afterEach(() => {
@@ -167,6 +180,25 @@ describe('BusinessRegistrationSection', () => {
     expect(screen.getByLabelText('업태')).toBeDisabled()
     expect(screen.getByLabelText('업종')).toBeDisabled()
     expect(screen.getByLabelText('상세주소')).toBeDisabled()
+  })
+
+  it("disabled prop이 true이면 mode가 'create'여도 모든 필드가 비활성화된다 (예: 제출 처리 중)", () => {
+    render(<Harness mode="create" disabled />)
+
+    expect(screen.getByLabelText('법인명')).toBeDisabled()
+    expect(screen.getByLabelText('대표자명')).toBeDisabled()
+    expect(screen.getByLabelText('사업자등록번호 앞 3자리')).toBeDisabled()
+    expect(screen.getByLabelText('업태')).toBeDisabled()
+    expect(screen.getByLabelText('업종')).toBeDisabled()
+    expect(screen.getByLabelText('상세주소')).toBeDisabled()
+  })
+
+  it("disabled prop이 true여도 mode가 'create'이면 필수 안내 문구는 그대로 표시된다", () => {
+    render(<Harness mode="create" disabled />)
+
+    expect(
+      screen.getByText('사업자 등록은 조직 등록을 위한 절차로, 필수 진행하셔야 합니다.')
+    ).toBeInTheDocument()
   })
 
   it("mode가 'view'이면 사업자등록증 파일 선택 버튼이 렌더링되지 않는다", () => {

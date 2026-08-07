@@ -3,3 +3,16 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  /* 크롬 등에서 자동완성된 input(이메일 등)에 파란/노란 배경이 강제로 입혀지는 것을 방지 —
+     다른 input과 동일한 흰 배경 유지 */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0 1000px #fff inset;
+    box-shadow: 0 0 0 1000px #fff inset;
+    -webkit-text-fill-color: #111827;
+    transition: background-color 9999s ease-in-out 0s;
+  }
+}

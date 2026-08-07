@@ -2,6 +2,7 @@ import { useRef } from 'react'
 
 import type { FormInputMessageColor } from './messageColor'
 import { MESSAGE_COLOR_CLASS_NAME } from './messageColor'
+import { RequiredMark } from './RequiredMark'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -60,9 +61,12 @@ export function FormFileInput({
   return (
     <div>
       <div className="mb-1 flex items-center justify-between">
-        <label htmlFor={id} className="text-sm font-medium text-gray-700">
-          {label}
-        </label>
+        <div className="flex items-center">
+          <label htmlFor={id} className="text-sm font-medium text-gray-700">
+            {label}
+          </label>
+          {required && <RequiredMark />}
+        </div>
         {labelDescription && <span className="text-xs text-gray-500">{labelDescription}</span>}
       </div>
       <div className="flex items-center gap-2">

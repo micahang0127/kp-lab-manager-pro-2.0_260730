@@ -6,9 +6,10 @@ import type { SignupRequest } from '../api/user'
 import { signup } from '../api/user'
 import type { BusinessRegistrationFormValue } from '../components/businessRegistration'
 import { BusinessRegistrationSection } from '../components/businessRegistration'
-import { FormInput } from '../components/form'
+import { FormCheckbox, FormInput, RequiredMark } from '../components/form'
 import { IdentityVerificationButton } from '../components/identityVerification'
 import {
+  EMAIL_MAX_LENGTH,
   EMAIL_RULE_MESSAGE,
   isValidBusinessNumber,
   isValidEmail,
@@ -173,7 +174,10 @@ export function RegisterPage() {
 
       <form className="space-y-4" onSubmit={handleSubmit}>
         <div>
-          <span className="mb-1 block text-sm font-medium text-gray-700">핸드폰인증</span>
+          <span className="mb-1 flex items-center text-sm font-medium text-gray-700">
+            핸드폰인증
+            <RequiredMark />
+          </span>
           <IdentityVerificationButton
             onVerified={(customer) => {
               // 사전에 입력되어 있던 값은 모두 지우고 인증된 값으로 다시 채운다 (이메일은 제외)
@@ -192,7 +196,7 @@ export function RegisterPage() {
           label="휴대폰번호"
           type="tel"
           required
-          disabled={isVerified}
+          disabled={isVerified || signupMutation.isPending}
           value={form.phoneNumber}
           onChange={(e) => setForm((f) => ({ ...f, phoneNumber: e.target.value }))}
         />
@@ -201,7 +205,7 @@ export function RegisterPage() {
           id="name"
           label="이름"
           required
-          disabled={isVerified}
+          disabled={isVerified || signupMutation.isPending}
           value={form.name}
           onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
         />
@@ -211,7 +215,8 @@ export function RegisterPage() {
           label="이메일"
           type="email"
           required
-          maxLength={254}
+          disabled={signupMutation.isPending}
+          maxLength={EMAIL_MAX_LENGTH}
           value={form.email}
           onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
           message={isEmailInvalid ? EMAIL_RULE_MESSAGE : undefined}
@@ -222,6 +227,7 @@ export function RegisterPage() {
           label="비밀번호"
           type="password"
           required
+          disabled={signupMutation.isPending}
           maxLength={64}
           value={form.password}
           onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
@@ -233,43 +239,42 @@ export function RegisterPage() {
           label="비밀번호 확인"
           type="password"
           required
+          disabled={signupMutation.isPending}
           maxLength={64}
           value={form.confirmPassword}
           onChange={(e) => setForm((f) => ({ ...f, confirmPassword: e.target.value }))}
           message={isConfirmMismatch ? '비밀번호가 일치하지 않습니다.' : undefined}
         />
 
-        <BusinessRegistrationSection mode="create" value={business} onChange={setBusiness} />
+        <BusinessRegistrationSection
+          mode="create"
+          value={business}
+          onChange={setBusiness}
+          disabled={signupMutation.isPending}
+        />
 
         {/* 약관동의 */}
         <div className="space-y-3 rounded border border-gray-200 p-3">
-          <div className="flex items-center gap-2 border-b border-gray-200 pb-2">
-            <input
+          <div className="border-b border-gray-200 pb-2">
+            <FormCheckbox
               id="agree-all"
-              type="checkbox"
+              label="전체 동의"
               checked={isAllAgreed}
-              onChange={(e) => handleToggleAll(e.target.checked)}
-              className="h-4 w-4 rounded border-gray-300"
+              onChange={handleToggleAll}
+              disabled={signupMutation.isPending}
+              labelClassName="text-sm font-medium text-gray-900"
             />
-            <label htmlFor="agree-all" className="text-sm font-medium text-gray-900">
-              전체 동의
-            </label>
           </div>
 
           <div>
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <input
-                  id="agree-terms"
-                  type="checkbox"
-                  checked={agreements.terms}
-                  onChange={(e) => setAgreements((a) => ({ ...a, terms: e.target.checked }))}
-                  className="h-4 w-4 rounded border-gray-300"
-                />
-                <label htmlFor="agree-terms" className="text-sm text-gray-700">
-                  (필수) 이용약관 동의
-                </label>
-              </div>
+              <FormCheckbox
+                id="agree-terms"
+                label="(필수) 이용약관 동의"
+                checked={agreements.terms}
+                onChange={(checked) => setAgreements((a) => ({ ...a, terms: checked }))}
+                disabled={signupMutation.isPending}
+              />
               <button
                 type="button"
                 onClick={() => setOpenTerms((o) => ({ ...o, terms: !o.terms }))}
@@ -287,18 +292,13 @@ export function RegisterPage() {
 
           <div>
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <input
-                  id="agree-privacy"
-                  type="checkbox"
-                  checked={agreements.privacy}
-                  onChange={(e) => setAgreements((a) => ({ ...a, privacy: e.target.checked }))}
-                  className="h-4 w-4 rounded border-gray-300"
-                />
-                <label htmlFor="agree-privacy" className="text-sm text-gray-700">
-                  (필수) 개인정보 수집 및 이용 안내 동의
-                </label>
-              </div>
+              <FormCheckbox
+                id="agree-privacy"
+                label="(필수) 개인정보 수집 및 이용 안내 동의"
+                checked={agreements.privacy}
+                onChange={(checked) => setAgreements((a) => ({ ...a, privacy: checked }))}
+                disabled={signupMutation.isPending}
+              />
               <button
                 type="button"
                 onClick={() => setOpenTerms((o) => ({ ...o, privacy: !o.privacy }))}
@@ -317,32 +317,22 @@ export function RegisterPage() {
           <div>
             <p className="text-sm text-gray-700">[선택] 마케팅 정보 수신 동의</p>
             <div className="mt-1 flex gap-4 pl-1">
-              <div className="flex items-center gap-2">
-                <input
-                  id="agree-marketing-email"
-                  type="checkbox"
-                  checked={agreements.marketingEmail}
-                  onChange={(e) =>
-                    setAgreements((a) => ({ ...a, marketingEmail: e.target.checked }))
-                  }
-                  className="h-4 w-4 rounded border-gray-300"
-                />
-                <label htmlFor="agree-marketing-email" className="text-sm text-gray-600">
-                  이메일 수신
-                </label>
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  id="agree-marketing-sms"
-                  type="checkbox"
-                  checked={agreements.marketingSms}
-                  onChange={(e) => setAgreements((a) => ({ ...a, marketingSms: e.target.checked }))}
-                  className="h-4 w-4 rounded border-gray-300"
-                />
-                <label htmlFor="agree-marketing-sms" className="text-sm text-gray-600">
-                  SMS 수신
-                </label>
-              </div>
+              <FormCheckbox
+                id="agree-marketing-email"
+                label="이메일 수신"
+                checked={agreements.marketingEmail}
+                onChange={(checked) => setAgreements((a) => ({ ...a, marketingEmail: checked }))}
+                disabled={signupMutation.isPending}
+                labelClassName="text-sm text-gray-600"
+              />
+              <FormCheckbox
+                id="agree-marketing-sms"
+                label="SMS 수신"
+                checked={agreements.marketingSms}
+                onChange={(checked) => setAgreements((a) => ({ ...a, marketingSms: checked }))}
+                disabled={signupMutation.isPending}
+                labelClassName="text-sm text-gray-600"
+              />
             </div>
           </div>
         </div>

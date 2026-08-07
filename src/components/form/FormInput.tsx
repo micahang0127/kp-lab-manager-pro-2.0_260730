@@ -1,5 +1,6 @@
 import type { FormInputMessageColor } from './messageColor'
 import { MESSAGE_COLOR_CLASS_NAME } from './messageColor'
+import { RequiredMark } from './RequiredMark'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -65,9 +66,12 @@ export function FormInput({
 
   return (
     <div>
-      <label htmlFor={id} className="mb-1 block text-sm font-medium text-gray-700">
-        {label}
-      </label>
+      <div className="mb-1 flex items-center">
+        <label htmlFor={id} className="text-sm font-medium text-gray-700">
+          {label}
+        </label>
+        {required && <RequiredMark />}
+      </div>
       {addon ? (
         <div className="flex gap-2">
           <div className="flex-1">{inputElement}</div>

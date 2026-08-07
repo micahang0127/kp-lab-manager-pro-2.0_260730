@@ -76,6 +76,24 @@ describe('FormInput', () => {
     expect(input).toHaveClass('text-center', 'font-mono', 'tracking-widest')
   })
 
+  it('required가 true이면 라벨 옆에 필수 표시가 렌더링되고 label 접근성 텍스트는 그대로 유지된다', () => {
+    const { container } = render(
+      <FormInput id="email" label="이메일" value="" onChange={vi.fn()} required />
+    )
+
+    expect(screen.getByLabelText('이메일')).toBeInTheDocument()
+    expect(container.querySelector('label')).toHaveTextContent('이메일')
+    expect(container.textContent).toContain('*')
+  })
+
+  it('required가 없으면 필수 표시가 렌더링되지 않는다', () => {
+    const { container } = render(
+      <FormInput id="email" label="이메일" value="" onChange={vi.fn()} />
+    )
+
+    expect(container.textContent).not.toContain('*')
+  })
+
   it('addon이 주어지면 input과 함께 렌더링된다 (예: 사업장 소재지의 주소검색 버튼)', () => {
     render(
       <FormInput

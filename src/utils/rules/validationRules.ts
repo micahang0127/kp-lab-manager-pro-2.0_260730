@@ -4,6 +4,9 @@ export const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
 
 export const EMAIL_RULE_MESSAGE = '올바른 이메일 형식으로 입력해주세요.'
 
+// RFC 5321 기준 이메일 전체 최대 길이(로컬파트 64자 + '@' + 도메인 255자를 넉넉히 포함)
+export const EMAIL_MAX_LENGTH = 254
+
 /** 이메일이 형식에 맞는지 검사한다 */
 export function isValidEmail(value: string): boolean {
   return EMAIL_REGEX.test(value)

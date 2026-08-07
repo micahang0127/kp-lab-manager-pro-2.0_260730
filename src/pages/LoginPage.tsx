@@ -10,6 +10,7 @@ import type { LoginData, OtpLoginData } from '../api/user'
 import { FormInput } from '../components/form'
 import { useAuthStore } from '../stores/authStore'
 import { getFingerprint } from '../utils/fingerprint'
+import { EMAIL_MAX_LENGTH } from '../utils/rules/validationRules'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -183,6 +184,7 @@ export function LoginPage() {
               label="이메일"
               type="email"
               required
+              maxLength={EMAIL_MAX_LENGTH}
               value={form.email}
               onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
             />

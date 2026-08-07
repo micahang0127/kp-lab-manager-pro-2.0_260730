@@ -2,6 +2,7 @@ import { useRef } from 'react'
 
 import type { FormInputMessageColor } from './messageColor'
 import { MESSAGE_COLOR_CLASS_NAME } from './messageColor'
+import { RequiredMark } from './RequiredMark'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -63,7 +64,10 @@ export function BusinessNumberInput({
 
   return (
     <div>
-      <span className="mb-1 block text-sm font-medium text-gray-700">{label}</span>
+      <span className="mb-1 block text-sm font-medium text-gray-700">
+        {label}
+        {required && <RequiredMark />}
+      </span>
       <div className="flex items-center gap-2">
         <input
           id={id}

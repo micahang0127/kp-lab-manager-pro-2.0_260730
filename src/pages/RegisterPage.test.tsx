@@ -100,9 +100,19 @@ describe('RegisterPage', () => {
     cleanup()
   })
 
+  it('핸드폰인증 라벨 옆에도 다른 필수 입력 항목처럼 필수 표시가 렌더링된다', () => {
+    render(<RegisterPage />)
+    expect(screen.getByText('핸드폰인증').parentElement).toHaveTextContent('핸드폰인증*')
+  })
+
   it('필수 필드를 입력하지 않으면 제출 버튼이 비활성화된다', () => {
     render(<RegisterPage />)
     expect(screen.getByRole('button', { name: /^회원가입$/ })).toBeDisabled()
+  })
+
+  it('이메일은 254자를 초과하여 입력할 수 없다 (RFC 5321 기준)', () => {
+    render(<RegisterPage />)
+    expect(screen.getByLabelText(/^이메일$/)).toHaveAttribute('maxLength', '254')
   })
 
   it('비밀번호 규칙을 충족하지 못하면 안내 문구를 표시한다', async () => {
@@ -220,6 +230,37 @@ describe('RegisterPage', () => {
     // 이메일은 인증 대상이 아니므로 입력값이 그대로 유지되고 계속 수정 가능하다
     expect(emailInput.value).toBe('temp@test.com')
     expect(emailInput).not.toBeDisabled()
+  })
+
+  it('회원가입 요청이 진행 중일 때는 제출 버튼과 폼 전체 필드가 잠긴다', async () => {
+    let resolveSignup: () => void = () => {}
+    const signupPromise = new Promise<void>((resolve) => {
+      resolveSignup = resolve
+    })
+    server.use(
+      http.post('*/auth/signup', async () => {
+        await signupPromise
+        return HttpResponse.json({ statusCode: 200, data: true, error: [] })
+      })
+    )
+
+    render(<RegisterPage />)
+    await fillValidForm()
+
+    const submitButton = screen.getByRole('button', { name: /^회원가입$/ })
+    await userEvent.click(submitButton)
+
+    expect(submitButton).toBeDisabled()
+    expect(submitButton).toHaveTextContent(/가입 중/)
+    expect(screen.getByLabelText(/^이메일$/)).toBeDisabled()
+    expect(screen.getByLabelText(/^비밀번호$/)).toBeDisabled()
+    expect(screen.getByLabelText(/비밀번호 확인/)).toBeDisabled()
+    expect(screen.getByLabelText('법인명')).toBeDisabled()
+    expect(screen.getByLabelText(/이용약관 동의/)).toBeDisabled()
+
+    resolveSignup()
+    // 회원가입 완료까지 대기하여 act 경고 방지
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith({ to: '/login' }))
   })
 
   it('모든 값을 올바르게 입력하면 회원가입에 성공하여 /login으로 이동한다', async () => {

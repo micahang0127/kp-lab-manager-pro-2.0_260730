@@ -119,6 +119,21 @@ describe('AddressField', () => {
     expect(screen.queryByText('address-search-mock')).not.toBeInTheDocument()
   })
 
+  it('상세주소는 100자를 초과하여 입력할 수 없다', () => {
+    render(
+      <AddressField
+        id="businessAddress"
+        label="사업장 소재지"
+        address=""
+        onAddressChange={vi.fn()}
+        addressDetail=""
+        onAddressDetailChange={vi.fn()}
+      />
+    )
+
+    expect(screen.getByLabelText('상세주소')).toHaveAttribute('maxLength', '100')
+  })
+
   it('disabled 시 상세주소 입력창도 잠긴다', () => {
     render(
       <AddressField
