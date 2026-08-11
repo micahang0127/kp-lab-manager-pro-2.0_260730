@@ -14,15 +14,21 @@ import { Route as MainRouteImport } from './routes/main'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ZustandIndexRouteImport } from './routes/zustand/index'
+import { Route as SettingsStorageLocationRouteImport } from './routes/settings/storage-location'
+import { Route as SettingsProcessRouteImport } from './routes/settings/process'
+import { Route as SettingsMemberRouteImport } from './routes/settings/member'
+import { Route as SettingsInventoryConfigRouteImport } from './routes/settings/inventory-config'
+import { Route as SettingsGroupRouteImport } from './routes/settings/group'
+import { Route as SettingsCategoryRouteImport } from './routes/settings/category'
 import { Route as SafetySpecialSubstanceRouteImport } from './routes/safety/special-substance'
 import { Route as SafetyMsdsRouteImport } from './routes/safety/msds'
 import { Route as SafetyHazardousQuantityRouteImport } from './routes/safety/hazardous-quantity'
 import { Route as SafetyHazardousChemicalRouteImport } from './routes/safety/hazardous-chemical'
+import { Route as ReservationPreparingRouteImport } from './routes/reservation/preparing'
 import { Route as ItemsRegisterRouteImport } from './routes/items/register'
 import { Route as ItemsPhotoPendingRouteImport } from './routes/items/photo-pending'
 import { Route as ItemsIncomingPendingRouteImport } from './routes/items/incoming-pending'
-import { Route as InstitutionLocationRouteImport } from './routes/institution/location'
-import { Route as InstitutionInfoRouteImport } from './routes/institution/info'
+import { Route as InventoryPreparingRouteImport } from './routes/inventory/preparing'
 
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
@@ -49,6 +55,36 @@ const ZustandIndexRoute = ZustandIndexRouteImport.update({
   path: '/zustand/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsStorageLocationRoute = SettingsStorageLocationRouteImport.update({
+  id: '/settings/storage-location',
+  path: '/settings/storage-location',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsProcessRoute = SettingsProcessRouteImport.update({
+  id: '/settings/process',
+  path: '/settings/process',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsMemberRoute = SettingsMemberRouteImport.update({
+  id: '/settings/member',
+  path: '/settings/member',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsInventoryConfigRoute = SettingsInventoryConfigRouteImport.update({
+  id: '/settings/inventory-config',
+  path: '/settings/inventory-config',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsGroupRoute = SettingsGroupRouteImport.update({
+  id: '/settings/group',
+  path: '/settings/group',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsCategoryRoute = SettingsCategoryRouteImport.update({
+  id: '/settings/category',
+  path: '/settings/category',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SafetySpecialSubstanceRoute = SafetySpecialSubstanceRouteImport.update({
   id: '/safety/special-substance',
   path: '/safety/special-substance',
@@ -69,6 +105,11 @@ const SafetyHazardousChemicalRoute = SafetyHazardousChemicalRouteImport.update({
   path: '/safety/hazardous-chemical',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReservationPreparingRoute = ReservationPreparingRouteImport.update({
+  id: '/reservation/preparing',
+  path: '/reservation/preparing',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ItemsRegisterRoute = ItemsRegisterRouteImport.update({
   id: '/items/register',
   path: '/items/register',
@@ -84,14 +125,9 @@ const ItemsIncomingPendingRoute = ItemsIncomingPendingRouteImport.update({
   path: '/items/incoming-pending',
   getParentRoute: () => rootRouteImport,
 } as any)
-const InstitutionLocationRoute = InstitutionLocationRouteImport.update({
-  id: '/institution/location',
-  path: '/institution/location',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const InstitutionInfoRoute = InstitutionInfoRouteImport.update({
-  id: '/institution/info',
-  path: '/institution/info',
+const InventoryPreparingRoute = InventoryPreparingRouteImport.update({
+  id: '/inventory/preparing',
+  path: '/inventory/preparing',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -100,15 +136,21 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/main': typeof MainRoute
   '/register': typeof RegisterRoute
-  '/institution/info': typeof InstitutionInfoRoute
-  '/institution/location': typeof InstitutionLocationRoute
+  '/inventory/preparing': typeof InventoryPreparingRoute
   '/items/incoming-pending': typeof ItemsIncomingPendingRoute
   '/items/photo-pending': typeof ItemsPhotoPendingRoute
   '/items/register': typeof ItemsRegisterRoute
+  '/reservation/preparing': typeof ReservationPreparingRoute
   '/safety/hazardous-chemical': typeof SafetyHazardousChemicalRoute
   '/safety/hazardous-quantity': typeof SafetyHazardousQuantityRoute
   '/safety/msds': typeof SafetyMsdsRoute
   '/safety/special-substance': typeof SafetySpecialSubstanceRoute
+  '/settings/category': typeof SettingsCategoryRoute
+  '/settings/group': typeof SettingsGroupRoute
+  '/settings/inventory-config': typeof SettingsInventoryConfigRoute
+  '/settings/member': typeof SettingsMemberRoute
+  '/settings/process': typeof SettingsProcessRoute
+  '/settings/storage-location': typeof SettingsStorageLocationRoute
   '/zustand/': typeof ZustandIndexRoute
 }
 export interface FileRoutesByTo {
@@ -116,15 +158,21 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/main': typeof MainRoute
   '/register': typeof RegisterRoute
-  '/institution/info': typeof InstitutionInfoRoute
-  '/institution/location': typeof InstitutionLocationRoute
+  '/inventory/preparing': typeof InventoryPreparingRoute
   '/items/incoming-pending': typeof ItemsIncomingPendingRoute
   '/items/photo-pending': typeof ItemsPhotoPendingRoute
   '/items/register': typeof ItemsRegisterRoute
+  '/reservation/preparing': typeof ReservationPreparingRoute
   '/safety/hazardous-chemical': typeof SafetyHazardousChemicalRoute
   '/safety/hazardous-quantity': typeof SafetyHazardousQuantityRoute
   '/safety/msds': typeof SafetyMsdsRoute
   '/safety/special-substance': typeof SafetySpecialSubstanceRoute
+  '/settings/category': typeof SettingsCategoryRoute
+  '/settings/group': typeof SettingsGroupRoute
+  '/settings/inventory-config': typeof SettingsInventoryConfigRoute
+  '/settings/member': typeof SettingsMemberRoute
+  '/settings/process': typeof SettingsProcessRoute
+  '/settings/storage-location': typeof SettingsStorageLocationRoute
   '/zustand': typeof ZustandIndexRoute
 }
 export interface FileRoutesById {
@@ -133,15 +181,21 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/main': typeof MainRoute
   '/register': typeof RegisterRoute
-  '/institution/info': typeof InstitutionInfoRoute
-  '/institution/location': typeof InstitutionLocationRoute
+  '/inventory/preparing': typeof InventoryPreparingRoute
   '/items/incoming-pending': typeof ItemsIncomingPendingRoute
   '/items/photo-pending': typeof ItemsPhotoPendingRoute
   '/items/register': typeof ItemsRegisterRoute
+  '/reservation/preparing': typeof ReservationPreparingRoute
   '/safety/hazardous-chemical': typeof SafetyHazardousChemicalRoute
   '/safety/hazardous-quantity': typeof SafetyHazardousQuantityRoute
   '/safety/msds': typeof SafetyMsdsRoute
   '/safety/special-substance': typeof SafetySpecialSubstanceRoute
+  '/settings/category': typeof SettingsCategoryRoute
+  '/settings/group': typeof SettingsGroupRoute
+  '/settings/inventory-config': typeof SettingsInventoryConfigRoute
+  '/settings/member': typeof SettingsMemberRoute
+  '/settings/process': typeof SettingsProcessRoute
+  '/settings/storage-location': typeof SettingsStorageLocationRoute
   '/zustand/': typeof ZustandIndexRoute
 }
 export interface FileRouteTypes {
@@ -151,15 +205,21 @@ export interface FileRouteTypes {
     | '/login'
     | '/main'
     | '/register'
-    | '/institution/info'
-    | '/institution/location'
+    | '/inventory/preparing'
     | '/items/incoming-pending'
     | '/items/photo-pending'
     | '/items/register'
+    | '/reservation/preparing'
     | '/safety/hazardous-chemical'
     | '/safety/hazardous-quantity'
     | '/safety/msds'
     | '/safety/special-substance'
+    | '/settings/category'
+    | '/settings/group'
+    | '/settings/inventory-config'
+    | '/settings/member'
+    | '/settings/process'
+    | '/settings/storage-location'
     | '/zustand/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -167,15 +227,21 @@ export interface FileRouteTypes {
     | '/login'
     | '/main'
     | '/register'
-    | '/institution/info'
-    | '/institution/location'
+    | '/inventory/preparing'
     | '/items/incoming-pending'
     | '/items/photo-pending'
     | '/items/register'
+    | '/reservation/preparing'
     | '/safety/hazardous-chemical'
     | '/safety/hazardous-quantity'
     | '/safety/msds'
     | '/safety/special-substance'
+    | '/settings/category'
+    | '/settings/group'
+    | '/settings/inventory-config'
+    | '/settings/member'
+    | '/settings/process'
+    | '/settings/storage-location'
     | '/zustand'
   id:
     | '__root__'
@@ -183,15 +249,21 @@ export interface FileRouteTypes {
     | '/login'
     | '/main'
     | '/register'
-    | '/institution/info'
-    | '/institution/location'
+    | '/inventory/preparing'
     | '/items/incoming-pending'
     | '/items/photo-pending'
     | '/items/register'
+    | '/reservation/preparing'
     | '/safety/hazardous-chemical'
     | '/safety/hazardous-quantity'
     | '/safety/msds'
     | '/safety/special-substance'
+    | '/settings/category'
+    | '/settings/group'
+    | '/settings/inventory-config'
+    | '/settings/member'
+    | '/settings/process'
+    | '/settings/storage-location'
     | '/zustand/'
   fileRoutesById: FileRoutesById
 }
@@ -200,15 +272,21 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   MainRoute: typeof MainRoute
   RegisterRoute: typeof RegisterRoute
-  InstitutionInfoRoute: typeof InstitutionInfoRoute
-  InstitutionLocationRoute: typeof InstitutionLocationRoute
+  InventoryPreparingRoute: typeof InventoryPreparingRoute
   ItemsIncomingPendingRoute: typeof ItemsIncomingPendingRoute
   ItemsPhotoPendingRoute: typeof ItemsPhotoPendingRoute
   ItemsRegisterRoute: typeof ItemsRegisterRoute
+  ReservationPreparingRoute: typeof ReservationPreparingRoute
   SafetyHazardousChemicalRoute: typeof SafetyHazardousChemicalRoute
   SafetyHazardousQuantityRoute: typeof SafetyHazardousQuantityRoute
   SafetyMsdsRoute: typeof SafetyMsdsRoute
   SafetySpecialSubstanceRoute: typeof SafetySpecialSubstanceRoute
+  SettingsCategoryRoute: typeof SettingsCategoryRoute
+  SettingsGroupRoute: typeof SettingsGroupRoute
+  SettingsInventoryConfigRoute: typeof SettingsInventoryConfigRoute
+  SettingsMemberRoute: typeof SettingsMemberRoute
+  SettingsProcessRoute: typeof SettingsProcessRoute
+  SettingsStorageLocationRoute: typeof SettingsStorageLocationRoute
   ZustandIndexRoute: typeof ZustandIndexRoute
 }
 
@@ -249,6 +327,48 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ZustandIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings/storage-location': {
+      id: '/settings/storage-location'
+      path: '/settings/storage-location'
+      fullPath: '/settings/storage-location'
+      preLoaderRoute: typeof SettingsStorageLocationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/process': {
+      id: '/settings/process'
+      path: '/settings/process'
+      fullPath: '/settings/process'
+      preLoaderRoute: typeof SettingsProcessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/member': {
+      id: '/settings/member'
+      path: '/settings/member'
+      fullPath: '/settings/member'
+      preLoaderRoute: typeof SettingsMemberRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/inventory-config': {
+      id: '/settings/inventory-config'
+      path: '/settings/inventory-config'
+      fullPath: '/settings/inventory-config'
+      preLoaderRoute: typeof SettingsInventoryConfigRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/group': {
+      id: '/settings/group'
+      path: '/settings/group'
+      fullPath: '/settings/group'
+      preLoaderRoute: typeof SettingsGroupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/category': {
+      id: '/settings/category'
+      path: '/settings/category'
+      fullPath: '/settings/category'
+      preLoaderRoute: typeof SettingsCategoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/safety/special-substance': {
       id: '/safety/special-substance'
       path: '/safety/special-substance'
@@ -277,6 +397,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SafetyHazardousChemicalRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reservation/preparing': {
+      id: '/reservation/preparing'
+      path: '/reservation/preparing'
+      fullPath: '/reservation/preparing'
+      preLoaderRoute: typeof ReservationPreparingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/items/register': {
       id: '/items/register'
       path: '/items/register'
@@ -298,18 +425,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ItemsIncomingPendingRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/institution/location': {
-      id: '/institution/location'
-      path: '/institution/location'
-      fullPath: '/institution/location'
-      preLoaderRoute: typeof InstitutionLocationRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/institution/info': {
-      id: '/institution/info'
-      path: '/institution/info'
-      fullPath: '/institution/info'
-      preLoaderRoute: typeof InstitutionInfoRouteImport
+    '/inventory/preparing': {
+      id: '/inventory/preparing'
+      path: '/inventory/preparing'
+      fullPath: '/inventory/preparing'
+      preLoaderRoute: typeof InventoryPreparingRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -320,15 +440,21 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   MainRoute: MainRoute,
   RegisterRoute: RegisterRoute,
-  InstitutionInfoRoute: InstitutionInfoRoute,
-  InstitutionLocationRoute: InstitutionLocationRoute,
+  InventoryPreparingRoute: InventoryPreparingRoute,
   ItemsIncomingPendingRoute: ItemsIncomingPendingRoute,
   ItemsPhotoPendingRoute: ItemsPhotoPendingRoute,
   ItemsRegisterRoute: ItemsRegisterRoute,
+  ReservationPreparingRoute: ReservationPreparingRoute,
   SafetyHazardousChemicalRoute: SafetyHazardousChemicalRoute,
   SafetyHazardousQuantityRoute: SafetyHazardousQuantityRoute,
   SafetyMsdsRoute: SafetyMsdsRoute,
   SafetySpecialSubstanceRoute: SafetySpecialSubstanceRoute,
+  SettingsCategoryRoute: SettingsCategoryRoute,
+  SettingsGroupRoute: SettingsGroupRoute,
+  SettingsInventoryConfigRoute: SettingsInventoryConfigRoute,
+  SettingsMemberRoute: SettingsMemberRoute,
+  SettingsProcessRoute: SettingsProcessRoute,
+  SettingsStorageLocationRoute: SettingsStorageLocationRoute,
   ZustandIndexRoute: ZustandIndexRoute,
 }
 export const routeTree = rootRouteImport
