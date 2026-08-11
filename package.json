@@ -51,6 +51,7 @@
   "pnpm": {
     "overrides": {
       "flatted": ">=3.4.2",
+      "nanoid": ">=3.3.17",
       "picomatch": ">=4.0.4",
       "minimatch": "^10.2.4",
       "immutable": "^5.1.8",
