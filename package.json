@@ -7,8 +7,7 @@
   "scripts": {
     "preinstall": "npx only-allow pnpm",
     "dev": "vite",
-    "build": "tsc -b && pnpm copy:ketcher-assets && vite build",
-    "copy:ketcher-assets": "node scripts/copy-ketcher-assets.js",
+    "build": "tsc -b && vite build",
     "build:dev": "vite build --mode development",
     "build:prod": "vite build --mode production",
     "lint": "eslint .",
@@ -42,8 +41,6 @@
     "@tanstack/react-table": "^8.21.3",
     "@tanstack/router-devtools": "^1.166.3",
     "dayjs": "^1.11.19",
-    "ketcher-react": "^3.12.0",
-    "ketcher-standalone": "^3.12.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "zustand": "^5.0.11"

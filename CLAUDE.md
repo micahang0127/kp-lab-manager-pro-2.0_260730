@@ -121,13 +121,6 @@
 - export: `use{Name}Store` hook 형태
 - sessionStorage 접근은 스토어 내부에서 처리 (컴포넌트에서 직접 접근 금지)
 
-### Ketcher (분자 구조 편집기)
-
-- **직접 import 금지** — 번들 크기 문제로 반드시 lazy load
-- `src/components/ketcher/KetcherLoader`를 경유
-- 데이터 형식: SMILES 문자열
-- 테스트 시 `vi.mock()` 필수 (jsdom에서 렌더 불가)
-
 ---
 
 ## ✍️ 코드 컨벤션
@@ -186,7 +179,6 @@ ESLint `simple-import-sort` 플러그인이 자동 정렬합니다. 수동 조�
 - `beforeEach(() => sessionStorage.clear())` — 인증 상태 격리
 - 에러 케이스 (`rejects.toThrow`) 필수 작성
 - 한국어 테스트 설명: `describe('기능명', () => { it('한국어 설명', ...) })`
-- Ketcher 관련 컴포넌트 테스트: `vi.mock('../components/ketcher/KetcherLoader')`
 
 ---
 
@@ -227,11 +219,10 @@ update: 로그인 폼 유효성 검증 강화
 2. `npm`, `yarn`, `npx` 명령어 사용
 3. `any` 타입 사용
 4. 팀 합의 없는 `@ts-ignore` / `@ts-expect-error`
-5. Ketcher를 `KetcherLoader` 없이 직접 import
-6. 서버 응답 데이터를 Zustand 스토어에 복제 저장
-7. `[TEMP]` 마킹 없이 임시 stub 코드 작성
-8. `localStorage` 사용 (이 프로젝트는 sessionStorage 정책)
-9. 테스트 생략 (새 로직은 반드시 테스트 추가)
+5. 서버 응답 데이터를 Zustand 스토어에 복제 저장
+6. `[TEMP]` 마킹 없이 임시 stub 코드 작성
+7. `localStorage` 사용 (이 프로젝트는 sessionStorage 정책)
+8. 테스트 생략 (새 로직은 반드시 테스트 추가)
 
 ---
 
@@ -242,7 +233,6 @@ update: 로그인 폼 유효성 검증 강화
 | `VITE_API_BASE_URL`        | API 서버 주소                |
 | `VITE_PORTONE_STORE_ID`    | PortOne 스토어 ID (본인인증) |
 | `VITE_PORTONE_CHANNEL_KEY` | PortOne 채널 키              |
-| `VITE_KETCHER_ASSETS_URL`  | Ketcher 정적 에셋 경로       |
 
 새 환경 변수 추가 시: `.env.example`, `.env.local`, `.env.production` 모두에 동기화.
 
@@ -254,7 +244,6 @@ update: 로그인 폼 유효성 검증 강화
 src/
   api/          — API 함수 + 타입 (.test.ts 포함)
   components/   — 재사용 컴포넌트
-    ketcher/    — Ketcher 래퍼 (lazy load)
     layout/     — Header, Footer, Layout
   pages/        — 페이지 단위 컴포넌트
   routes/       — TanStack Router 파일 기반 라우트
@@ -268,4 +257,3 @@ src/
 
 - `src/api/CLAUDE.md`
 - `src/routes/CLAUDE.md`
-- `src/components/ketcher/CLAUDE.md`

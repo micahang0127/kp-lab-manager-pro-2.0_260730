@@ -44,7 +44,6 @@ tools: Read, Grep, Glob, Bash
 - [ ] 신규 로직에 테스트가 추가됨
 - [ ] 성공 케이스 + 에러 케이스 모두 포함
 - [ ] `beforeEach(() => sessionStorage.clear())` (인증 관련 시)
-- [ ] Ketcher 사용 시 `vi.mock` 적용
 
 ### 보안
 
@@ -56,7 +55,6 @@ tools: Read, Grep, Glob, Bash
 
 - [ ] 서버 상태를 Zustand에 저장하지 않음
 - [ ] API는 `api.*` 래퍼 사용
-- [ ] Ketcher는 `KetcherLoader` 경유
 
 ## 출력 형식
 

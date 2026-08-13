@@ -52,7 +52,7 @@ tools: Read, Grep, Glob, WebFetch
 
 1. **반드시 코드를 읽고 작성**: 영향 파일을 추측하지 말고 Grep/Read로 확인
 2. **재사용 우선**: 새 함수/유틸을 만들기 전에 `src/utils`, `src/components`에 동일 기능이 있는지 검색
-3. **프로젝트 컨벤션 준수**: 루트 `CLAUDE.md`와 모듈별 `CLAUDE.md` (`src/api/CLAUDE.md`, `src/routes/CLAUDE.md`, `src/components/ketcher/CLAUDE.md`)의 규칙을 계획에 반영
+3. **프로젝트 컨벤션 준수**: 루트 `CLAUDE.md`와 모듈별 `CLAUDE.md` (`src/api/CLAUDE.md`, `src/routes/CLAUDE.md`)의 규칙을 계획에 반영
 4. **상태 관리 분리**: 서버 상태는 React Query, 클라이언트 전역은 Zustand — 잘못된 배치 금지
 5. **환각 금지**: 존재하지 않는 라이브러리/함수/경로를 계획에 포함하지 말 것
 
