@@ -213,7 +213,7 @@ export function LoginPage() {
                   setTurnstileToken(null)
                   setTurnstileError('로봇 인증이 만료되었습니다. 새로고침 후 다시 시도해주세요.')
                 }}
-                options={{ theme: 'light' }}
+                options={{ theme: 'light', appearance: 'interaction-only' }}
               />
             </div>
             {/* Turnstile 에러 */}
