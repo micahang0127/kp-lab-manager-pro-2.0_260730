@@ -1,3 +1,5 @@
+import { forwardRef } from 'react'
+
 import type { FormInputMessageColor } from './messageColor'
 import { MESSAGE_COLOR_CLASS_NAME } from './messageColor'
 import { RequiredMark } from './RequiredMark'
@@ -11,9 +13,13 @@ interface FormInputProps {
   value: string
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
   required?: boolean
+  /** required가 true여도 라벨 옆 필수 표시(*)를 숨긴다 (예: 로그인 폼처럼 표시가 불필요한 경우) */
+  hideRequiredMark?: boolean
   disabled?: boolean
   maxLength?: number
   inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode']
+  /** 입력값이 없을 때 input에 표시할 안내 문구 */
+  placeholder?: string
   /** input 하단에 표시할 안내/에러 문구. 없으면 렌더링하지 않는다 */
   message?: string
   /** message 색상 (기본값 'red') */
@@ -34,30 +40,40 @@ const INPUT_CLASS_NAME =
 /**
  * 라벨 + input + 하단 안내/에러 메시지로 구성된 공통 폼 입력 컴포넌트.
  * disabled 시 잠금 스타일이 자동 적용되고, message가 주어지면 messageColor에 맞는 색상으로 하단에 표시된다.
+ * required가 true이면 라벨 옆에 필수 표시(*)가 렌더링되며, hideRequiredMark로 표시만 숨길 수 있다
+ * (input의 required 속성/접근성 의미는 그대로 유지됨).
+ * ref를 전달하면 input DOM에 그대로 연결된다 (예: 마운트 시 자동 포커스가 필요한 경우 `ref.current?.focus()`).
  */
-export function FormInput({
-  id,
-  label,
-  type = 'text',
-  value,
-  onChange,
-  required = false,
-  disabled = false,
-  maxLength,
-  inputMode,
-  message,
-  messageColor = 'red',
-  inputClassName,
-  addon,
-}: FormInputProps) {
+export const FormInput = forwardRef<HTMLInputElement, FormInputProps>(function FormInput(
+  {
+    id,
+    label,
+    type = 'text',
+    value,
+    onChange,
+    required = false,
+    hideRequiredMark = false,
+    disabled = false,
+    maxLength,
+    inputMode,
+    placeholder,
+    message,
+    messageColor = 'red',
+    inputClassName,
+    addon,
+  },
+  ref
+) {
   const inputElement = (
     <input
+      ref={ref}
       id={id}
       type={type}
       required={required}
       disabled={disabled}
       maxLength={maxLength}
       inputMode={inputMode}
+      placeholder={placeholder}
       value={value}
       onChange={onChange}
       className={inputClassName ? `${INPUT_CLASS_NAME} ${inputClassName}` : INPUT_CLASS_NAME}
@@ -70,7 +86,7 @@ export function FormInput({
         <label htmlFor={id} className="text-sm font-medium text-gray-700">
           {label}
         </label>
-        {required && <RequiredMark />}
+        {required && !hideRequiredMark && <RequiredMark />}
       </div>
       {addon ? (
         <div className="flex gap-2">
@@ -85,4 +101,4 @@ export function FormInput({
       )}
     </div>
   )
-}
+})

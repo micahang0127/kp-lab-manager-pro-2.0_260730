@@ -10,11 +10,23 @@ import type { LoginData, OtpLoginData } from '../api/user'
 import { FormInput } from '../components/form'
 import { useAuthStore } from '../stores/authStore'
 import { getFingerprint } from '../utils/fingerprint'
-import { EMAIL_MAX_LENGTH } from '../utils/rules/validationRules'
+import {
+  EMAIL_MAX_LENGTH,
+  isValidEmail,
+  isValidPassword,
+  PASSWORD_RULE_MESSAGE,
+  removeHangul,
+  sanitizePasswordInput,
+} from '../utils/rules/validationRules'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type LoginStep = { kind: 'credentials' } | { kind: 'otp'; email: string; expiresAt: number }
+
+// ─── Validation ────────────────────────────────────────────────────────────────
+
+const EMAIL_INVALID_MESSAGE = '이메일 형식이 아닙니다.'
+const PASSWORD_MISMATCH_MESSAGE = '올바른 비밀번호가 아닙니다.'
 
 // ─── TEMP: 백엔드 미연동 스텁 ────────────────────────────────────────────────────
 
@@ -50,6 +62,15 @@ export function LoginPage() {
 
   // 핑거프린트 (두 mutation 간 공유)
   const fingerprintRef = useRef<string | null>(null)
+
+  // 이메일 입력란 자동 포커스용
+  const emailInputRef = useRef<HTMLInputElement>(null)
+
+  // ─── 이메일 자동 포커스 ────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    emailInputRef.current?.focus()
+  }, [])
 
   // ─── OTP 타이머 ───────────────────────────────────────────────────────────────
 
@@ -112,7 +133,9 @@ export function LoginPage() {
     onError: (err: unknown) => {
       if (err instanceof Error && err.message.includes('cf-turnstile')) {
         setTurnstileError('로봇 인증에 실패했습니다. 새로고침 후 다시 시도해주세요.')
+        return
       }
+      alert(PASSWORD_MISMATCH_MESSAGE)
     },
   })
 
@@ -142,6 +165,15 @@ export function LoginPage() {
   const handleLoginSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setTurnstileError(null)
+
+    if (!isValidEmail(form.email)) {
+      alert(EMAIL_INVALID_MESSAGE)
+      return
+    }
+    if (!isValidPassword(form.password)) {
+      alert(PASSWORD_RULE_MESSAGE)
+      return
+    }
     if (!turnstileToken) {
       setTurnstileError('로봇 인증을 완료해주세요.')
       return
@@ -156,8 +188,9 @@ export function LoginPage() {
   }
 
   // ─── Render ───────────────────────────────────────────────────────────────────
+  // 자격증명 관련 에러(이메일 형식, 비밀번호 길이, 로그인 실패)는 alert()로 안내하므로
+  // 인라인 배너를 별도로 렌더링하지 않는다.
 
-  const credentialErrors = loginMutation.error instanceof Error ? [loginMutation.error.message] : []
   const otpErrors = otpMutation.error instanceof Error ? [otpMutation.error.message] : []
 
   const isOtpExpired = timeLeft === 0 && step.kind === 'otp'
@@ -169,32 +202,32 @@ export function LoginPage() {
 
       {step.kind === 'credentials' ? (
         <>
-          {/* 자격증명 폼 에러 */}
-          {credentialErrors.length > 0 && (
-            <ul className="mb-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-600">
-              {credentialErrors.map((msg) => (
-                <li key={msg}>{msg}</li>
-              ))}
-            </ul>
-          )}
           {/* 자격증명 폼 */}
-          <form className="space-y-4" onSubmit={handleLoginSubmit}>
+          {/* noValidate: 브라우저 기본 검증(영문 툴팁 등) 대신 alert()로 안내하는 커스텀 검증만 사용 */}
+          <form className="space-y-4" onSubmit={handleLoginSubmit} noValidate>
             <FormInput
+              ref={emailInputRef}
               id="email"
               label="이메일"
               type="email"
               required
+              hideRequiredMark
+              placeholder="이메일을 입력하세요."
               maxLength={EMAIL_MAX_LENGTH}
               value={form.email}
-              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+              onChange={(e) => setForm((f) => ({ ...f, email: removeHangul(e.target.value) }))}
             />
             <FormInput
               id="password"
               label="비밀번호"
               type="password"
               required
+              hideRequiredMark
+              placeholder="비밀번호 8자리 이상 입력하세요"
               value={form.password}
-              onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, password: sanitizePasswordInput(e.target.value) }))
+              }
             />
 
             {/* Turnstile 컴포넌트 */}
@@ -272,6 +305,7 @@ export function LoginPage() {
               inputMode="numeric"
               maxLength={6}
               required
+              hideRequiredMark
               value={otpCode}
               onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
               inputClassName="text-center font-mono tracking-widest"

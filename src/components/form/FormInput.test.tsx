@@ -1,3 +1,5 @@
+import { createRef } from 'react'
+
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -92,6 +94,36 @@ describe('FormInput', () => {
     )
 
     expect(container.textContent).not.toContain('*')
+  })
+
+  it('required가 true여도 hideRequiredMark가 true이면 필수 표시(*)가 렌더링되지 않는다 (input의 required 속성은 유지)', () => {
+    const { container } = render(
+      <FormInput id="email" label="이메일" value="" onChange={vi.fn()} required hideRequiredMark />
+    )
+
+    expect(container.textContent).not.toContain('*')
+    expect(screen.getByLabelText('이메일')).toBeRequired()
+  })
+
+  it('placeholder가 지정되면 input에 표시된다', () => {
+    render(
+      <FormInput
+        id="email"
+        label="이메일"
+        value=""
+        onChange={vi.fn()}
+        placeholder="이메일을 입력하세요."
+      />
+    )
+
+    expect(screen.getByPlaceholderText('이메일을 입력하세요.')).toBeInTheDocument()
+  })
+
+  it('ref를 전달하면 input DOM에 연결된다 (마운트 시 자동 포커스 등에서 활용)', () => {
+    const ref = createRef<HTMLInputElement>()
+    render(<FormInput ref={ref} id="email" label="이메일" value="" onChange={vi.fn()} />)
+
+    expect(ref.current).toBe(screen.getByLabelText('이메일'))
   })
 
   it('addon이 주어지면 input과 함께 렌더링된다 (예: 사업장 소재지의 주소검색 버튼)', () => {

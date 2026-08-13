@@ -118,9 +118,7 @@ describe('RegisterPage', () => {
   it('비밀번호 규칙을 충족하지 못하면 안내 문구를 표시한다', async () => {
     render(<RegisterPage />)
     await userEvent.type(screen.getByLabelText(/^비밀번호$/), 'abc')
-    expect(
-      await screen.findByText(/영문, 숫자, 특수문자를 포함하여 8~64자로 입력해주세요./)
-    ).toBeInTheDocument()
+    expect(await screen.findByText(/비밀번호는 최소 8자리 이상입니다./)).toBeInTheDocument()
   })
 
   it('비밀번호와 비밀번호 확인이 다르면 에러를 표시한다', async () => {

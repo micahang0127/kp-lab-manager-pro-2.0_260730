@@ -7,23 +7,38 @@ export const EMAIL_RULE_MESSAGE = '올바른 이메일 형식으로 입력해주
 // RFC 5321 기준 이메일 전체 최대 길이(로컬파트 64자 + '@' + 도메인 255자를 넉넉히 포함)
 export const EMAIL_MAX_LENGTH = 254
 
+// 한글(완성형 음절 + 자모) 매칭 — 이메일은 한글을 허용하지 않으므로 입력 즉시 제거하는 데 사용
+const HANGUL_REGEX = /[ㄱ-ㅎㅏ-ㅣ가-힣]/g
+
 /** 이메일이 형식에 맞는지 검사한다 */
 export function isValidEmail(value: string): boolean {
   return EMAIL_REGEX.test(value)
 }
 
-// ─── Password Rule (샘플) ────────────────────────────────────────────────────
-// 영문, 숫자, 특수문자를 각 1개 이상 포함한 8~64자. NIST SP 800-63B 권고에 따라 최대 길이를
-// 64자로 설정 — 비밀번호 관리자 생성 값·패스프레이즈 사용을 막지 않기 위함. 실제 정책 확정 시 이 파일만 교체하면 됨.
+/** 입력값에서 한글(완성형 음절 + 자모)을 제거한다 (이메일 입력 시 한글 실시간 차단용) */
+export function removeHangul(value: string): string {
+  return value.replace(HANGUL_REGEX, '')
+}
 
-export const PASSWORD_REGEX =
-  /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{8,64}$/
+// ─── Password Rule ────────────────────────────────────────────────────────────
+// 영문 대소문자·숫자·특수기호만 허용하며 최소 8자 이상이어야 한다.
+// (기존에는 조합 필수 + 최대 64자 규칙을 임시로 적용했으나, 정책 확정에 따라 삭제됨)
 
-export const PASSWORD_RULE_MESSAGE = '영문, 숫자, 특수문자를 포함하여 8~64자로 입력해주세요.'
+export const PASSWORD_MIN_LENGTH = 8
 
-/** 비밀번호가 정책을 만족하는지 검사한다 */
+// 공백을 제외한 출력 가능 ASCII 문자(영문 대소문자, 숫자, 특수기호)만 허용
+export const PASSWORD_ALLOWED_CHAR_REGEX = /^[\x21-\x7E]*$/
+
+export const PASSWORD_RULE_MESSAGE = '비밀번호는 최소 8자리 이상입니다.'
+
+/** 비밀번호가 정책(영문 대소문자·숫자·특수기호, 8자 이상)을 만족하는지 검사한다 */
 export function isValidPassword(value: string): boolean {
-  return PASSWORD_REGEX.test(value)
+  return value.length >= PASSWORD_MIN_LENGTH && PASSWORD_ALLOWED_CHAR_REGEX.test(value)
+}
+
+/** 입력값에서 허용되지 않는 문자(한글, 공백 등)를 제거한다 (비밀번호 입력 시 실시간 차단용) */
+export function sanitizePasswordInput(value: string): string {
+  return value.replace(/[^\x21-\x7E]/g, '')
 }
 
 // ─── Business Registration Number Rule ──────────────────────────────────────
