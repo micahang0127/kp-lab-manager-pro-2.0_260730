@@ -257,16 +257,27 @@ export function LoginPage() {
             >
               {loginMutation.isPending ? '로그인 중...' : '로그인'}
             </button>
-            {/* 회원가입 페이지 이동 */}
-            <button
-              type="button"
-              onClick={() => {
-                void navigate({ to: '/register' })
-              }}
-              className="w-full rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              회원가입
-            </button>
+            {/* 아이디/비밀번호 찾기 · 회원가입 */}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  void navigate({ to: '/find-account' })
+                }}
+                className="flex-1 rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                아이디/비밀번호 찾기
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void navigate({ to: '/register' })
+                }}
+                className="flex-1 rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                회원가입
+              </button>
+            </div>
           </form>
         </>
       ) : (
