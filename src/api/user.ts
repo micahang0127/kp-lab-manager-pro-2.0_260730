@@ -29,6 +29,7 @@ export interface LoginRequest {
   email: string
   password: string
   deviceType: string
+  cfTurnstileResponse: string
 }
 
 export interface LoginData {
@@ -57,7 +58,7 @@ export interface ChangePasswordRequest {
 export const signup = (body: SignupRequest): Promise<ApiResponse<boolean>> =>
   api.post('/auth/signup', body, { skipAuth: true })
 
-/** 로그인 — 인증 불필요(skipAuth), KPMFP 헤더로 핑거프린트 전송 */
+/** 로그인 — 인증 불필요(skipAuth), KPMFP 헤더로 핑거프린트 전송, body에 Turnstile 토큰(cfTurnstileResponse) 포함 */
 export const login = (
   body: LoginRequest,
   fingerprint: string | null

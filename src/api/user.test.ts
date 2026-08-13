@@ -22,7 +22,12 @@ describe('login API', () => {
     )
 
     const result = await login(
-      { email: 'test@test.com', password: '1234', deviceType: 'WEB' },
+      {
+        email: 'test@test.com',
+        password: '1234',
+        deviceType: 'WEB',
+        cfTurnstileResponse: 'mock-turnstile-token',
+      },
       null
     )
     expect(result.statusCode).toBe(200)
@@ -42,7 +47,12 @@ describe('login API', () => {
     )
 
     const result = await login(
-      { email: 'test@test.com', password: '1234', deviceType: 'WEB' },
+      {
+        email: 'test@test.com',
+        password: '1234',
+        deviceType: 'WEB',
+        cfTurnstileResponse: 'mock-turnstile-token',
+      },
       null
     )
     expect(result.statusCode).toBe(200)
@@ -65,7 +75,15 @@ describe('login API', () => {
     )
 
     await expect(
-      login({ email: 'wrong@test.com', password: 'wrong', deviceType: 'WEB' }, null)
+      login(
+        {
+          email: 'wrong@test.com',
+          password: 'wrong',
+          deviceType: 'WEB',
+          cfTurnstileResponse: 'mock-turnstile-token',
+        },
+        null
+      )
     ).rejects.toThrow('이메일 또는 비밀번호가 틀렸습니다.')
   })
 
@@ -84,7 +102,15 @@ describe('login API', () => {
     )
 
     await expect(
-      login({ email: 'test@test.com', password: 'test', deviceType: 'WEB' }, null)
+      login(
+        {
+          email: 'test@test.com',
+          password: 'test',
+          deviceType: 'WEB',
+          cfTurnstileResponse: 'mock-turnstile-token',
+        },
+        null
+      )
     ).rejects.toThrow('서버 오류가 발생했습니다.')
   })
 
@@ -101,7 +127,15 @@ describe('login API', () => {
       })
     )
 
-    await login({ email: 'a@b.com', password: 'pw', deviceType: 'WEB' }, 'mock-fp-abc123')
+    await login(
+      {
+        email: 'a@b.com',
+        password: 'pw',
+        deviceType: 'WEB',
+        cfTurnstileResponse: 'mock-turnstile-token',
+      },
+      'mock-fp-abc123'
+    )
     expect(capturedHeader).toBe('mock-fp-abc123')
   })
 
@@ -119,7 +153,15 @@ describe('login API', () => {
       })
     )
 
-    await login({ email: 'a@b.com', password: 'pw', deviceType: 'WEB' }, null)
+    await login(
+      {
+        email: 'a@b.com',
+        password: 'pw',
+        deviceType: 'WEB',
+        cfTurnstileResponse: 'mock-turnstile-token',
+      },
+      null
+    )
     expect(authHeader).toBeNull()
   })
 })

@@ -90,20 +90,14 @@ export function LoginPage() {
   // ─── Mutations ─────────────────────────────────────────────────────────────────
 
   // [TEMP] 26.07.27 백엔드 미연동 — 아래 실제 구현 참고용 타입/로직은 주석 처리. 연동 완료 시 주석 해제
-  // type LoginRequestWithTurnstile = {
-  //   email: string
-  //   password: string
-  //   deviceType: string
-  //   cfTurnstileResponse: string
-  // }
+  // import type { LoginRequest } from '../api/user'
   const loginMutation = useMutation({
     mutationFn: async (_vars: { email: string; password: string; cfTurnstileResponse: string }) => {
       const fp = await getFingerprint()
       fingerprintRef.current = fp
 
       // [TEMP] 26.07.27 백엔드 미연동 — 항상 성공 처리. 연동 완료 시 아래 주석 해제하고 스텁 제거
-      // cfTurnstileResponse를 body에 포함 (LoginRequest 타입 확장)
-      // const loginBody: LoginRequestWithTurnstile = {
+      // const loginBody: LoginRequest = {
       //   email: vars.email,
       //   password: vars.password,
       //   deviceType: DEVICE_TYPE_WEB,

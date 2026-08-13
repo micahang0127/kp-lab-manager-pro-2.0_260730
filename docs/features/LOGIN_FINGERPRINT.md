@@ -51,7 +51,9 @@ graph TD
 
 ## 3. 기기 식별 (Fingerprint)
 
-같은 계정이라도 **처음 접속하는 기기**인지를 서버가 판단하여 보안을 강화합니다. 서버가 `type: 'O'`를 반환하면 추가 OTP 인증을 요구합니다.
+같은 계정이라도 **처음 접속하는 기기(브라우저)**인지를 서버가 판단하여 보안을 강화합니다. 서버가 `type: 'O'`를 반환하면 추가 OTP 인증을 요구합니다.
+
+**정책**: 동일 브라우저에서 이미 인증(OTP 통과)한 적이 있는 `KPMFP` 값으로 재로그인하면 `type: 'T'`로 즉시 통과시키고, 처음 수신하는 `KPMFP` 값(새 브라우저·새 기기·모바일 웹앱 최초 접속 포함)이면 `type: 'O'`로 이메일 OTP를 요구합니다. 이 판단 기준과 OTP 코드 발송/보관은 전적으로 백엔드 책임이며, 프론트는 `KPMFP` 값을 매 로그인 시도마다 그대로 전달하는 역할만 합니다.
 
 | 항목        | 내용                                                           |
 | :---------- | :------------------------------------------------------------- |
@@ -59,6 +61,8 @@ graph TD
 | 결과값      | `visitorId` — 브라우저/OS/하드웨어 환경을 조합한 해시 문자열   |
 | 실패 처리   | `null` 반환, 로그인은 계속 진행                                |
 | 초기화 시점 | 모듈 import 시점 (렌더 이전), 로그인 버튼 클릭 시 `await`만 함 |
+
+> **비고 (백엔드 설계 시 참고)**: 오픈소스 버전 FingerprintJS의 `visitorId`는 Pro 버전 대비 안정성이 낮아, 브라우저/OS 업데이트나 일부 모바일 브라우저 환경에서 동일 기기인데도 값이 바뀌어 신규 기기로 오판(불필요한 OTP 요구)될 수 있습니다. 서버 판단 로직에 완전 일치가 아닌 허용 오차·유사도 기반 정책이 필요하다면 이를 고려해 설계하는 것을 권장합니다.
 
 ### 서버 전달 방법
 
@@ -69,7 +73,7 @@ graph TD
 const fp = await getFingerprint()
 fingerprintRef.current = fp // Step 2(OTP)에서도 재사용
 
-login({ email, password, deviceType }, fp)
+login({ email, password, deviceType, cfTurnstileResponse }, fp)
 // → api.post('/user/login', body, { extraHeaders: { KPMFP: fp } })
 ```
 
@@ -121,3 +125,14 @@ if (res.status === 401) {
 | **Turnstile 클라이언트 토큰 획득** |     ✅ 완료      | `onSuccess` 콜백을 통한 상태 저장         |
 | **백엔드 Turnstile 최종 검증**     | 🛠 **진행 예정** | 백엔드 API와의 스펙 조율 필요             |
 | **OTP 타이머 및 유효성**           |     ✅ 완료      | 5분 제한 시간 적용                        |
+
+---
+
+## 6. 백엔드 연동 시 체크리스트
+
+현재 `src/pages/LoginPage.tsx`는 `[TEMP] 26.07.27` 주석으로 실제 API 호출을 막고, 항상 성공 응답을 반환하는 `createTempAccessToken()` 스텁으로 대체되어 있습니다. `/user/login`, `/user/otplogin` 백엔드 구현이 완료되면 다음을 진행합니다.
+
+- [ ] `src/pages/LoginPage.tsx`: `[TEMP]` 주석 블록 전체 해제, `createTempAccessToken()` 함수와 호출부 제거
+- [ ] `src/pages/LoginPage.test.tsx`: `TEMP:` 테스트(항상 성공 가정) 삭제, `[FUTURE WORK]` 주석 블록(Turnstile 서버 검증 실패 1건 + 신규 기기 OTP 플로우 7건) 주석 해제
+- [ ] 2.2절의 Cloudflare Turnstile `siteverify` 백엔드 검증 연동 확인
+- [ ] `pnpm type-check` / `pnpm test --run` / `pnpm lint` 로 회귀 확인
