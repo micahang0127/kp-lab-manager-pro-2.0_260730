@@ -13,7 +13,6 @@ import { Route as RegisterRouteImport } from './routes/register'
 import { Route as MainRouteImport } from './routes/main'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ZustandIndexRouteImport } from './routes/zustand/index'
 import { Route as SettingsStorageLocationRouteImport } from './routes/settings/storage-location'
 import { Route as SettingsProcessRouteImport } from './routes/settings/process'
 import { Route as SettingsMemberRouteImport } from './routes/settings/member'
@@ -48,11 +47,6 @@ const LoginRoute = LoginRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ZustandIndexRoute = ZustandIndexRouteImport.update({
-  id: '/zustand/',
-  path: '/zustand/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsStorageLocationRoute = SettingsStorageLocationRouteImport.update({
@@ -151,7 +145,6 @@ export interface FileRoutesByFullPath {
   '/settings/member': typeof SettingsMemberRoute
   '/settings/process': typeof SettingsProcessRoute
   '/settings/storage-location': typeof SettingsStorageLocationRoute
-  '/zustand/': typeof ZustandIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -173,7 +166,6 @@ export interface FileRoutesByTo {
   '/settings/member': typeof SettingsMemberRoute
   '/settings/process': typeof SettingsProcessRoute
   '/settings/storage-location': typeof SettingsStorageLocationRoute
-  '/zustand': typeof ZustandIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -196,7 +188,6 @@ export interface FileRoutesById {
   '/settings/member': typeof SettingsMemberRoute
   '/settings/process': typeof SettingsProcessRoute
   '/settings/storage-location': typeof SettingsStorageLocationRoute
-  '/zustand/': typeof ZustandIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -220,7 +211,6 @@ export interface FileRouteTypes {
     | '/settings/member'
     | '/settings/process'
     | '/settings/storage-location'
-    | '/zustand/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -242,7 +232,6 @@ export interface FileRouteTypes {
     | '/settings/member'
     | '/settings/process'
     | '/settings/storage-location'
-    | '/zustand'
   id:
     | '__root__'
     | '/'
@@ -264,7 +253,6 @@ export interface FileRouteTypes {
     | '/settings/member'
     | '/settings/process'
     | '/settings/storage-location'
-    | '/zustand/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -287,7 +275,6 @@ export interface RootRouteChildren {
   SettingsMemberRoute: typeof SettingsMemberRoute
   SettingsProcessRoute: typeof SettingsProcessRoute
   SettingsStorageLocationRoute: typeof SettingsStorageLocationRoute
-  ZustandIndexRoute: typeof ZustandIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -318,13 +305,6 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/zustand/': {
-      id: '/zustand/'
-      path: '/zustand'
-      fullPath: '/zustand/'
-      preLoaderRoute: typeof ZustandIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings/storage-location': {
@@ -455,7 +435,6 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsMemberRoute: SettingsMemberRoute,
   SettingsProcessRoute: SettingsProcessRoute,
   SettingsStorageLocationRoute: SettingsStorageLocationRoute,
-  ZustandIndexRoute: ZustandIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
