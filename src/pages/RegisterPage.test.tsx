@@ -4,6 +4,8 @@ import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { checkExistingAccount, deleteExistingAccount } from '../api/auth'
+import { sendEmailVerificationCode, verifyEmailVerificationCode } from '../api/user'
 import { server } from '../test/mocks/server'
 import { render, screen } from '../test/test-utils'
 import { RegisterPage } from './RegisterPage'
@@ -16,9 +18,13 @@ vi.mock('@tanstack/react-router', () => ({
   useNavigate: vi.fn(),
 }))
 
-// 핸드폰인증 완료 시 백엔드(본인인증)에서 확인된 값 — 이름/휴대폰번호만 사전 입력값을 덮어씀 (이메일은 제외)
+// 핸드폰인증 완료 시 백엔드(본인인증)에서 확인된 값 — 이름/휴대폰번호/생년월일/성별 자동 입력에 사용 (이메일은 제외)
 const VERIFIED_CUSTOMER = {
+  ci: 'mock-ci-123',
+  di: 'mock-di-456',
   name: '홍길동',
+  gender: 'M',
+  birthDate: '1990-01-01',
   phoneNumber: '010-1234-5678',
 }
 
@@ -56,9 +62,32 @@ vi.mock('../components/addressSearch', () => ({
   ),
 }))
 
+// 기존 계정 확인/삭제([TEMP] 스텁) — 기본은 실제 구현(항상 exists: false)을 그대로 쓰고,
+// 필요한 테스트에서만 mockResolvedValueOnce 등으로 override한다
+vi.mock('../api/auth', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../api/auth')>()
+  return {
+    ...actual,
+    checkExistingAccount: vi.fn(actual.checkExistingAccount),
+    deleteExistingAccount: vi.fn(actual.deleteExistingAccount),
+  }
+})
+
+// 이메일 인증번호 발송/확인([TEMP] 스텁) — 기본은 실제 구현(항상 성공)을 그대로 쓰고,
+// 필요한 테스트에서만 override한다. signup은 MSW로 실제 fetch를 검증하므로 actual을 그대로 유지한다
+vi.mock('../api/user', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../api/user')>()
+  return {
+    ...actual,
+    sendEmailVerificationCode: vi.fn(actual.sendEmailVerificationCode),
+    verifyEmailVerificationCode: vi.fn(actual.verifyEmailVerificationCode),
+  }
+})
+
 // ─── Setup ─────────────────────────────────────────────────────────────────────
 
 const VALID_PASSWORD = 'Password1!'
+const VALID_EMAIL_CODE = '123456'
 
 const BUSINESS_LICENSE_FILE = new File(['dummy'], 'business-license.pdf', {
   type: 'application/pdf',
@@ -77,10 +106,32 @@ async function fillBusinessInfo() {
   await userEvent.type(screen.getByLabelText('업종'), '화학제품')
 }
 
-/** 핸드폰인증을 완료하고 이메일/비밀번호/사업자정보/필수 약관까지 채워 제출 가능한 상태로 만든다 */
-async function fillValidForm() {
+/** 핸드폰인증을 완료하고, 기존 계정 확인(비동기) 응답까지 기다린다 */
+async function completeIdentityVerification() {
   await userEvent.click(screen.getByText('identity-verification-mock'))
-  await userEvent.type(screen.getByLabelText(/^이메일$/), 'newuser@test.com')
+  await waitFor(() => {
+    expect(screen.getByLabelText('이름')).toHaveValue(VERIFIED_CUSTOMER.name)
+  })
+}
+
+/** 이메일을 입력하고 인증번호 발송 → 확인까지 완료한다 */
+async function completeEmailVerification(email: string) {
+  await userEvent.type(screen.getByLabelText(/^이메일$/), email)
+  await userEvent.click(screen.getByRole('button', { name: '인증번호 보내기' }))
+  await waitFor(() => {
+    expect(screen.getByLabelText('이메일 인증번호')).not.toBeDisabled()
+  })
+  await userEvent.type(screen.getByLabelText('이메일 인증번호'), VALID_EMAIL_CODE)
+  await userEvent.click(screen.getByRole('button', { name: '확인' }))
+  await waitFor(() => {
+    expect(screen.getByText('이메일 인증이 완료되었습니다.')).toBeInTheDocument()
+  })
+}
+
+/** 핸드폰인증/이메일인증을 완료하고 비밀번호/사업자정보/필수 약관까지 채워 제출 가능한 상태로 만든다 */
+async function fillValidForm() {
+  await completeIdentityVerification()
+  await completeEmailVerification('newuser@test.com')
   await userEvent.type(screen.getByLabelText(/^비밀번호$/), VALID_PASSWORD)
   await userEvent.type(screen.getByLabelText(/비밀번호 확인/), VALID_PASSWORD)
   await fillBusinessInfo()
@@ -128,15 +179,48 @@ describe('RegisterPage', () => {
     expect(await screen.findByText(/비밀번호가 일치하지 않습니다./)).toBeInTheDocument()
   })
 
+  it('본인인증 전에는 이름/휴대폰번호/생년월일/성별 입력란에 안내 placeholder가 표시되고 비활성화된다', () => {
+    render(<RegisterPage />)
+
+    for (const label of ['이름', '휴대폰번호', '생년월일', '성별']) {
+      const input = screen.getByLabelText(label)
+      expect(input).toBeDisabled()
+      expect(input).toHaveAttribute('placeholder', '본인 인증이 필요합니다.')
+    }
+  })
+
+  it('핸드폰인증을 완료하면 이름/휴대폰번호/생년월일/성별이 인증된 값으로 자동 입력된다', async () => {
+    render(<RegisterPage />)
+
+    await completeIdentityVerification()
+
+    expect(screen.getByLabelText('이름')).toHaveValue(VERIFIED_CUSTOMER.name)
+    expect(screen.getByLabelText('휴대폰번호')).toHaveValue(VERIFIED_CUSTOMER.phoneNumber)
+    expect(screen.getByLabelText('생년월일')).toHaveValue('1990.01.01')
+    expect(screen.getByLabelText('성별')).toHaveValue('남성')
+  })
+
   it('핸드폰인증을 완료하지 않으면 제출 버튼이 비활성화된다', async () => {
     render(<RegisterPage />)
 
-    // 이름/이메일/휴대폰번호를 직접 입력해도 인증을 완료하지 않았다면 제출할 수 없다
-    await userEvent.type(screen.getByLabelText(/이름/), '홍길동')
-    await userEvent.type(screen.getByLabelText(/^이메일$/), 'newuser@test.com')
-    await userEvent.type(screen.getByLabelText(/휴대폰번호/), '010-0000-0000')
+    await completeEmailVerification('newuser@test.com')
     await userEvent.type(screen.getByLabelText(/^비밀번호$/), VALID_PASSWORD)
     await userEvent.type(screen.getByLabelText(/비밀번호 확인/), VALID_PASSWORD)
+    await fillBusinessInfo()
+    await userEvent.click(screen.getByLabelText(/이용약관 동의/))
+    await userEvent.click(screen.getByLabelText(/개인정보 수집 및 이용 안내 동의/))
+
+    expect(screen.getByRole('button', { name: /^회원가입$/ })).toBeDisabled()
+  })
+
+  it('이메일 인증을 완료하지 않으면 제출 버튼이 비활성화된다', async () => {
+    render(<RegisterPage />)
+
+    await completeIdentityVerification()
+    await userEvent.type(screen.getByLabelText(/^이메일$/), 'newuser@test.com')
+    await userEvent.type(screen.getByLabelText(/^비밀번호$/), VALID_PASSWORD)
+    await userEvent.type(screen.getByLabelText(/비밀번호 확인/), VALID_PASSWORD)
+    await fillBusinessInfo()
     await userEvent.click(screen.getByLabelText(/이용약관 동의/))
     await userEvent.click(screen.getByLabelText(/개인정보 수집 및 이용 안내 동의/))
 
@@ -146,10 +230,11 @@ describe('RegisterPage', () => {
   it('필수 약관에 동의하지 않으면 제출 버튼이 비활성화된다', async () => {
     render(<RegisterPage />)
 
-    await userEvent.click(screen.getByText('identity-verification-mock'))
-    await userEvent.type(screen.getByLabelText(/^이메일$/), 'newuser@test.com')
+    await completeIdentityVerification()
+    await completeEmailVerification('newuser@test.com')
     await userEvent.type(screen.getByLabelText(/^비밀번호$/), VALID_PASSWORD)
     await userEvent.type(screen.getByLabelText(/비밀번호 확인/), VALID_PASSWORD)
+    await fillBusinessInfo()
 
     expect(screen.getByRole('button', { name: /^회원가입$/ })).toBeDisabled()
   })
@@ -157,8 +242,8 @@ describe('RegisterPage', () => {
   it('사업자등록증을 첨부하지 않으면 제출 버튼이 비활성화된다', async () => {
     render(<RegisterPage />)
 
-    await userEvent.click(screen.getByText('identity-verification-mock'))
-    await userEvent.type(screen.getByLabelText(/^이메일$/), 'newuser@test.com')
+    await completeIdentityVerification()
+    await completeEmailVerification('newuser@test.com')
     await userEvent.type(screen.getByLabelText(/^비밀번호$/), VALID_PASSWORD)
     await userEvent.type(screen.getByLabelText(/비밀번호 확인/), VALID_PASSWORD)
     await userEvent.type(screen.getByLabelText('법인명'), '(주)케이피랩')
@@ -205,29 +290,158 @@ describe('RegisterPage', () => {
     expect(screen.getByLabelText(/^SMS 수신$/)).toBeChecked()
   })
 
-  it('핸드폰인증을 완료하면 이름/휴대폰번호가 인증된 값으로 자동 입력되고 수정할 수 없다 (이메일은 제외)', async () => {
-    render(<RegisterPage />)
+  describe('본인인증 후 기존 계정 확인', () => {
+    it('기존 계정이 없으면 confirm 없이 인증이 완료된다', async () => {
+      const confirmSpy = vi.spyOn(window, 'confirm')
+      render(<RegisterPage />)
 
-    // 사전에 다른 값을 입력해둔 상태
-    await userEvent.type(screen.getByLabelText(/이름/), '임시이름')
-    await userEvent.type(screen.getByLabelText(/^이메일$/), 'temp@test.com')
-    await userEvent.type(screen.getByLabelText(/휴대폰번호/), '010-9999-9999')
+      await completeIdentityVerification()
 
-    await userEvent.click(screen.getByText('identity-verification-mock'))
+      expect(confirmSpy).not.toHaveBeenCalled()
+      expect(deleteExistingAccount).not.toHaveBeenCalled()
+    })
 
-    const nameInput = screen.getByLabelText(/이름/) as HTMLInputElement
-    const emailInput = screen.getByLabelText(/^이메일$/) as HTMLInputElement
-    const phoneInput = screen.getByLabelText(/휴대폰번호/) as HTMLInputElement
+    it('기존 계정이 있으면 confirm 후 동의하면 기존 계정을 삭제하고 인증을 완료한다', async () => {
+      vi.mocked(checkExistingAccount).mockResolvedValueOnce({
+        statusCode: 200,
+        data: { exists: true },
+        error: [],
+      })
+      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
 
-    // 이름/휴대폰번호는 사전 입력값이 지워지고 인증된 값으로 덮어써진 뒤 잠긴다
-    expect(nameInput.value).toBe(VERIFIED_CUSTOMER.name)
-    expect(phoneInput.value).toBe(VERIFIED_CUSTOMER.phoneNumber)
-    expect(nameInput).toBeDisabled()
-    expect(phoneInput).toBeDisabled()
+      render(<RegisterPage />)
+      await completeIdentityVerification()
 
-    // 이메일은 인증 대상이 아니므로 입력값이 그대로 유지되고 계속 수정 가능하다
-    expect(emailInput.value).toBe('temp@test.com')
-    expect(emailInput).not.toBeDisabled()
+      expect(confirmSpy).toHaveBeenCalledWith(
+        '기존 가입한 계정이 존재합니다. \n 기존 계정을 삭제하고, 가입을 계속 진행하시겠습니까?'
+      )
+      expect(deleteExistingAccount).toHaveBeenCalledWith({ ci: VERIFIED_CUSTOMER.ci })
+    })
+
+    it('기존 계정이 있을 때 confirm을 취소하면 인증이 완료되지 않고 취소 안내 문구를 표시한다', async () => {
+      vi.mocked(checkExistingAccount).mockResolvedValueOnce({
+        statusCode: 200,
+        data: { exists: true },
+        error: [],
+      })
+      vi.spyOn(window, 'confirm').mockReturnValue(false)
+
+      render(<RegisterPage />)
+      await userEvent.click(screen.getByText('identity-verification-mock'))
+
+      expect(
+        await screen.findByText(
+          '회원가입이 취소되었습니다. 계속하려면 본인인증을 다시 진행해주세요.'
+        )
+      ).toBeInTheDocument()
+      expect(deleteExistingAccount).not.toHaveBeenCalled()
+      expect(screen.getByLabelText('이름')).toHaveValue('')
+      expect(screen.getByLabelText('이름')).toBeDisabled()
+    })
+
+    it('기존 계정 확인 중 오류가 발생하면 오류 메시지를 표시하고 인증을 완료하지 않는다', async () => {
+      vi.mocked(checkExistingAccount).mockRejectedValueOnce(
+        new Error('기존 계정 확인 중 오류가 발생했습니다.')
+      )
+
+      render(<RegisterPage />)
+      await userEvent.click(screen.getByText('identity-verification-mock'))
+
+      expect(await screen.findByText('기존 계정 확인 중 오류가 발생했습니다.')).toBeInTheDocument()
+      expect(screen.getByLabelText('이름')).toHaveValue('')
+      expect(screen.getByLabelText('이름')).toBeDisabled()
+    })
+  })
+
+  describe('이메일 인증번호', () => {
+    it('유효한 이메일 형식이 아니면 인증번호 보내기 버튼이 비활성화된다', async () => {
+      render(<RegisterPage />)
+      expect(screen.getByRole('button', { name: '인증번호 보내기' })).toBeDisabled()
+
+      await userEvent.type(screen.getByLabelText(/^이메일$/), 'invalid-email')
+      expect(screen.getByRole('button', { name: '인증번호 보내기' })).toBeDisabled()
+    })
+
+    it('인증번호 보내기를 클릭하면 인증번호 입력란이 활성화되고 발송 안내 문구가 표시된다', async () => {
+      render(<RegisterPage />)
+
+      await userEvent.type(screen.getByLabelText(/^이메일$/), 'newuser@test.com')
+      expect(screen.getByLabelText('이메일 인증번호')).toBeDisabled()
+
+      await userEvent.click(screen.getByRole('button', { name: '인증번호 보내기' }))
+
+      await waitFor(() => {
+        expect(screen.getByLabelText('이메일 인증번호')).not.toBeDisabled()
+      })
+      expect(
+        screen.getByText('인증번호가 발송되었습니다. 이메일을 확인해주세요.')
+      ).toBeInTheDocument()
+      expect(sendEmailVerificationCode).toHaveBeenCalledWith({ email: 'newuser@test.com' })
+    })
+
+    it('인증번호를 확인하면 인증 완료 문구가 표시되고 이메일/인증번호 입력란이 잠긴다', async () => {
+      render(<RegisterPage />)
+      await completeEmailVerification('newuser@test.com')
+
+      expect(screen.getByText('이메일 인증이 완료되었습니다.')).toBeInTheDocument()
+      expect(screen.getByLabelText(/^이메일$/)).toBeDisabled()
+      expect(screen.getByLabelText('이메일 인증번호')).toBeDisabled()
+      expect(verifyEmailVerificationCode).toHaveBeenCalledWith({
+        email: 'newuser@test.com',
+        code: VALID_EMAIL_CODE,
+      })
+    })
+
+    it('잘못된 인증번호를 확인하면 에러 메시지를 표시한다', async () => {
+      vi.mocked(verifyEmailVerificationCode).mockRejectedValueOnce(
+        new Error('인증번호가 일치하지 않습니다.')
+      )
+
+      render(<RegisterPage />)
+      await userEvent.type(screen.getByLabelText(/^이메일$/), 'newuser@test.com')
+      await userEvent.click(screen.getByRole('button', { name: '인증번호 보내기' }))
+      await waitFor(() => {
+        expect(screen.getByLabelText('이메일 인증번호')).not.toBeDisabled()
+      })
+      await userEvent.type(screen.getByLabelText('이메일 인증번호'), '000000')
+      await userEvent.click(screen.getByRole('button', { name: '확인' }))
+
+      expect(await screen.findByText('인증번호가 일치하지 않습니다.')).toBeInTheDocument()
+    })
+
+    it('인증번호 발송 후 이메일을 수정하면 발송 상태가 초기화된다', async () => {
+      render(<RegisterPage />)
+
+      await userEvent.type(screen.getByLabelText(/^이메일$/), 'newuser@test.com')
+      await userEvent.click(screen.getByRole('button', { name: '인증번호 보내기' }))
+      await waitFor(() => {
+        expect(screen.getByLabelText('이메일 인증번호')).not.toBeDisabled()
+      })
+
+      await userEvent.type(screen.getByLabelText(/^이메일$/), '2')
+
+      expect(screen.getByLabelText('이메일 인증번호')).toBeDisabled()
+    })
+
+    it('인증번호 확인 실패 후 이메일을 수정하면 에러 메시지가 사라진다', async () => {
+      vi.mocked(verifyEmailVerificationCode).mockRejectedValueOnce(
+        new Error('인증번호가 일치하지 않습니다.')
+      )
+
+      render(<RegisterPage />)
+      await userEvent.type(screen.getByLabelText(/^이메일$/), 'newuser@test.com')
+      await userEvent.click(screen.getByRole('button', { name: '인증번호 보내기' }))
+      await waitFor(() => {
+        expect(screen.getByLabelText('이메일 인증번호')).not.toBeDisabled()
+      })
+      await userEvent.type(screen.getByLabelText('이메일 인증번호'), '000000')
+      await userEvent.click(screen.getByRole('button', { name: '확인' }))
+      expect(await screen.findByText('인증번호가 일치하지 않습니다.')).toBeInTheDocument()
+
+      await userEvent.type(screen.getByLabelText(/^이메일$/), '2')
+
+      expect(screen.queryByText('인증번호가 일치하지 않습니다.')).not.toBeInTheDocument()
+    })
   })
 
   it('회원가입 요청이 진행 중일 때는 제출 버튼과 폼 전체 필드가 잠긴다', async () => {
@@ -251,6 +465,7 @@ describe('RegisterPage', () => {
     expect(submitButton).toBeDisabled()
     expect(submitButton).toHaveTextContent(/가입 중/)
     expect(screen.getByLabelText(/^이메일$/)).toBeDisabled()
+    expect(screen.getByLabelText('이메일 인증번호')).toBeDisabled()
     expect(screen.getByLabelText(/^비밀번호$/)).toBeDisabled()
     expect(screen.getByLabelText(/비밀번호 확인/)).toBeDisabled()
     expect(screen.getByLabelText('법인명')).toBeDisabled()

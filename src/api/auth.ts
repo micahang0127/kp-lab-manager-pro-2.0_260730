@@ -50,3 +50,43 @@ export const confirmIdentityVerification = (
   _body: ConfirmIdentityVerificationRequest
 ): Promise<ApiResponse<IdentityVerificationResponse>> =>
   Promise.resolve({ statusCode: 200, data: resultTemp, error: [] })
+
+// ─── 기존 계정 확인/삭제 ─────────────────────────────────────────────────────────
+
+export interface CheckExistingAccountRequest {
+  /** 본인인증으로 확인된 CI (개인 고유 식별값) */
+  ci: string
+}
+
+export interface CheckExistingAccountData {
+  exists: boolean
+}
+
+/** 본인인증(CI) 기준 기존 가입 계정 존재 여부 확인 — 회원가입 시 재가입 여부 판단에 사용 */
+// [TEMP] 26.08.13 백엔드 미연동 — 항상 존재하지 않음(false) 처리. 연동 완료 시 아래 stub을 실제 API 호출로 교체
+// export const checkExistingAccount = (
+//   body: CheckExistingAccountRequest,
+// ): Promise<ApiResponse<CheckExistingAccountData>> =>
+//   api.post<CheckExistingAccountData>('/auth/identity-verification/existing-account', body, {
+//     skipAuth: true,
+//   })
+
+// [TEMP] 26.08.13
+export const checkExistingAccount = (
+  _body: CheckExistingAccountRequest
+): Promise<ApiResponse<CheckExistingAccountData>> =>
+  Promise.resolve({ statusCode: 200, data: { exists: false }, error: [] })
+
+/** 본인인증(CI) 기준 기존 가입 계정 삭제 — 재가입 진행 confirm 이후 호출 */
+// [TEMP] 26.08.13 백엔드 미연동 — 항상 성공 처리. 연동 완료 시 아래 stub을 실제 API 호출로 교체
+// export const deleteExistingAccount = (
+//   body: CheckExistingAccountRequest,
+// ): Promise<ApiResponse<boolean>> =>
+//   api.post<boolean>('/auth/identity-verification/existing-account/delete', body, {
+//     skipAuth: true,
+//   })
+
+// [TEMP] 26.08.13
+export const deleteExistingAccount = (
+  _body: CheckExistingAccountRequest
+): Promise<ApiResponse<boolean>> => Promise.resolve({ statusCode: 200, data: true, error: [] })

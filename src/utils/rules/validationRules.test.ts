@@ -4,10 +4,12 @@ import {
   BUSINESS_NUMBER_RULE_MESSAGE,
   BUSINESS_REGISTRATION_FILE_MAX_SIZE_BYTES,
   BUSINESS_REGISTRATION_FILE_RULE_MESSAGE,
+  EMAIL_CODE_RULE_MESSAGE,
   EMAIL_RULE_MESSAGE,
   isValidBusinessNumber,
   isValidBusinessRegistrationFile,
   isValidEmail,
+  isValidEmailCode,
   isValidPassword,
   isValidRepresentativeName,
   PASSWORD_RULE_MESSAGE,
@@ -185,18 +187,21 @@ describe('validationRules', () => {
   })
 
   describe('isValidBusinessRegistrationFile', () => {
-    it('PDF, JPG, PNG 파일은 통과한다', () => {
+    it('PDF 파일은 통과한다', () => {
       expect(
         isValidBusinessRegistrationFile(
           new File(['dummy'], 'license.pdf', { type: 'application/pdf' })
         )
       ).toBe(true)
+    })
+
+    it('이미지 파일(JPG, PNG)이면 실패한다', () => {
       expect(
         isValidBusinessRegistrationFile(new File(['dummy'], 'license.jpg', { type: 'image/jpeg' }))
-      ).toBe(true)
+      ).toBe(false)
       expect(
         isValidBusinessRegistrationFile(new File(['dummy'], 'license.png', { type: 'image/png' }))
-      ).toBe(true)
+      ).toBe(false)
     })
 
     it('허용되지 않는 형식이면 실패한다', () => {
@@ -227,5 +232,28 @@ describe('validationRules', () => {
 
   it('BUSINESS_REGISTRATION_FILE_RULE_MESSAGE는 규칙 안내 문구를 담고 있다', () => {
     expect(BUSINESS_REGISTRATION_FILE_RULE_MESSAGE).toContain('PDF')
+  })
+
+  describe('isValidEmailCode', () => {
+    it('숫자 6자리면 통과한다', () => {
+      expect(isValidEmailCode('123456')).toBe(true)
+    })
+
+    it('6자리가 아니면 실패한다', () => {
+      expect(isValidEmailCode('12345')).toBe(false)
+      expect(isValidEmailCode('1234567')).toBe(false)
+    })
+
+    it('숫자가 아닌 문자가 포함되면 실패한다', () => {
+      expect(isValidEmailCode('12345a')).toBe(false)
+    })
+
+    it('빈 문자열이면 실패한다', () => {
+      expect(isValidEmailCode('')).toBe(false)
+    })
+  })
+
+  it('EMAIL_CODE_RULE_MESSAGE는 규칙 안내 문구를 담고 있다', () => {
+    expect(EMAIL_CODE_RULE_MESSAGE).toContain('인증번호')
   })
 })

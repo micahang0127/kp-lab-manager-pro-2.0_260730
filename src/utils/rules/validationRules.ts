@@ -72,22 +72,35 @@ export function isValidRepresentativeName(value: string): boolean {
 }
 
 // ─── Business Registration File Rule ────────────────────────────────────────
-// 사업자등록증 스캔본은 보통 PDF 또는 사진(JPG/PNG)으로 제출되므로 해당 형식만 허용한다.
+// 사업자등록증은 위변조를 막기 위해 스캔 이미지(JPG/PNG)는 받지 않고 PDF만 허용한다.
 // 과도한 용량의 파일이 업로드되어 요청이 지연·실패하는 것을 막기 위해 용량 상한도 둔다.
 // ⚠️ 아래 검사는 클라이언트 UX용이며 devtools 등으로 우회 가능하므로, 서버에서도 동일한
 // 형식·용량 검증(가능하면 매직 바이트 기준)을 반드시 수행해야 한다.
 
-export const BUSINESS_REGISTRATION_FILE_ACCEPT = '.pdf,.jpg,.jpeg,.png'
+export const BUSINESS_REGISTRATION_FILE_ACCEPT = '.pdf'
 
-const BUSINESS_REGISTRATION_FILE_ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png']
+const BUSINESS_REGISTRATION_FILE_ALLOWED_TYPES = ['application/pdf']
 
 export const BUSINESS_REGISTRATION_FILE_MAX_SIZE_BYTES = 10 * 1024 * 1024 // 10MB
 
 export const BUSINESS_REGISTRATION_FILE_RULE_MESSAGE =
-  'PDF, JPG, PNG 파일만 첨부할 수 있으며, 최대 10MB까지 업로드할 수 있습니다.'
+  'PDF 파일만 첨부할 수 있으며, 최대 10MB까지 업로드할 수 있습니다.'
 
 /** 사업자등록증 첨부파일이 허용된 형식·용량인지 검사한다 */
 export function isValidBusinessRegistrationFile(file: File): boolean {
   if (file.size <= 0 || file.size > BUSINESS_REGISTRATION_FILE_MAX_SIZE_BYTES) return false
   return BUSINESS_REGISTRATION_FILE_ALLOWED_TYPES.includes(file.type)
+}
+
+// ─── Email Verification Code Rule ────────────────────────────────────────────
+
+export const EMAIL_CODE_LENGTH = 6
+
+export const EMAIL_CODE_REGEX = /^\d{6}$/
+
+export const EMAIL_CODE_RULE_MESSAGE = '인증번호 6자리를 숫자로 입력해주세요.'
+
+/** 이메일 인증번호가 6자리 숫자 형식인지 검사한다 */
+export function isValidEmailCode(value: string): boolean {
+  return EMAIL_CODE_REGEX.test(value)
 }

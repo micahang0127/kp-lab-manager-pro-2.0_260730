@@ -2,7 +2,15 @@ import { http, HttpResponse } from 'msw'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { server } from '../test/mocks/server'
-import { changePassword, login, otpLogin, signup, withdraw } from './user'
+import {
+  changePassword,
+  login,
+  otpLogin,
+  sendEmailVerificationCode,
+  signup,
+  verifyEmailVerificationCode,
+  withdraw,
+} from './user'
 
 describe('login API', () => {
   beforeEach(() => {
@@ -567,5 +575,24 @@ describe('otpLogin API', () => {
 
     await otpLogin({ email: 'test@test.com', otpCode: '123456', deviceType: 'WEB' }, null)
     expect(authHeader).toBeNull()
+  })
+})
+
+// sendEmailVerificationCode/verifyEmailVerificationCode는 [TEMP] 스텁이라 실제 HTTP 호출 없이
+// 항상 고정된 값을 반환한다. 백엔드 연동 완료 시 이 테스트도 MSW 기반으로 교체해야 한다.
+
+describe('sendEmailVerificationCode API', () => {
+  it('[TEMP] 항상 성공(true) 응답한다', async () => {
+    const result = await sendEmailVerificationCode({ email: 'test@test.com' })
+    expect(result.statusCode).toBe(200)
+    expect(result.data).toBe(true)
+  })
+})
+
+describe('verifyEmailVerificationCode API', () => {
+  it('[TEMP] 항상 성공(true) 응답한다', async () => {
+    const result = await verifyEmailVerificationCode({ email: 'test@test.com', code: '123456' })
+    expect(result.statusCode).toBe(200)
+    expect(result.data).toBe(true)
   })
 })
