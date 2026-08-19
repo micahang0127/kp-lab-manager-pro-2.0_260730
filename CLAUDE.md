@@ -108,7 +108,7 @@
 ### API 클라이언트 (`src/api/index.ts`)
 
 - 모든 HTTP 호출은 `api.get / post / patch / delete` 래퍼를 통해서만 수행
-- 응답 타입: `ApiResponse<T>` = `{ statusCode, data, error[] }`
+- 응답 타입: `ApiResponse<T>` = `{ result, data: T | null, message: string[], statusCode }` (백엔드 `CommonResponsePayload<T>`와 동일 구조) — `data` 접근 시 옵셔널 체이닝(`?.`) 필수
 - 토큰: `sessionStorage.getItem('accessToken')` 자동 주입
 - 인증 헤더 생략: `{ skipAuth: true }` 옵션
 - 커스텀 헤더 (예: KPMFP 핑거프린트): `{ extraHeaders: {...} }`

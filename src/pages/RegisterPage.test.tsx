@@ -265,7 +265,7 @@ describe('RegisterPage', () => {
     server.use(
       http.post('*/auth/signup', async ({ request }) => {
         capturedBody = (await request.json()) as Record<string, unknown>
-        return HttpResponse.json({ statusCode: 200, data: true, error: [] })
+        return HttpResponse.json({ result: true, statusCode: 200, data: true, message: [] })
       })
     )
 
@@ -303,9 +303,10 @@ describe('RegisterPage', () => {
 
     it('기존 계정이 있으면 confirm 후 동의하면 기존 계정을 삭제하고 인증을 완료한다', async () => {
       vi.mocked(checkExistingAccount).mockResolvedValueOnce({
+        result: true,
         statusCode: 200,
         data: { exists: true },
-        error: [],
+        message: [],
       })
       const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
 
@@ -320,9 +321,10 @@ describe('RegisterPage', () => {
 
     it('기존 계정이 있을 때 confirm을 취소하면 인증이 완료되지 않고 취소 안내 문구를 표시한다', async () => {
       vi.mocked(checkExistingAccount).mockResolvedValueOnce({
+        result: true,
         statusCode: 200,
         data: { exists: true },
-        error: [],
+        message: [],
       })
       vi.spyOn(window, 'confirm').mockReturnValue(false)
 
@@ -452,7 +454,7 @@ describe('RegisterPage', () => {
     server.use(
       http.post('*/auth/signup', async () => {
         await signupPromise
-        return HttpResponse.json({ statusCode: 200, data: true, error: [] })
+        return HttpResponse.json({ result: true, statusCode: 200, data: true, message: [] })
       })
     )
 
@@ -479,7 +481,7 @@ describe('RegisterPage', () => {
   it('모든 값을 올바르게 입력하면 회원가입에 성공하여 /login으로 이동한다', async () => {
     server.use(
       http.post('*/auth/signup', () =>
-        HttpResponse.json({ statusCode: 200, data: true, error: [] })
+        HttpResponse.json({ result: true, statusCode: 200, data: true, message: [] })
       )
     )
 
@@ -499,7 +501,7 @@ describe('RegisterPage', () => {
     server.use(
       http.post('*/auth/signup', () =>
         HttpResponse.json(
-          { statusCode: 409, data: false, error: ['이미 가입된 이메일입니다.'] },
+          { result: false, statusCode: 409, data: null, message: ['이미 가입된 이메일입니다.'] },
           { status: 409 }
         )
       )

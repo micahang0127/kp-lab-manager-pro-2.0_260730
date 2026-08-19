@@ -75,7 +75,12 @@ const seedStorageLocations: StorageLocationNode[] = [
 
 // [TEMP] 26.08.18
 export const getStorageLocations = (): Promise<ApiResponse<StorageLocationNode[]>> =>
-  Promise.resolve({ statusCode: 200, data: structuredClone(seedStorageLocations), error: [] })
+  Promise.resolve({
+    result: true,
+    statusCode: 200,
+    data: structuredClone(seedStorageLocations),
+    message: [],
+  })
 
 /** 보관위치 노드 생성 (하위 위치 추가 포함) */
 // [TEMP] 26.08.18 백엔드 미연동 — 항상 성공 처리. 연동 완료 시 아래 stub을 실제 API 호출로 교체
@@ -86,7 +91,8 @@ export const getStorageLocations = (): Promise<ApiResponse<StorageLocationNode[]
 // [TEMP] 26.08.18
 export const createStorageLocation = (
   _body: CreateStorageLocationRequest
-): Promise<ApiResponse<boolean>> => Promise.resolve({ statusCode: 200, data: true, error: [] })
+): Promise<ApiResponse<boolean>> =>
+  Promise.resolve({ result: true, statusCode: 200, data: true, message: [] })
 
 /** 보관위치 노드 이름 변경 */
 // [TEMP] 26.08.18 백엔드 미연동 — 항상 성공 처리. 연동 완료 시 아래 stub을 실제 API 호출로 교체
@@ -97,7 +103,8 @@ export const createStorageLocation = (
 // [TEMP] 26.08.18
 export const renameStorageLocation = (
   _body: RenameStorageLocationRequest
-): Promise<ApiResponse<boolean>> => Promise.resolve({ statusCode: 200, data: true, error: [] })
+): Promise<ApiResponse<boolean>> =>
+  Promise.resolve({ result: true, statusCode: 200, data: true, message: [] })
 
 /** 보관위치 노드 삭제 (하위 노드 포함 전체 삭제) */
 // [TEMP] 26.08.18 백엔드 미연동 — 항상 성공 처리. 연동 완료 시 아래 stub을 실제 API 호출로 교체
@@ -106,7 +113,7 @@ export const renameStorageLocation = (
 
 // [TEMP] 26.08.18
 export const deleteStorageLocation = (_id: string): Promise<ApiResponse<boolean>> =>
-  Promise.resolve({ statusCode: 200, data: true, error: [] })
+  Promise.resolve({ result: true, statusCode: 200, data: true, message: [] })
 
 /** 드래그로 변경된 보관위치의 새 부모/순서(index)를 반영 */
 // [TEMP] 26.08.18 백엔드 미연동 — 항상 성공 처리. 연동 완료 시 아래 stub을 실제 API 호출로 교체
@@ -117,4 +124,5 @@ export const deleteStorageLocation = (_id: string): Promise<ApiResponse<boolean>
 // [TEMP] 26.08.18
 export const updateStorageLocationOrder = (
   _body: UpdateStorageLocationOrderRequest
-): Promise<ApiResponse<boolean>> => Promise.resolve({ statusCode: 200, data: true, error: [] })
+): Promise<ApiResponse<boolean>> =>
+  Promise.resolve({ result: true, statusCode: 200, data: true, message: [] })

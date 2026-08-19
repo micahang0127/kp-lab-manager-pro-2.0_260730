@@ -18,9 +18,10 @@ vi.mock('../api/storageLocation', async (importOriginal) => {
 })
 
 const buildResponse = (data: StorageLocationNode[]): ApiResponse<StorageLocationNode[]> => ({
+  result: true,
   statusCode: 200,
   data,
-  error: [],
+  message: [],
 })
 
 // ─── Tests ────────────────────────────────────────────────────────────────────

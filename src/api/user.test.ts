@@ -22,9 +22,10 @@ describe('login API', () => {
     server.use(
       http.post('*/user/login', () =>
         HttpResponse.json({
+          result: true,
           statusCode: 200,
           data: { type: 'T', token: 'real-token-xyz' },
-          error: [],
+          message: [],
         })
       )
     )
@@ -47,9 +48,10 @@ describe('login API', () => {
     server.use(
       http.post('*/user/login', () =>
         HttpResponse.json({
+          result: true,
           statusCode: 200,
           data: { type: 'O' },
-          error: [],
+          message: [],
         })
       )
     )
@@ -73,9 +75,10 @@ describe('login API', () => {
       http.post('*/user/login', () =>
         HttpResponse.json(
           {
+            result: false,
             statusCode: 400,
-            data: {},
-            error: ['이메일 또는 비밀번호가 틀렸습니다.'],
+            data: null,
+            message: ['이메일 또는 비밀번호가 틀렸습니다.'],
           },
           { status: 400 }
         )
@@ -100,9 +103,10 @@ describe('login API', () => {
       http.post('*/user/login', () =>
         HttpResponse.json(
           {
+            result: false,
             statusCode: 500,
-            data: {},
-            error: ['서버 오류가 발생했습니다.'],
+            data: null,
+            message: ['서버 오류가 발생했습니다.'],
           },
           { status: 500 }
         )
@@ -128,9 +132,10 @@ describe('login API', () => {
       http.post('*/user/login', ({ request }) => {
         capturedHeader = request.headers.get('KPMFP')
         return HttpResponse.json({
+          result: true,
           statusCode: 200,
           data: { type: 'T', token: 'tok' },
-          error: [],
+          message: [],
         })
       })
     )
@@ -154,9 +159,10 @@ describe('login API', () => {
       http.post('*/user/login', ({ request }) => {
         authHeader = request.headers.get('Authorization')
         return HttpResponse.json({
+          result: true,
           statusCode: 200,
           data: { type: 'T', token: 'tok' },
-          error: [],
+          message: [],
         })
       })
     )
@@ -184,9 +190,10 @@ describe('signup API', () => {
     server.use(
       http.post('*/auth/signup', () =>
         HttpResponse.json({
+          result: true,
           statusCode: 200,
           data: true,
-          error: [],
+          message: [],
         })
       )
     )
@@ -216,7 +223,7 @@ describe('signup API', () => {
     server.use(
       http.post('*/auth/signup', async ({ request }) => {
         capturedBody = (await request.json()) as Record<string, unknown>
-        return HttpResponse.json({ statusCode: 200, data: true, error: [] })
+        return HttpResponse.json({ result: true, statusCode: 200, data: true, message: [] })
       })
     )
 
@@ -252,9 +259,10 @@ describe('signup API', () => {
       http.post('*/auth/signup', () =>
         HttpResponse.json(
           {
+            result: false,
             statusCode: 409,
-            data: false,
-            error: ['이미 가입된 이메일입니다.'],
+            data: null,
+            message: ['이미 가입된 이메일입니다.'],
           },
           { status: 409 }
         )
@@ -286,9 +294,10 @@ describe('signup API', () => {
       http.post('*/auth/signup', () =>
         HttpResponse.json(
           {
+            result: false,
             statusCode: 400,
-            data: false,
-            error: ['입력값이 올바르지 않습니다.'],
+            data: null,
+            message: ['입력값이 올바르지 않습니다.'],
           },
           { status: 400 }
         )
@@ -321,7 +330,7 @@ describe('signup API', () => {
     server.use(
       http.post('*/auth/signup', ({ request }) => {
         authHeader = request.headers.get('Authorization')
-        return HttpResponse.json({ statusCode: 200, data: true, error: [] })
+        return HttpResponse.json({ result: true, statusCode: 200, data: true, message: [] })
       })
     )
 
@@ -356,9 +365,10 @@ describe('withdraw API', () => {
     server.use(
       http.delete('*/auth/withdraw', () =>
         HttpResponse.json({
+          result: true,
           statusCode: 200,
           data: true,
-          error: [],
+          message: [],
         })
       )
     )
@@ -373,9 +383,10 @@ describe('withdraw API', () => {
       http.delete('*/auth/withdraw', () =>
         HttpResponse.json(
           {
+            result: false,
             statusCode: 401,
-            data: false,
-            error: ['인증이 필요합니다.'],
+            data: null,
+            message: ['인증이 필요합니다.'],
           },
           { status: 401 }
         )
@@ -391,9 +402,10 @@ describe('withdraw API', () => {
       http.delete('*/auth/withdraw', () =>
         HttpResponse.json(
           {
+            result: false,
             statusCode: 500,
-            data: false,
-            error: ['회원탈퇴 처리 중 오류가 발생했습니다.'],
+            data: null,
+            message: ['회원탈퇴 처리 중 오류가 발생했습니다.'],
           },
           { status: 500 }
         )
@@ -415,9 +427,10 @@ describe('changePassword API', () => {
     server.use(
       http.patch('*/auth/password', () =>
         HttpResponse.json({
+          result: true,
           statusCode: 200,
           data: true,
-          error: [],
+          message: [],
         })
       )
     )
@@ -435,9 +448,10 @@ describe('changePassword API', () => {
       http.patch('*/auth/password', () =>
         HttpResponse.json(
           {
+            result: false,
             statusCode: 401,
-            data: false,
-            error: ['인증이 필요합니다.'],
+            data: null,
+            message: ['인증이 필요합니다.'],
           },
           { status: 401 }
         )
@@ -458,9 +472,10 @@ describe('changePassword API', () => {
       http.patch('*/auth/password', () =>
         HttpResponse.json(
           {
+            result: false,
             statusCode: 400,
-            data: false,
-            error: ['현재 비밀번호가 일치하지 않습니다.'],
+            data: null,
+            message: ['현재 비밀번호가 일치하지 않습니다.'],
           },
           { status: 400 }
         )
@@ -486,9 +501,10 @@ describe('otpLogin API', () => {
     server.use(
       http.post('*/user/otplogin', () =>
         HttpResponse.json({
+          result: true,
           statusCode: 200,
           data: { token: 'otp-token-xyz' },
-          error: [],
+          message: [],
         })
       )
     )
@@ -506,9 +522,10 @@ describe('otpLogin API', () => {
       http.post('*/user/otplogin', () =>
         HttpResponse.json(
           {
+            result: false,
             statusCode: 400,
-            data: {},
-            error: ['잘못된 OTP 코드입니다.'],
+            data: null,
+            message: ['잘못된 OTP 코드입니다.'],
           },
           { status: 400 }
         )
@@ -525,9 +542,10 @@ describe('otpLogin API', () => {
       http.post('*/user/otplogin', () =>
         HttpResponse.json(
           {
+            result: false,
             statusCode: 400,
-            data: {},
-            error: ['인증번호가 만료되었습니다.'],
+            data: null,
+            message: ['인증번호가 만료되었습니다.'],
           },
           { status: 400 }
         )
@@ -545,9 +563,10 @@ describe('otpLogin API', () => {
       http.post('*/user/otplogin', ({ request }) => {
         capturedHeader = request.headers.get('KPMFP')
         return HttpResponse.json({
+          result: true,
           statusCode: 200,
           data: { token: 'tok' },
-          error: [],
+          message: [],
         })
       })
     )
@@ -566,9 +585,10 @@ describe('otpLogin API', () => {
       http.post('*/user/otplogin', ({ request }) => {
         authHeader = request.headers.get('Authorization')
         return HttpResponse.json({
+          result: true,
           statusCode: 200,
           data: { token: 'tok' },
-          error: [],
+          message: [],
         })
       })
     )

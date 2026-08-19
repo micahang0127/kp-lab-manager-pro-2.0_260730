@@ -13,7 +13,7 @@ describe('checkExistingAccount API', () => {
   it('[TEMP] 항상 기존 계정이 존재하지 않는다(exists: false)고 응답한다', async () => {
     const result = await checkExistingAccount({ ci: 'mock-ci' })
     expect(result.statusCode).toBe(200)
-    expect(result.data.exists).toBe(false)
+    expect(result.data?.exists).toBe(false)
   })
 })
 

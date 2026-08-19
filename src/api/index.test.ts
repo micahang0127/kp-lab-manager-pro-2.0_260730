@@ -17,7 +17,7 @@ describe('api client', () => {
     server.use(
       http.get('*/test', ({ request }) => {
         receivedAuth = request.headers.get('Authorization')
-        return HttpResponse.json({ statusCode: 200, data: null, error: [] })
+        return HttpResponse.json({ result: true, statusCode: 200, data: null, message: [] })
       })
     )
 
@@ -30,7 +30,7 @@ describe('api client', () => {
     server.use(
       http.get('*/test', ({ request }) => {
         receivedAuth = request.headers.get('Authorization')
-        return HttpResponse.json({ statusCode: 200, data: null, error: [] })
+        return HttpResponse.json({ result: true, statusCode: 200, data: null, message: [] })
       })
     )
 
@@ -43,7 +43,7 @@ describe('api client', () => {
     server.use(
       http.post('*/test', async ({ request }) => {
         receivedBody = await request.json()
-        return HttpResponse.json({ statusCode: 200, data: null, error: [] })
+        return HttpResponse.json({ result: true, statusCode: 200, data: null, message: [] })
       })
     )
 
@@ -55,7 +55,7 @@ describe('api client', () => {
     server.use(
       http.get('*/test', () =>
         HttpResponse.json(
-          { statusCode: 401, data: null, error: ['인증이 필요합니다.'] },
+          { result: false, statusCode: 401, data: null, message: ['인증이 필요합니다.'] },
           { status: 401 }
         )
       )
@@ -68,7 +68,7 @@ describe('api client', () => {
     server.use(
       http.get('*/test', () =>
         HttpResponse.json(
-          { statusCode: 500, data: null, error: ['서버 오류가 발생했습니다.'] },
+          { result: false, statusCode: 500, data: null, message: ['서버 오류가 발생했습니다.'] },
           { status: 500 }
         )
       )
@@ -77,12 +77,12 @@ describe('api client', () => {
     await expect(api.get('/test')).rejects.toThrow('서버 오류가 발생했습니다.')
   })
 
-  it('statusCode가 200이 아니면 에러를 던진다', async () => {
+  it('result가 false이면 HTTP 상태와 무관하게 에러를 던진다', async () => {
     server.use(
       http.get('*/test', () =>
         HttpResponse.json(
-          { statusCode: 400, data: null, error: ['잘못된 요청입니다.'] },
-          { status: 200 } // HTTP 상태는 200이지만 statusCode는 400
+          { result: false, statusCode: 400, data: null, message: ['잘못된 요청입니다.'] },
+          { status: 200 } // HTTP 상태는 200이지만 result는 false
         )
       )
     )
@@ -102,10 +102,13 @@ describe('api client', () => {
     await expect(api.get('/test')).rejects.toThrow('일시적인 오류가 발생했습니다.')
   })
 
-  it('에러 배열이 비어있으면 기본 에러 메시지를 사용한다', async () => {
+  it('메시지 배열이 비어있으면 기본 에러 메시지를 사용한다', async () => {
     server.use(
       http.get('*/test', () =>
-        HttpResponse.json({ statusCode: 400, data: null, error: [] }, { status: 400 })
+        HttpResponse.json(
+          { result: false, statusCode: 400, data: null, message: [] },
+          { status: 400 }
+        )
       )
     )
 

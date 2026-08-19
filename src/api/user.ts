@@ -104,7 +104,8 @@ export const changePassword = (body: ChangePasswordRequest): Promise<ApiResponse
 // [TEMP] 26.08.13
 export const sendEmailVerificationCode = (
   _body: SendEmailVerificationCodeRequest
-): Promise<ApiResponse<boolean>> => Promise.resolve({ statusCode: 200, data: true, error: [] })
+): Promise<ApiResponse<boolean>> =>
+  Promise.resolve({ result: true, statusCode: 200, data: true, message: [] })
 
 /** 회원가입 이메일 인증번호 확인 — 인증 불필요(skipAuth) */
 // [TEMP] 26.08.13 백엔드 미연동 — 항상 성공 처리. 연동 완료 시 아래 stub을 실제 API 호출로 교체
@@ -116,4 +117,5 @@ export const sendEmailVerificationCode = (
 // [TEMP] 26.08.13
 export const verifyEmailVerificationCode = (
   _body: VerifyEmailVerificationCodeRequest
-): Promise<ApiResponse<boolean>> => Promise.resolve({ statusCode: 200, data: true, error: [] })
+): Promise<ApiResponse<boolean>> =>
+  Promise.resolve({ result: true, statusCode: 200, data: true, message: [] })

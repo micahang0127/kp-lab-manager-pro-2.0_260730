@@ -13,19 +13,20 @@ import {
 describe('storageLocation API', () => {
   it('보관위치 트리(최상위 2개, 하위 계층 포함)를 조회한다', async () => {
     const res = await getStorageLocations()
+    const data = res.data!
 
     expect(res.statusCode).toBe(200)
-    expect(res.data).toHaveLength(2)
-    expect(res.data[0].name).toBe('본관')
-    expect(res.data[0].children?.[0].children?.[0].name).toBe('시약보관실 A')
+    expect(data).toHaveLength(2)
+    expect(data[0].name).toBe('본관')
+    expect(data[0].children?.[0].children?.[0].name).toBe('시약보관실 A')
   })
 
   it('조회할 때마다 독립된 트리를 반환한다 (호출 측 변경이 다음 조회에 영향을 주지 않음)', async () => {
     const first = await getStorageLocations()
-    first.data[0].name = '변경된 이름'
+    first.data![0].name = '변경된 이름'
 
     const second = await getStorageLocations()
-    expect(second.data[0].name).toBe('본관')
+    expect(second.data![0].name).toBe('본관')
   })
 
   it('보관위치를 생성하면 성공 응답을 반환한다', async () => {

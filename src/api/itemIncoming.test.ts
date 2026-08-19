@@ -7,25 +7,26 @@ import { getIncomingItems } from './itemIncoming'
 describe('itemIncoming API', () => {
   it('기본 조회 시 전체 6건을 원래 순서대로 반환한다', async () => {
     const res = await getIncomingItems({})
+    const data = res.data!
 
     expect(res.statusCode).toBe(200)
-    expect(res.data.data).toHaveLength(6)
-    expect(res.data.total).toBe(6)
-    expect(res.data.totalPages).toBe(1)
-    expect(res.data.data.map((item) => item.id)).toEqual([1, 2, 3, 4, 5, 6])
+    expect(data.data).toHaveLength(6)
+    expect(data.total).toBe(6)
+    expect(data.totalPages).toBe(1)
+    expect(data.data.map((item) => item.id)).toEqual([1, 2, 3, 4, 5, 6])
   })
 
   it('sortBy/sortOrder로 오름차순 정렬된 결과를 반환한다', async () => {
     const res = await getIncomingItems({ sortBy: 'quantity', sortOrder: 'asc' })
 
-    const quantities = res.data.data.map((item) => item.quantity)
+    const quantities = res.data!.data.map((item) => item.quantity)
     expect(quantities).toEqual([...quantities].sort((a, b) => a - b))
   })
 
   it('sortBy/sortOrder로 내림차순 정렬된 결과를 반환한다', async () => {
     const res = await getIncomingItems({ sortBy: 'quantity', sortOrder: 'desc' })
 
-    const quantities = res.data.data.map((item) => item.quantity)
+    const quantities = res.data!.data.map((item) => item.quantity)
     expect(quantities).toEqual([...quantities].sort((a, b) => b - a))
   })
 })

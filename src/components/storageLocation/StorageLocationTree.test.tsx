@@ -14,12 +14,18 @@ vi.mock('../../api/storageLocation', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../api/storageLocation')>()
   return {
     ...actual,
-    createStorageLocation: vi.fn().mockResolvedValue({ statusCode: 200, data: true, error: [] }),
-    renameStorageLocation: vi.fn().mockResolvedValue({ statusCode: 200, data: true, error: [] }),
-    deleteStorageLocation: vi.fn().mockResolvedValue({ statusCode: 200, data: true, error: [] }),
+    createStorageLocation: vi
+      .fn()
+      .mockResolvedValue({ result: true, statusCode: 200, data: true, message: [] }),
+    renameStorageLocation: vi
+      .fn()
+      .mockResolvedValue({ result: true, statusCode: 200, data: true, message: [] }),
+    deleteStorageLocation: vi
+      .fn()
+      .mockResolvedValue({ result: true, statusCode: 200, data: true, message: [] }),
     updateStorageLocationOrder: vi
       .fn()
-      .mockResolvedValue({ statusCode: 200, data: true, error: [] }),
+      .mockResolvedValue({ result: true, statusCode: 200, data: true, message: [] }),
   }
 })
 

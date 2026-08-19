@@ -184,7 +184,7 @@ export function RegisterPage() {
     setIdentityVerificationNotice(undefined)
     try {
       const checkRes = await checkExistingAccount({ ci: customer.ci })
-      if (checkRes.data.exists) {
+      if (checkRes.data?.exists) {
         const shouldContinue = window.confirm(
           '기존 가입한 계정이 존재합니다. \n 기존 계정을 삭제하고, 가입을 계속 진행하시겠습니까?'
         )

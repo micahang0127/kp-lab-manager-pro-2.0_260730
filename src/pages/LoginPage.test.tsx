@@ -109,9 +109,10 @@ describe('LoginPage', () => {
     //     http.post('*/user/login', () =>
     //       HttpResponse.json(
     //         {
+    //           result: false,
     //           statusCode: 401,
-    //           data: {},
-    //           error: ['로봇 인증에 실패했습니다.'],
+    //           data: null,
+    //           message: ['로봇 인증에 실패했습니다.'],
     //         },
     //         { status: 401 }
     //       )
@@ -242,9 +243,10 @@ describe('LoginPage', () => {
     //     http.post('*/user/login', () =>
     //       HttpResponse.json(
     //         {
+    //           result: false,
     //           statusCode: 401,
-    //           data: {},
-    //           error: ['이메일 또는 비밀번호가 틀렸습니다.'],
+    //           data: null,
+    //           message: ['이메일 또는 비밀번호가 틀렸습니다.'],
     //         },
     //         { status: 401 }
     //       )
@@ -270,9 +272,10 @@ describe('LoginPage', () => {
     //   server.use(
     //     http.post('*/user/login', () =>
     //       HttpResponse.json({
+    //         result: true,
     //         statusCode: 200,
     //         data: { type: 'T', token: 'new-token-123' },
-    //         error: [],
+    //         message: [],
     //       })
     //     )
     //   )
@@ -300,9 +303,10 @@ describe('LoginPage', () => {
     //     http.post('*/user/login', () =>
     //       HttpResponse.json(
     //         {
+    //           result: false,
     //           statusCode: 401,
-    //           data: {},
-    //           error: ['이메일 또는 비밀번호가 틀렸습니다.'],
+    //           data: null,
+    //           message: ['이메일 또는 비밀번호가 틀렸습니다.'],
     //         },
     //         { status: 401 }
     //       )
@@ -338,9 +342,10 @@ describe('LoginPage', () => {
     //     http.post('*/user/login', async () => {
     //       await loginPromise
     //       return HttpResponse.json({
+    //         result: true,
     //         statusCode: 200,
     //         data: { type: 'T', token: 'token' },
-    //         error: [],
+    //         message: [],
     //       })
     //     })
     //   )
@@ -373,9 +378,10 @@ describe('LoginPage', () => {
   //     server.use(
   //       http.post('*/user/login', () =>
   //         HttpResponse.json({
+  //           result: true,
   //           statusCode: 200,
   //           data: { type: 'O' },
-  //           error: [],
+  //           message: [],
   //         })
   //       )
   //     )
@@ -401,16 +407,18 @@ describe('LoginPage', () => {
   //     server.use(
   //       http.post('*/user/login', () =>
   //         HttpResponse.json({
+  //           result: true,
   //           statusCode: 200,
   //           data: { type: 'O' },
-  //           error: [],
+  //           message: [],
   //         })
   //       ),
   //       http.post('*/user/otplogin', () =>
   //         HttpResponse.json({
+  //           result: true,
   //           statusCode: 200,
   //           data: { token: 'otp-token-456' },
-  //           error: [],
+  //           message: [],
   //         })
   //       )
   //     )
@@ -442,9 +450,10 @@ describe('LoginPage', () => {
   //     server.use(
   //       http.post('*/user/login', () =>
   //         HttpResponse.json({
+  //           result: true,
   //           statusCode: 200,
   //           data: { type: 'O' },
-  //           error: [],
+  //           message: [],
   //         })
   //       )
   //     )
@@ -467,9 +476,10 @@ describe('LoginPage', () => {
   //     server.use(
   //       http.post('*/user/login', () =>
   //         HttpResponse.json({
+  //           result: true,
   //           statusCode: 200,
   //           data: { type: 'O' },
-  //           error: [],
+  //           message: [],
   //         })
   //       )
   //     )
@@ -497,17 +507,19 @@ describe('LoginPage', () => {
   //     server.use(
   //       http.post('*/user/login', () =>
   //         HttpResponse.json({
+  //           result: true,
   //           statusCode: 200,
   //           data: { type: 'O' },
-  //           error: [],
+  //           message: [],
   //         })
   //       ),
   //       http.post('*/user/otplogin', () =>
   //         HttpResponse.json(
   //           {
+  //             result: false,
   //             statusCode: 400,
-  //             data: {},
-  //             error: ['잘못된 OTP 코드입니다.'],
+  //             data: null,
+  //             message: ['잘못된 OTP 코드입니다.'],
   //           },
   //           { status: 400 }
   //         )
@@ -532,9 +544,10 @@ describe('LoginPage', () => {
   //     server.use(
   //       http.post('*/user/login', () =>
   //         HttpResponse.json({
+  //           result: true,
   //           statusCode: 200,
   //           data: { type: 'O' },
-  //           error: [],
+  //           message: [],
   //         })
   //       )
   //     )
@@ -566,17 +579,19 @@ describe('LoginPage', () => {
   //     server.use(
   //       http.post('*/user/login', () =>
   //         HttpResponse.json({
+  //           result: true,
   //           statusCode: 200,
   //           data: { type: 'O' },
-  //           error: [],
+  //           message: [],
   //         })
   //       ),
   //       http.post('*/user/otplogin', async () => {
   //         await otpPromise
   //         return HttpResponse.json({
+  //           result: true,
   //           statusCode: 200,
   //           data: { token: 'tok' },
-  //           error: [],
+  //           message: [],
   //         })
   //       })
   //     )

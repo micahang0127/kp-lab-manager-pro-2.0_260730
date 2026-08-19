@@ -10,10 +10,18 @@ export interface PagedData {
   totalPages: number
 }
 
+/**
+ * 모든 API 응답이 공통으로 따르는 표준 응답 형태 (백엔드 CommonResponsePayload와 동일)
+ */
 export interface ApiResponse<T> {
+  /** 요청 성공 여부 */
+  result: boolean
+  /** 성공 시 응답 데이터, 실패 시 null */
+  data: T | null
+  /** 에러 메시지 목록. 성공 시 빈 배열 */
+  message: string[]
+  /** HTTP 상태 코드 */
   statusCode: number
-  data: T
-  error: string[]
 }
 
 export interface RequestOptions {
@@ -72,7 +80,7 @@ async function request<T>(
 
     // 401 Unauthorized: 응답 메시지 사용, 만료된 경우만 자동 로그아웃
     if (res.status === 401) {
-      const errorMessage = json.error?.[0] || '인증이 필요합니다.'
+      const errorMessage = json.message?.[0] || '인증이 필요합니다.'
 
       // 토큰 만료로 인한 401인 경우에만 자동 로그아웃
       // (api 요청 중 토큰이 만료된 경우 = Silent Refresh 필요)
@@ -86,12 +94,13 @@ async function request<T>(
       throw new ApiError(errorMessage, 401)
     }
 
-    if (res.ok && json.statusCode === 200) {
+    // result가 요청 성공 여부의 단일 기준 (statusCode는 부가 정보)
+    if (json.result) {
       return json
     }
 
     // 에러 발생 시 에러 객체를 던짐
-    const errorMessage = json.error?.[0] || '알 수 없는 오류가 발생했습니다.'
+    const errorMessage = json.message?.[0] || '알 수 없는 오류가 발생했습니다.'
     throw new ApiError(errorMessage, json.statusCode)
   } catch (err) {
     // ApiError는 백엔드가 사용자에게 보여줄 목적으로 준 메시지이므로 그대로 전달한다.

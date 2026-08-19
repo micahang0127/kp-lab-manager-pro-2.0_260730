@@ -105,18 +105,19 @@ export function LoginPage() {
       // }
       // return login(loginBody, fp)
       const stubResponse: ApiResponse<LoginData> = {
+        result: true,
         statusCode: 200,
         data: { type: 'T', token: createTempAccessToken() },
-        error: [],
+        message: [],
       }
       return stubResponse
     },
     onSuccess: (res) => {
-      if (res.data.type === 'T' && res.data.token) {
+      if (res.data?.type === 'T' && res.data.token) {
         sessionStorage.setItem('accessToken', res.data.token)
         setLoggedIn(true)
         void navigate({ to: '/main' })
-      } else if (res.data.type === 'O') {
+      } else if (res.data?.type === 'O') {
         setStep({
           kind: 'otp',
           email: form.email,
@@ -141,13 +142,15 @@ export function LoginPage() {
       //   fingerprintRef.current
       // )
       const stubResponse: ApiResponse<OtpLoginData> = {
+        result: true,
         statusCode: 200,
         data: { token: createTempAccessToken() },
-        error: [],
+        message: [],
       }
       return await Promise.resolve(stubResponse)
     },
     onSuccess: (res) => {
+      if (!res.data) return
       sessionStorage.setItem('accessToken', res.data.token)
       setLoggedIn(true)
       void navigate({ to: '/main' })

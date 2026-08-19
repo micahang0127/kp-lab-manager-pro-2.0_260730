@@ -49,7 +49,7 @@ const resultTemp: IdentityVerificationResponse = {
 export const confirmIdentityVerification = (
   _body: ConfirmIdentityVerificationRequest
 ): Promise<ApiResponse<IdentityVerificationResponse>> =>
-  Promise.resolve({ statusCode: 200, data: resultTemp, error: [] })
+  Promise.resolve({ result: true, statusCode: 200, data: resultTemp, message: [] })
 
 // ─── 기존 계정 확인/삭제 ─────────────────────────────────────────────────────────
 
@@ -75,7 +75,7 @@ export interface CheckExistingAccountData {
 export const checkExistingAccount = (
   _body: CheckExistingAccountRequest
 ): Promise<ApiResponse<CheckExistingAccountData>> =>
-  Promise.resolve({ statusCode: 200, data: { exists: false }, error: [] })
+  Promise.resolve({ result: true, statusCode: 200, data: { exists: false }, message: [] })
 
 /** 본인인증(CI) 기준 기존 가입 계정 삭제 — 재가입 진행 confirm 이후 호출 */
 // [TEMP] 26.08.13 백엔드 미연동 — 항상 성공 처리. 연동 완료 시 아래 stub을 실제 API 호출로 교체
@@ -89,4 +89,5 @@ export const checkExistingAccount = (
 // [TEMP] 26.08.13
 export const deleteExistingAccount = (
   _body: CheckExistingAccountRequest
-): Promise<ApiResponse<boolean>> => Promise.resolve({ statusCode: 200, data: true, error: [] })
+): Promise<ApiResponse<boolean>> =>
+  Promise.resolve({ result: true, statusCode: 200, data: true, message: [] })
