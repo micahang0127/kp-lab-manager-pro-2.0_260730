@@ -169,6 +169,25 @@ ESLint `simple-import-sort` 플러그인이 자동 정렬합니다. 수동 조�
 - `aria-label`: 한국어로 작성
 - Tailwind CSS 클래스 사용
 
+### 반응형 브레이크포인트 (`tailwind.config.js`)
+
+Tailwind 기본 브레이크포인트(`sm`/`md`/`lg`/`xl`/`2xl`)는 **전부 제거**되어 있으며, 프로젝트 전용 3단계로 교체되어 있습니다. 기본 prefix는 존재하지 않으므로 사용 시 빌드 에러가 발생합니다.
+
+| 구분   | prefix    | 범위                 |
+| ------ | --------- | -------------------- |
+| 모바일 | `mobile:` | 최소 360px ~ 767px   |
+| 태블릿 | `tablet:` | 768px ~ 1023px       |
+| 웹     | `web:`    | 1024px ~ (최대 없음) |
+
+- **`sm:` / `md:` / `lg:` / `xl:` / `2xl:` 사용 금지** — 존재하지 않는 prefix (제거됨)
+- 반응형에 따라 값이 달라지는 속성은 항상 `mobile:` / `tablet:` / `web:` 를 명시할 것. prefix 없는 클래스는 "모든 화면 공통" 값에만 사용 (리뷰어가 의도를 바로 파악할 수 있도록)
+  ```tsx
+  // 모바일 기준값 + 태블릿/웹에서 재정의
+  <div className="mobile:flex-col tablet:flex-row web:gap-8" />
+  ```
+- 360px 미만 화면은 별도 `min-width` 강제 없이 자연 축소되도록 둠 (지원 최소 기준일 뿐, 하드 제약 아님)
+- Tailwind는 mobile-first(min-width) 방식이라 각 prefix는 "그 값 이상"에 적용되며, 다음 단계 prefix가 실제 상한(예: `tablet:`은 `web:`이 시작되는 1024px 전까지)을 형성함
+
 ---
 
 ## 🧪 테스트 규칙
