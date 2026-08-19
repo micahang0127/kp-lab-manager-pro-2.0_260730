@@ -68,7 +68,6 @@ describe('Header', () => {
     render(<Header />)
     expect(screen.getByText('Home')).toBeInTheDocument()
     expect(screen.getByText('Main')).toBeInTheDocument()
-    expect(screen.getByText('Zustand')).toBeInTheDocument()
   })
 
   it('사이트 로고가 렌더링된다', () => {

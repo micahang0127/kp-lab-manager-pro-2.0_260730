@@ -2,17 +2,22 @@ import { useMutation } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 
+import type { VerifiedCustomer } from '../api/auth'
+import { checkExistingAccount, deleteExistingAccount } from '../api/auth'
 import type { SignupRequest } from '../api/user'
-import { signup } from '../api/user'
+import { sendEmailVerificationCode, signup, verifyEmailVerificationCode } from '../api/user'
 import type { BusinessRegistrationFormValue } from '../components/businessRegistration'
 import { BusinessRegistrationSection } from '../components/businessRegistration'
 import { FormCheckbox, FormInput, RequiredMark } from '../components/form'
 import { IdentityVerificationButton } from '../components/identityVerification'
 import {
+  EMAIL_CODE_LENGTH,
+  EMAIL_CODE_RULE_MESSAGE,
   EMAIL_MAX_LENGTH,
   EMAIL_RULE_MESSAGE,
   isValidBusinessNumber,
   isValidEmail,
+  isValidEmailCode,
   isValidPassword,
   isValidRepresentativeName,
   PASSWORD_RULE_MESSAGE,
@@ -22,8 +27,11 @@ import {
 
 interface RegisterForm {
   name: string
-  email: string
   phoneNumber: string
+  birthDate: string
+  gender: string
+  email: string
+  emailCode: string
   password: string
   confirmPassword: string
 }
@@ -46,6 +54,20 @@ const PRIVACY_SAMPLE_TEXT =
   '(샘플) 회사는 회원가입 시 이름, 이메일, 휴대폰번호를 수집하며, 수집한 정보는 회원 식별 및 ' +
   '서비스 제공 목적으로만 이용하고 목적 달성 후 지체 없이 파기합니다.'
 
+// ─── Helpers ───────────────────────────────────────────────────────────────────
+
+/** 본인인증 성별 코드('M'/'F')를 한국어 표시용 문자열로 변환한다. 알려지지 않은 값은 그대로 표시한다 */
+function formatGender(gender: string): string {
+  if (gender === 'M') return '남성'
+  if (gender === 'F') return '여성'
+  return gender
+}
+
+/** 본인인증 생년월일('YYYY-MM-DD')을 화면 표시용 형식('YYYY.MM.DD')으로 변환한다 */
+function formatBirthDate(birthDate: string): string {
+  return birthDate.replaceAll('-', '.')
+}
+
 // ─── Component ─────────────────────────────────────────────────────────────────
 
 export function RegisterPage() {
@@ -53,14 +75,26 @@ export function RegisterPage() {
 
   const [form, setForm] = useState<RegisterForm>({
     name: '',
-    email: '',
     phoneNumber: '',
+    birthDate: '',
+    gender: '',
+    email: '',
+    emailCode: '',
     password: '',
     confirmPassword: '',
   })
 
-  // 핸드폰인증 완료 여부 — 완료 시 이름/휴대폰번호는 인증된 값으로 잠김
+  // 본인인증 완료 여부 — 완료 시 이름/휴대폰번호/생년월일/성별은 인증된 값으로 잠김
   const [isVerified, setIsVerified] = useState(false)
+
+  // 이메일 인증번호 발송/확인 여부
+  const [isEmailCodeSent, setIsEmailCodeSent] = useState(false)
+  const [isEmailVerified, setIsEmailVerified] = useState(false)
+
+  // 본인인증 처리(기존 계정 확인/삭제) 중 취소·오류 안내 문구
+  const [identityVerificationNotice, setIdentityVerificationNotice] = useState<string | undefined>(
+    undefined
+  )
 
   const [agreements, setAgreements] = useState<Agreements>({
     terms: false,
@@ -89,9 +123,24 @@ export function RegisterPage() {
     },
   })
 
+  const sendEmailCodeMutation = useMutation({
+    mutationFn: () => sendEmailVerificationCode({ email: form.email }),
+    onSuccess: () => {
+      setIsEmailCodeSent(true)
+    },
+  })
+
+  const verifyEmailCodeMutation = useMutation({
+    mutationFn: () => verifyEmailVerificationCode({ email: form.email, code: form.emailCode }),
+    onSuccess: () => {
+      setIsEmailVerified(true)
+    },
+  })
+
   // ─── Validation ────────────────────────────────────────────────────────────
 
   const isEmailInvalid = form.email.length > 0 && !isValidEmail(form.email)
+  const isEmailCodeInvalid = form.emailCode.length > 0 && !isValidEmailCode(form.emailCode)
   const isPasswordInvalid = form.password.length > 0 && !isValidPassword(form.password)
   const isConfirmMismatch =
     form.confirmPassword.length > 0 && form.confirmPassword !== form.password
@@ -101,8 +150,11 @@ export function RegisterPage() {
   const canSubmit =
     isVerified &&
     form.name.trim().length > 0 &&
-    isValidEmail(form.email) &&
     form.phoneNumber.trim().length > 0 &&
+    form.birthDate.trim().length > 0 &&
+    form.gender.trim().length > 0 &&
+    isValidEmail(form.email) &&
+    isEmailVerified &&
     isValidPassword(form.password) &&
     form.password === form.confirmPassword &&
     business.registrationFile !== null &&
@@ -125,6 +177,40 @@ export function RegisterPage() {
       marketingEmail: checked,
       marketingSms: checked,
     })
+  }
+
+  /** 본인인증 성공 시 기존 가입 계정 존재 여부를 확인하고, 있으면 재가입 진행 여부를 확인받는다 */
+  const handleVerified = async (customer: VerifiedCustomer) => {
+    setIdentityVerificationNotice(undefined)
+    try {
+      const checkRes = await checkExistingAccount({ ci: customer.ci })
+      if (checkRes.data?.exists) {
+        const shouldContinue = window.confirm(
+          '기존 가입한 계정이 존재합니다. \n 기존 계정을 삭제하고, 가입을 계속 진행하시겠습니까?'
+        )
+        if (!shouldContinue) {
+          setIdentityVerificationNotice(
+            '회원가입이 취소되었습니다. 계속하려면 본인인증을 다시 진행해주세요.'
+          )
+          return
+        }
+        await deleteExistingAccount({ ci: customer.ci })
+      }
+
+      // 사전에 입력되어 있던 값은 모두 지우고 인증된 값으로 다시 채운다 (이메일은 제외)
+      setForm((f) => ({
+        ...f,
+        name: customer.name,
+        phoneNumber: customer.phoneNumber,
+        birthDate: formatBirthDate(customer.birthDate),
+        gender: formatGender(customer.gender),
+      }))
+      setIsVerified(true)
+    } catch (err) {
+      setIdentityVerificationNotice(
+        err instanceof Error ? err.message : '본인인증 처리 중 오류가 발생했습니다.'
+      )
+    }
   }
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -159,6 +245,12 @@ export function RegisterPage() {
   // ─── Render ───────────────────────────────────────────────────────────────────
 
   const signupErrors = signupMutation.error instanceof Error ? [signupMutation.error.message] : []
+  const emailCodeSendError =
+    sendEmailCodeMutation.error instanceof Error ? sendEmailCodeMutation.error.message : undefined
+  const emailCodeVerifyError =
+    verifyEmailCodeMutation.error instanceof Error
+      ? verifyEmailCodeMutation.error.message
+      : undefined
 
   return (
     <section className="mx-auto w-full max-w-lg">
@@ -180,34 +272,53 @@ export function RegisterPage() {
           </span>
           <IdentityVerificationButton
             onVerified={(customer) => {
-              // 사전에 입력되어 있던 값은 모두 지우고 인증된 값으로 다시 채운다 (이메일은 제외)
-              setForm((f) => ({
-                ...f,
-                name: customer.name,
-                phoneNumber: customer.phoneNumber,
-              }))
-              setIsVerified(true)
+              void handleVerified(customer)
             }}
           />
+          {identityVerificationNotice && (
+            <p className="mt-2 text-xs text-red-600">{identityVerificationNotice}</p>
+          )}
         </div>
+
+        <FormInput
+          id="name"
+          label="이름"
+          required
+          disabled
+          placeholder="본인 인증이 필요합니다."
+          value={form.name}
+          onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+        />
 
         <FormInput
           id="phoneNumber"
           label="휴대폰번호"
           type="tel"
           required
-          disabled={isVerified || signupMutation.isPending}
+          disabled
+          placeholder="본인 인증이 필요합니다."
           value={form.phoneNumber}
           onChange={(e) => setForm((f) => ({ ...f, phoneNumber: e.target.value }))}
         />
 
         <FormInput
-          id="name"
-          label="이름"
+          id="birthDate"
+          label="생년월일"
           required
-          disabled={isVerified || signupMutation.isPending}
-          value={form.name}
-          onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+          disabled
+          placeholder="본인 인증이 필요합니다."
+          value={form.birthDate}
+          onChange={(e) => setForm((f) => ({ ...f, birthDate: e.target.value }))}
+        />
+
+        <FormInput
+          id="gender"
+          label="성별"
+          required
+          disabled
+          placeholder="본인 인증이 필요합니다."
+          value={form.gender}
+          onChange={(e) => setForm((f) => ({ ...f, gender: e.target.value }))}
         />
 
         <FormInput
@@ -215,11 +326,74 @@ export function RegisterPage() {
           label="이메일"
           type="email"
           required
-          disabled={signupMutation.isPending}
+          disabled={isEmailVerified || signupMutation.isPending}
           maxLength={EMAIL_MAX_LENGTH}
           value={form.email}
-          onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-          message={isEmailInvalid ? EMAIL_RULE_MESSAGE : undefined}
+          onChange={(e) => {
+            const email = e.target.value
+            setForm((f) => ({ ...f, email, emailCode: '' }))
+            setIsEmailCodeSent(false)
+            setIsEmailVerified(false)
+            sendEmailCodeMutation.reset()
+            verifyEmailCodeMutation.reset()
+          }}
+          message={
+            isEmailInvalid
+              ? EMAIL_RULE_MESSAGE
+              : (emailCodeSendError ??
+                (isEmailCodeSent && !isEmailVerified
+                  ? '인증번호가 발송되었습니다. 이메일을 확인해주세요.'
+                  : undefined))
+          }
+          messageColor={isEmailInvalid || emailCodeSendError ? 'red' : 'green'}
+          addon={
+            <button
+              type="button"
+              disabled={
+                !isValidEmail(form.email) ||
+                isEmailVerified ||
+                sendEmailCodeMutation.isPending ||
+                signupMutation.isPending
+              }
+              onClick={() => sendEmailCodeMutation.mutate()}
+              className="shrink-0 rounded border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              {sendEmailCodeMutation.isPending ? '발송 중...' : '인증번호 보내기'}
+            </button>
+          }
+        />
+
+        <FormInput
+          id="emailCode"
+          label="이메일 인증번호"
+          required
+          disabled={!isEmailCodeSent || isEmailVerified || signupMutation.isPending}
+          placeholder="인증번호 6자리를 입력하세요"
+          maxLength={EMAIL_CODE_LENGTH}
+          inputMode="numeric"
+          value={form.emailCode}
+          onChange={(e) => setForm((f) => ({ ...f, emailCode: e.target.value.replace(/\D/g, '') }))}
+          message={
+            isEmailVerified
+              ? '이메일 인증이 완료되었습니다.'
+              : (emailCodeVerifyError ?? (isEmailCodeInvalid ? EMAIL_CODE_RULE_MESSAGE : undefined))
+          }
+          messageColor={isEmailVerified ? 'green' : 'red'}
+          addon={
+            <button
+              type="button"
+              disabled={
+                !isValidEmailCode(form.emailCode) ||
+                isEmailVerified ||
+                verifyEmailCodeMutation.isPending ||
+                signupMutation.isPending
+              }
+              onClick={() => verifyEmailCodeMutation.mutate()}
+              className="shrink-0 rounded border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              {verifyEmailCodeMutation.isPending ? '확인 중...' : '확인'}
+            </button>
+          }
         />
 
         <FormInput

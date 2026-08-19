@@ -38,16 +38,19 @@ export const createLab = (body: CreateLabRequest): Promise<ApiResponse<Lab>> =>
 
 ## 응답 구조
 
+백엔드 공통 응답 포맷(`CommonResponsePayload<T>`)과 동일한 구조를 그대로 사용한다.
+
 ```typescript
 interface ApiResponse<T> {
-  statusCode: number // 200 = 성공
-  data: T // 실제 데이터
-  error: string[] // 에러 메시지 배열
+  result: boolean // 요청 성공 여부 — 성공/실패 판단의 단일 기준
+  data: T | null // 성공 시 응답 데이터, 실패 시 null
+  message: string[] // 에러 메시지 목록. 성공 시 빈 배열
+  statusCode: number // HTTP 상태 코드
 }
 ```
 
-- 성공: `response.data`에서 추출
-- 실패: `ApiError` throw됨 — `.statusCode`, `.message`로 접근
+- 성공: `response.data`에서 추출 — **`data`는 `T | null` 타입이므로 접근 시 옵셔널 체이닝(`?.`) 또는 널 가드 필수**
+- 실패: `ApiError` throw됨 — `.statusCode`, `.message`로 접근 (`request()` 내부에서 `result`가 `false`면 자동으로 throw하므로, `res.result`가 `true`인 응답만 컴포넌트에 도달함)
 - **401 자동 처리**: 만료 감지 시 자동 로그아웃 + `/login` 리다이렉트. 컴포넌트에서 별도 처리 금지
 
 ## 옵션
@@ -83,7 +86,7 @@ const createLabTemp: Lab = {
 }
 
 export const createLab = (_body: CreateLabRequest): Promise<ApiResponse<Lab>> =>
-  Promise.resolve({ statusCode: 200, data: createLabTemp, error: [] })
+  Promise.resolve({ result: true, statusCode: 200, data: createLabTemp, message: [] })
 ```
 
 실제 예시: `src/api/auth.ts`의 `confirmIdentityVerification` 참고.
@@ -107,9 +110,10 @@ describe('lab API', () => {
     server.use(
       http.get('*/labs', () =>
         HttpResponse.json({
+          result: true,
           statusCode: 200,
           data: [{ id: 1, name: '테스트 실험실' }],
-          error: [],
+          message: [],
         })
       )
     )
@@ -121,7 +125,10 @@ describe('lab API', () => {
   it('서버 에러 시 ApiError를 던진다', async () => {
     server.use(
       http.get('*/labs', () =>
-        HttpResponse.json({ statusCode: 500, data: null, error: ['서버 오류'] }, { status: 500 })
+        HttpResponse.json(
+          { result: false, statusCode: 500, data: null, message: ['서버 오류'] },
+          { status: 500 }
+        )
       )
     )
 

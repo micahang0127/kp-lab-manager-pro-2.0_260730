@@ -36,54 +36,58 @@ describe('Sidebar', () => {
     render(<Sidebar />)
 
     expect(screen.getByRole('link', { name: '홈' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /물품관리/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /안전관리/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /기관관리/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '재고관리' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '구매/입고 관리' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '예약/출고 관리' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '안전/법령 관리' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '설정' })).toBeInTheDocument()
   })
 
   it('현재 경로와 무관한 대메뉴는 초기에 접혀 있다', () => {
     mockUseLocation.mockReturnValue({ pathname: '/main' })
     render(<Sidebar />)
 
-    expect(screen.getByRole('button', { name: /물품관리/ })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: '재고관리' })).toHaveAttribute(
       'aria-expanded',
       'false'
     )
-    expect(screen.getByRole('button', { name: /안전관리/ })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: '구매/입고 관리' })).toHaveAttribute(
       'aria-expanded',
       'false'
     )
-    expect(screen.getByRole('button', { name: /기관관리/ })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: '예약/출고 관리' })).toHaveAttribute(
       'aria-expanded',
       'false'
     )
+    expect(screen.getByRole('button', { name: '안전/법령 관리' })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    )
+    expect(screen.getByRole('button', { name: '설정' })).toHaveAttribute('aria-expanded', 'false')
   })
 
   it('현재 경로에 해당하는 대메뉴는 초기에 펼쳐진다', () => {
     mockUseLocation.mockReturnValue({ pathname: '/items/register' })
     render(<Sidebar />)
 
-    expect(screen.getByRole('button', { name: /물품관리/ })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: '구매/입고 관리' })).toHaveAttribute(
       'aria-expanded',
       'true'
     )
     expect(screen.getByRole('link', { name: '물품목록' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: '입고등록대기' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /안전관리/ })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: '안전/법령 관리' })).toHaveAttribute(
       'aria-expanded',
       'false'
     )
-    expect(screen.getByRole('button', { name: /기관관리/ })).toHaveAttribute(
-      'aria-expanded',
-      'false'
-    )
+    expect(screen.getByRole('button', { name: '설정' })).toHaveAttribute('aria-expanded', 'false')
   })
 
   it('대메뉴 버튼 클릭 시 소메뉴가 토글된다', async () => {
     mockUseLocation.mockReturnValue({ pathname: '/main' })
     render(<Sidebar />)
 
-    const safetyButton = screen.getByRole('button', { name: /안전관리/ })
+    const safetyButton = screen.getByRole('button', { name: '안전/법령 관리' })
     expect(safetyButton).toHaveAttribute('aria-expanded', 'false')
 
     await userEvent.click(safetyButton)
@@ -94,18 +98,32 @@ describe('Sidebar', () => {
     expect(safetyButton).toHaveAttribute('aria-expanded', 'false')
   })
 
+  it('설정 대메뉴를 펼치면 하위 메뉴 6개가 모두 노출된다', async () => {
+    mockUseLocation.mockReturnValue({ pathname: '/main' })
+    render(<Sidebar />)
+
+    await userEvent.click(screen.getByRole('button', { name: '설정' }))
+
+    expect(screen.getByRole('link', { name: '프로세스 관리' })).toBeVisible()
+    expect(screen.getByRole('link', { name: '멤버 관리' })).toBeVisible()
+    expect(screen.getByRole('link', { name: '그룹 관리' })).toBeVisible()
+    expect(screen.getByRole('link', { name: '카테고리 관리' })).toBeVisible()
+    expect(screen.getByRole('link', { name: '보관위치 관리' })).toBeVisible()
+    expect(screen.getByRole('link', { name: '재고 관리 설정' })).toBeVisible()
+  })
+
   it('여러 대메뉴를 동시에 펼칠 수 있다', async () => {
     mockUseLocation.mockReturnValue({ pathname: '/main' })
     render(<Sidebar />)
 
-    await userEvent.click(screen.getByRole('button', { name: /물품관리/ }))
-    await userEvent.click(screen.getByRole('button', { name: /안전관리/ }))
+    await userEvent.click(screen.getByRole('button', { name: '구매/입고 관리' }))
+    await userEvent.click(screen.getByRole('button', { name: '안전/법령 관리' }))
 
-    expect(screen.getByRole('button', { name: /물품관리/ })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: '구매/입고 관리' })).toHaveAttribute(
       'aria-expanded',
       'true'
     )
-    expect(screen.getByRole('button', { name: /안전관리/ })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: '안전/법령 관리' })).toHaveAttribute(
       'aria-expanded',
       'true'
     )

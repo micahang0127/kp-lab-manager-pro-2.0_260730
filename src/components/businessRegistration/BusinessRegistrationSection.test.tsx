@@ -135,9 +135,19 @@ describe('BusinessRegistrationSection', () => {
     fireEvent.change(screen.getByLabelText('사업자등록증'), { target: { files: [invalidFile] } })
 
     expect(
-      await screen.findByText(
-        'PDF, JPG, PNG 파일만 첨부할 수 있으며, 최대 10MB까지 업로드할 수 있습니다.'
-      )
+      await screen.findByText('PDF 파일만 첨부할 수 있으며, 최대 10MB까지 업로드할 수 있습니다.')
+    ).toBeInTheDocument()
+    expect(screen.getByDisplayValue('선택된 파일이 없습니다.')).toBeInTheDocument()
+  })
+
+  it('이미지 파일(JPG)은 위변조 방지를 위해 첨부할 수 없다', async () => {
+    render(<Harness />)
+
+    const imageFile = new File(['dummy'], 'business-license.jpg', { type: 'image/jpeg' })
+    fireEvent.change(screen.getByLabelText('사업자등록증'), { target: { files: [imageFile] } })
+
+    expect(
+      await screen.findByText('PDF 파일만 첨부할 수 있으며, 최대 10MB까지 업로드할 수 있습니다.')
     ).toBeInTheDocument()
     expect(screen.getByDisplayValue('선택된 파일이 없습니다.')).toBeInTheDocument()
   })
@@ -151,9 +161,7 @@ describe('BusinessRegistrationSection', () => {
     await userEvent.upload(screen.getByLabelText('사업자등록증'), oversizedFile)
 
     expect(
-      await screen.findByText(
-        'PDF, JPG, PNG 파일만 첨부할 수 있으며, 최대 10MB까지 업로드할 수 있습니다.'
-      )
+      await screen.findByText('PDF 파일만 첨부할 수 있으며, 최대 10MB까지 업로드할 수 있습니다.')
     ).toBeInTheDocument()
   })
 

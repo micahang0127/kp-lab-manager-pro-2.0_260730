@@ -24,9 +24,6 @@ export function Header() {
           <Link to="/main" className="hover:text-indigo-600">
             Main
           </Link>
-          <Link to="/zustand" className="hover:text-indigo-600">
-            Zustand
-          </Link>
 
           {isLoggedIn ? (
             <button

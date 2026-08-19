@@ -22,7 +22,6 @@ tools: Read, Grep, Glob
 - [ ] 라우팅: `src/routes/`에 파일 추가, `routeTree.gen.ts` 직접 수정 시도 없음
 - [ ] 상태 관리: 서버 상태를 Zustand에 저장하려 하지 않음
 - [ ] API: `api.*` 래퍼 사용, 직접 `fetch` 호출 없음
-- [ ] Ketcher: `KetcherLoader` 경유, 직접 import 없음
 - [ ] TypeScript: `any` 사용 없음
 - [ ] 파일명 규칙 (PascalCase / camelCase) 준수
 - [ ] 한국어 UI / 주석 / 커밋 컨벤션
@@ -39,7 +38,7 @@ tools: Read, Grep, Glob
 
 - 불확실한 백엔드 명세 → `[TEMP]` 패턴 적용 권장
 - 기존 코드와 충돌 가능성
-- 성능 영향 (특히 Ketcher 같은 무거운 의존성)
+- 성능 영향 (무거운 의존성 추가 등)
 
 ## 출력 형식
 

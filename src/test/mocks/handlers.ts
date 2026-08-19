@@ -9,17 +9,19 @@ export const handlers = [
     if (!body) {
       return HttpResponse.json(
         {
+          result: false,
           statusCode: 400,
           data: null,
-          error: ['이메일 또는 비밀번호가 틀렸습니다.'],
+          message: ['이메일 또는 비밀번호가 틀렸습니다.'],
         },
         { status: 400 }
       )
     }
     return HttpResponse.json({
+      result: true,
       statusCode: 200,
       data: { accessToken: 'mock-token-success' },
-      error: [],
+      message: [],
     })
   }),
 
@@ -29,26 +31,29 @@ export const handlers = [
     if (!authHeader) {
       return HttpResponse.json(
         {
+          result: false,
           statusCode: 401,
           data: null,
-          error: ['인증이 필요합니다.'],
+          message: ['인증이 필요합니다.'],
         },
         { status: 401 }
       )
     }
     return HttpResponse.json({
+      result: true,
       statusCode: 200,
       data: null,
-      error: [],
+      message: [],
     })
   }),
 
   // 회원가입 핸들러
   http.post(`${BASE_URL}/users`, () =>
     HttpResponse.json({
+      result: true,
       statusCode: 200,
       data: { userId: 'test-user-id' },
-      error: [],
+      message: [],
     })
   ),
 
@@ -58,17 +63,19 @@ export const handlers = [
     if (!authHeader) {
       return HttpResponse.json(
         {
+          result: false,
           statusCode: 401,
           data: null,
-          error: ['인증이 필요합니다.'],
+          message: ['인증이 필요합니다.'],
         },
         { status: 401 }
       )
     }
     return HttpResponse.json({
+      result: true,
       statusCode: 200,
       data: true,
-      error: [],
+      message: [],
     })
   }),
 
@@ -78,17 +85,19 @@ export const handlers = [
     if (!authHeader) {
       return HttpResponse.json(
         {
+          result: false,
           statusCode: 401,
           data: null,
-          error: ['인증이 필요합니다.'],
+          message: ['인증이 필요합니다.'],
         },
         { status: 401 }
       )
     }
     return HttpResponse.json({
+      result: true,
       statusCode: 200,
       data: true,
-      error: [],
+      message: [],
     })
   }),
 ]

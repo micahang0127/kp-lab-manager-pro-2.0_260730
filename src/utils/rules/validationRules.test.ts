@@ -4,14 +4,18 @@ import {
   BUSINESS_NUMBER_RULE_MESSAGE,
   BUSINESS_REGISTRATION_FILE_MAX_SIZE_BYTES,
   BUSINESS_REGISTRATION_FILE_RULE_MESSAGE,
+  EMAIL_CODE_RULE_MESSAGE,
   EMAIL_RULE_MESSAGE,
   isValidBusinessNumber,
   isValidBusinessRegistrationFile,
   isValidEmail,
+  isValidEmailCode,
   isValidPassword,
   isValidRepresentativeName,
   PASSWORD_RULE_MESSAGE,
+  removeHangul,
   REPRESENTATIVE_NAME_RULE_MESSAGE,
+  sanitizePasswordInput,
 } from './validationRules'
 
 describe('validationRules', () => {
@@ -42,9 +46,25 @@ describe('validationRules', () => {
     expect(EMAIL_RULE_MESSAGE).toContain('이메일')
   })
 
+  describe('removeHangul', () => {
+    it('한글 음절이 포함되면 제거한다', () => {
+      expect(removeHangul('test한글@example.com')).toBe('test@example.com')
+    })
+
+    it('한글 자모가 포함되면 제거한다', () => {
+      expect(removeHangul('testㄱㅏ@example.com')).toBe('test@example.com')
+    })
+
+    it('한글이 없으면 그대로 반환한다', () => {
+      expect(removeHangul('test@example.com')).toBe('test@example.com')
+    })
+  })
+
   describe('isValidPassword', () => {
-    it('영문, 숫자, 특수문자를 포함한 8~64자는 통과한다', () => {
-      expect(isValidPassword('abc123!@')).toBe(true)
+    it('영문 대소문자·숫자·특수문자만 포함한 8자 이상은 조합과 무관하게 통과한다', () => {
+      expect(isValidPassword('abcdefgh')).toBe(true)
+      expect(isValidPassword('12345678')).toBe(true)
+      expect(isValidPassword('!@#$%^&*')).toBe(true)
       expect(isValidPassword('Password1!')).toBe(true)
     })
 
@@ -52,33 +72,39 @@ describe('validationRules', () => {
       expect(isValidPassword('ab1!')).toBe(false)
     })
 
-    it('64자를 초과하면 실패한다', () => {
-      expect(isValidPassword('abc123!@'.repeat(8) + 'a')).toBe(false)
-    })
-
     it('경계값 8자는 통과한다', () => {
-      expect(isValidPassword('ab1!cd2@')).toBe(true)
+      expect(isValidPassword('abcdefg1')).toBe(true)
     })
 
-    it('경계값 64자는 통과한다', () => {
-      expect(isValidPassword('abc123!@'.repeat(8))).toBe(true)
+    it('한글이 포함되면 실패한다', () => {
+      expect(isValidPassword('abcdefg가')).toBe(false)
     })
 
-    it('영문이 없으면 실패한다', () => {
-      expect(isValidPassword('12345678!@')).toBe(false)
+    it('공백이 포함되면 실패한다', () => {
+      expect(isValidPassword('abcd efg1')).toBe(false)
     })
 
-    it('숫자가 없으면 실패한다', () => {
-      expect(isValidPassword('abcdefgh!@')).toBe(false)
-    })
-
-    it('특수문자가 없으면 실패한다', () => {
-      expect(isValidPassword('abcdefgh1234')).toBe(false)
+    it('길이 상한 없이 통과한다 (조합/최대 길이 필수 규칙 삭제됨)', () => {
+      expect(isValidPassword('a'.repeat(100))).toBe(true)
     })
   })
 
   it('PASSWORD_RULE_MESSAGE는 규칙 안내 문구를 담고 있다', () => {
-    expect(PASSWORD_RULE_MESSAGE).toContain('8~64자')
+    expect(PASSWORD_RULE_MESSAGE).toContain('8자리 이상')
+  })
+
+  describe('sanitizePasswordInput', () => {
+    it('한글이 포함되면 제거한다', () => {
+      expect(sanitizePasswordInput('abc한글123')).toBe('abc123')
+    })
+
+    it('공백이 포함되면 제거한다', () => {
+      expect(sanitizePasswordInput('abc 123')).toBe('abc123')
+    })
+
+    it('영문·숫자·특수문자는 그대로 유지한다', () => {
+      expect(sanitizePasswordInput('Abc123!@#')).toBe('Abc123!@#')
+    })
   })
 
   describe('isValidBusinessNumber', () => {
@@ -161,18 +187,21 @@ describe('validationRules', () => {
   })
 
   describe('isValidBusinessRegistrationFile', () => {
-    it('PDF, JPG, PNG 파일은 통과한다', () => {
+    it('PDF 파일은 통과한다', () => {
       expect(
         isValidBusinessRegistrationFile(
           new File(['dummy'], 'license.pdf', { type: 'application/pdf' })
         )
       ).toBe(true)
+    })
+
+    it('이미지 파일(JPG, PNG)이면 실패한다', () => {
       expect(
         isValidBusinessRegistrationFile(new File(['dummy'], 'license.jpg', { type: 'image/jpeg' }))
-      ).toBe(true)
+      ).toBe(false)
       expect(
         isValidBusinessRegistrationFile(new File(['dummy'], 'license.png', { type: 'image/png' }))
-      ).toBe(true)
+      ).toBe(false)
     })
 
     it('허용되지 않는 형식이면 실패한다', () => {
@@ -203,5 +232,28 @@ describe('validationRules', () => {
 
   it('BUSINESS_REGISTRATION_FILE_RULE_MESSAGE는 규칙 안내 문구를 담고 있다', () => {
     expect(BUSINESS_REGISTRATION_FILE_RULE_MESSAGE).toContain('PDF')
+  })
+
+  describe('isValidEmailCode', () => {
+    it('숫자 6자리면 통과한다', () => {
+      expect(isValidEmailCode('123456')).toBe(true)
+    })
+
+    it('6자리가 아니면 실패한다', () => {
+      expect(isValidEmailCode('12345')).toBe(false)
+      expect(isValidEmailCode('1234567')).toBe(false)
+    })
+
+    it('숫자가 아닌 문자가 포함되면 실패한다', () => {
+      expect(isValidEmailCode('12345a')).toBe(false)
+    })
+
+    it('빈 문자열이면 실패한다', () => {
+      expect(isValidEmailCode('')).toBe(false)
+    })
+  })
+
+  it('EMAIL_CODE_RULE_MESSAGE는 규칙 안내 문구를 담고 있다', () => {
+    expect(EMAIL_CODE_RULE_MESSAGE).toContain('인증번호')
   })
 })

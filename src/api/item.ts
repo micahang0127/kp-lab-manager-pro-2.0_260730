@@ -272,8 +272,9 @@ export const getItems = (params: GetItemsParams): Promise<ApiResponse<ItemListRe
   const data = sorted.slice(start, start + limit)
 
   return Promise.resolve({
+    result: true,
     statusCode: 200,
     data: { data, total, page, limit, totalPages },
-    error: [],
+    message: [],
   })
 }

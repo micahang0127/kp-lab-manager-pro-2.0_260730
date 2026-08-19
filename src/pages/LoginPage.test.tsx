@@ -109,9 +109,10 @@ describe('LoginPage', () => {
     //     http.post('*/user/login', () =>
     //       HttpResponse.json(
     //         {
+    //           result: false,
     //           statusCode: 401,
-    //           data: {},
-    //           error: ['로봇 인증에 실패했습니다.'],
+    //           data: null,
+    //           message: ['로봇 인증에 실패했습니다.'],
     //         },
     //         { status: 401 }
     //       )
@@ -147,6 +148,43 @@ describe('LoginPage', () => {
       expect(passwordInput.value).toBe('test123')
     })
 
+    it('진입 시 이메일 입력란에 자동으로 포커스된다', () => {
+      render(<LoginPage />)
+
+      expect(screen.getByLabelText(/이메일/)).toHaveFocus()
+    })
+
+    it('이메일/비밀번호 입력란에 안내 placeholder가 표시된다', () => {
+      render(<LoginPage />)
+
+      expect(screen.getByPlaceholderText('이메일을 입력하세요.')).toBeInTheDocument()
+      expect(screen.getByPlaceholderText('비밀번호 8자리 이상 입력하세요')).toBeInTheDocument()
+    })
+
+    it('라벨 옆에 필수 입력 표시(*)가 렌더링되지 않는다', () => {
+      const { container } = render(<LoginPage />)
+
+      expect(container.textContent).not.toContain('*')
+    })
+
+    it('이메일 입력 시 한글은 즉시 제거된다', async () => {
+      render(<LoginPage />)
+      const emailInput = screen.getByLabelText(/이메일/) as HTMLInputElement
+
+      await userEvent.type(emailInput, 'test한글abc')
+
+      expect(emailInput.value).toBe('testabc')
+    })
+
+    it('비밀번호 입력 시 한글/공백 등 허용되지 않는 문자는 즉시 제거된다', async () => {
+      render(<LoginPage />)
+      const passwordInput = screen.getByLabelText(/비밀번호/) as HTMLInputElement
+
+      await userEvent.type(passwordInput, 'abc 한글123!@')
+
+      expect(passwordInput.value).toBe('abc123!@')
+    })
+
     // [TEMP] 26.07.27 백엔드 미연동 — 로그인 API가 항상 성공한다고 가정한 스텁 동작 검증.
     // 연동 완료 시 이 테스트를 삭제하고 아래 [FUTURE WORK] 테스트들의 주석을 해제할 것
     it('TEMP: 이메일과 비밀번호를 입력하고 제출하면 항상 로그인에 성공하여 /main으로 이동한다', async () => {
@@ -171,14 +209,73 @@ describe('LoginPage', () => {
       })
     })
 
+    it('이메일 형식이 아니면 alert로 안내하고 로그인 요청을 보내지 않는다', async () => {
+      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
+      render(<LoginPage />)
+
+      fireEvent.click(screen.getByText('turnstile-success'))
+      await userEvent.type(screen.getByLabelText(/이메일/), 'invalid-email')
+      await userEvent.type(screen.getByLabelText(/비밀번호/), 'password123')
+      await userEvent.click(screen.getByRole('button', { name: /^로그인$/ }))
+
+      expect(alertSpy).toHaveBeenCalledWith('이메일 형식이 아닙니다.')
+      expect(sessionStorage.getItem('accessToken')).toBeNull()
+      expect(mockNavigate).not.toHaveBeenCalled()
+    })
+
+    it('비밀번호가 8자 미만이면 alert로 안내하고 로그인 요청을 보내지 않는다', async () => {
+      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
+      render(<LoginPage />)
+
+      fireEvent.click(screen.getByText('turnstile-success'))
+      await userEvent.type(screen.getByLabelText(/이메일/), 'user@test.com')
+      await userEvent.type(screen.getByLabelText(/비밀번호/), '1234567')
+      await userEvent.click(screen.getByRole('button', { name: /^로그인$/ }))
+
+      expect(alertSpy).toHaveBeenCalledWith('비밀번호는 최소 8자리 이상입니다.')
+      expect(sessionStorage.getItem('accessToken')).toBeNull()
+      expect(mockNavigate).not.toHaveBeenCalled()
+    })
+
     // [FUTURE WORK] 백엔드 연동 후 주석 해제
+    // it('로그인 실패(잘못된 비밀번호) 시 alert로 안내한다', async () => {
+    //   server.use(
+    //     http.post('*/user/login', () =>
+    //       HttpResponse.json(
+    //         {
+    //           result: false,
+    //           statusCode: 401,
+    //           data: null,
+    //           message: ['이메일 또는 비밀번호가 틀렸습니다.'],
+    //         },
+    //         { status: 401 }
+    //       )
+    //     )
+    //   )
+    //   const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
+    //
+    //   render(<LoginPage />)
+    //
+    //   fireEvent.click(screen.getByText('turnstile-success'))
+    //   await userEvent.type(screen.getByLabelText(/이메일/), 'user@test.com')
+    //   await userEvent.type(screen.getByLabelText(/비밀번호/), 'wrongpass1')
+    //   await userEvent.click(screen.getByRole('button', { name: /^로그인$/ }))
+    //
+    //   await waitFor(() => {
+    //     expect(alertSpy).toHaveBeenCalledWith('올바른 비밀번호가 아닙니다.')
+    //   })
+    //   expect(sessionStorage.getItem('accessToken')).toBeNull()
+    //   expect(mockNavigate).not.toHaveBeenCalled()
+    // })
+    //
     // it('이메일과 비밀번호를 입력하고 로그인할 수 있다', async () => {
     //   server.use(
     //     http.post('*/user/login', () =>
     //       HttpResponse.json({
+    //         result: true,
     //         statusCode: 200,
     //         data: { type: 'T', token: 'new-token-123' },
-    //         error: [],
+    //         message: [],
     //       })
     //     )
     //   )
@@ -206,9 +303,10 @@ describe('LoginPage', () => {
     //     http.post('*/user/login', () =>
     //       HttpResponse.json(
     //         {
+    //           result: false,
     //           statusCode: 401,
-    //           data: {},
-    //           error: ['이메일 또는 비밀번호가 틀렸습니다.'],
+    //           data: null,
+    //           message: ['이메일 또는 비밀번호가 틀렸습니다.'],
     //         },
     //         { status: 401 }
     //       )
@@ -244,9 +342,10 @@ describe('LoginPage', () => {
     //     http.post('*/user/login', async () => {
     //       await loginPromise
     //       return HttpResponse.json({
+    //         result: true,
     //         statusCode: 200,
     //         data: { type: 'T', token: 'token' },
-    //         error: [],
+    //         message: [],
     //       })
     //     })
     //   )
@@ -279,9 +378,10 @@ describe('LoginPage', () => {
   //     server.use(
   //       http.post('*/user/login', () =>
   //         HttpResponse.json({
+  //           result: true,
   //           statusCode: 200,
   //           data: { type: 'O' },
-  //           error: [],
+  //           message: [],
   //         })
   //       )
   //     )
@@ -307,16 +407,18 @@ describe('LoginPage', () => {
   //     server.use(
   //       http.post('*/user/login', () =>
   //         HttpResponse.json({
+  //           result: true,
   //           statusCode: 200,
   //           data: { type: 'O' },
-  //           error: [],
+  //           message: [],
   //         })
   //       ),
   //       http.post('*/user/otplogin', () =>
   //         HttpResponse.json({
+  //           result: true,
   //           statusCode: 200,
   //           data: { token: 'otp-token-456' },
-  //           error: [],
+  //           message: [],
   //         })
   //       )
   //     )
@@ -348,9 +450,10 @@ describe('LoginPage', () => {
   //     server.use(
   //       http.post('*/user/login', () =>
   //         HttpResponse.json({
+  //           result: true,
   //           statusCode: 200,
   //           data: { type: 'O' },
-  //           error: [],
+  //           message: [],
   //         })
   //       )
   //     )
@@ -373,9 +476,10 @@ describe('LoginPage', () => {
   //     server.use(
   //       http.post('*/user/login', () =>
   //         HttpResponse.json({
+  //           result: true,
   //           statusCode: 200,
   //           data: { type: 'O' },
-  //           error: [],
+  //           message: [],
   //         })
   //       )
   //     )
@@ -403,17 +507,19 @@ describe('LoginPage', () => {
   //     server.use(
   //       http.post('*/user/login', () =>
   //         HttpResponse.json({
+  //           result: true,
   //           statusCode: 200,
   //           data: { type: 'O' },
-  //           error: [],
+  //           message: [],
   //         })
   //       ),
   //       http.post('*/user/otplogin', () =>
   //         HttpResponse.json(
   //           {
+  //             result: false,
   //             statusCode: 400,
-  //             data: {},
-  //             error: ['잘못된 OTP 코드입니다.'],
+  //             data: null,
+  //             message: ['잘못된 OTP 코드입니다.'],
   //           },
   //           { status: 400 }
   //         )
@@ -438,9 +544,10 @@ describe('LoginPage', () => {
   //     server.use(
   //       http.post('*/user/login', () =>
   //         HttpResponse.json({
+  //           result: true,
   //           statusCode: 200,
   //           data: { type: 'O' },
-  //           error: [],
+  //           message: [],
   //         })
   //       )
   //     )
@@ -472,17 +579,19 @@ describe('LoginPage', () => {
   //     server.use(
   //       http.post('*/user/login', () =>
   //         HttpResponse.json({
+  //           result: true,
   //           statusCode: 200,
   //           data: { type: 'O' },
-  //           error: [],
+  //           message: [],
   //         })
   //       ),
   //       http.post('*/user/otplogin', async () => {
   //         await otpPromise
   //         return HttpResponse.json({
+  //           result: true,
   //           statusCode: 200,
   //           data: { token: 'tok' },
-  //           error: [],
+  //           message: [],
   //         })
   //       })
   //     )

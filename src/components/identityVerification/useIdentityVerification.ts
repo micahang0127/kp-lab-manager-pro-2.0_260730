@@ -53,7 +53,7 @@ export function useIdentityVerification(
 
     try {
       const res = await confirmIdentityVerification({ identityVerificationId })
-      if (res.statusCode === 200) {
+      if (res.result && res.data) {
         setVerifiedCustomer(res.data.verifiedCustomer)
         setStatus('success')
         onVerified?.(res.data.verifiedCustomer)

@@ -21,8 +21,9 @@ vi.mock('../api/itemIncoming', async (importOriginal) => {
 const buildResponse = (
   overrides?: Partial<IncomingItemListResult>
 ): ApiResponse<IncomingItemListResult> => ({
+  result: true,
   statusCode: 200,
-  error: [],
+  message: [],
   data: {
     data: [
       {

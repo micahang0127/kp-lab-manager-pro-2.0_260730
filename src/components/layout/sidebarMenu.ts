@@ -2,15 +2,21 @@
 
 export type SidebarPath =
   | '/main'
+  | '/inventory/preparing'
   | '/items/register'
   | '/items/incoming-pending'
   | '/items/photo-pending'
+  | '/reservation/preparing'
   | '/safety/msds'
   | '/safety/hazardous-quantity'
   | '/safety/hazardous-chemical'
   | '/safety/special-substance'
-  | '/institution/info'
-  | '/institution/location'
+  | '/settings/process'
+  | '/settings/member'
+  | '/settings/group'
+  | '/settings/category'
+  | '/settings/storage-location'
+  | '/settings/inventory-config'
 
 export interface SidebarLeafItem {
   kind: 'link'
@@ -34,8 +40,17 @@ export const SIDEBAR_MENU: SidebarItem[] = [
   { kind: 'link', key: 'home', label: '홈', to: '/main' },
   {
     kind: 'group',
+    key: 'inventory',
+    label: '재고관리',
+    children: [
+      // [TEMP] 26.08.11 하위 기능 미구현 — 사이드바 자리만 확보한 placeholder. 실제 기능 구현 시 교체
+      { kind: 'link', key: 'inventory-preparing', label: '준비중', to: '/inventory/preparing' },
+    ],
+  },
+  {
+    kind: 'group',
     key: 'items',
-    label: '물품관리',
+    label: '구매/입고 관리',
     children: [
       { kind: 'link', key: 'items-register', label: '물품목록', to: '/items/register' },
       {
@@ -54,8 +69,17 @@ export const SIDEBAR_MENU: SidebarItem[] = [
   },
   {
     kind: 'group',
+    key: 'reservation',
+    label: '예약/출고 관리',
+    children: [
+      // [TEMP] 26.08.11 하위 기능 미구현 — 사이드바 자리만 확보한 placeholder. 실제 기능 구현 시 교체
+      { kind: 'link', key: 'reservation-preparing', label: '준비중', to: '/reservation/preparing' },
+    ],
+  },
+  {
+    kind: 'group',
     key: 'safety',
-    label: '안전관리',
+    label: '안전/법령 관리',
     children: [
       { kind: 'link', key: 'safety-msds', label: 'MSDS', to: '/safety/msds' },
       {
@@ -80,15 +104,29 @@ export const SIDEBAR_MENU: SidebarItem[] = [
   },
   {
     kind: 'group',
-    key: 'institution',
-    label: '기관관리',
+    key: 'settings',
+    label: '설정',
     children: [
-      { kind: 'link', key: 'institution-info', label: '기관정보', to: '/institution/info' },
+      // [TEMP] 26.08.11 하위 기능 미구현 — 사이드바 자리만 확보한 placeholder. 실제 기능 구현 시 교체
+      { kind: 'link', key: 'settings-process', label: '프로세스 관리', to: '/settings/process' },
+      // [TEMP] 26.08.11 하위 기능 미구현 — 사이드바 자리만 확보한 placeholder. 실제 기능 구현 시 교체
+      { kind: 'link', key: 'settings-member', label: '멤버 관리', to: '/settings/member' },
+      // [TEMP] 26.08.11 하위 기능 미구현 — 사이드바 자리만 확보한 placeholder. 실제 기능 구현 시 교체
+      { kind: 'link', key: 'settings-group', label: '그룹 관리', to: '/settings/group' },
+      // [TEMP] 26.08.11 하위 기능 미구현 — 사이드바 자리만 확보한 placeholder. 실제 기능 구현 시 교체
+      { kind: 'link', key: 'settings-category', label: '카테고리 관리', to: '/settings/category' },
       {
         kind: 'link',
-        key: 'institution-location',
-        label: '위치 및 보관함',
-        to: '/institution/location',
+        key: 'settings-storage-location',
+        label: '보관위치 관리',
+        to: '/settings/storage-location',
+      },
+      // [TEMP] 26.08.11 하위 기능 미구현 — 사이드바 자리만 확보한 placeholder. 실제 기능 구현 시 교체
+      {
+        kind: 'link',
+        key: 'settings-inventory-config',
+        label: '재고 관리 설정',
+        to: '/settings/inventory-config',
       },
     ],
   },

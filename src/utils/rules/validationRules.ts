@@ -7,23 +7,38 @@ export const EMAIL_RULE_MESSAGE = '올바른 이메일 형식으로 입력해주
 // RFC 5321 기준 이메일 전체 최대 길이(로컬파트 64자 + '@' + 도메인 255자를 넉넉히 포함)
 export const EMAIL_MAX_LENGTH = 254
 
+// 한글(완성형 음절 + 자모) 매칭 — 이메일은 한글을 허용하지 않으므로 입력 즉시 제거하는 데 사용
+const HANGUL_REGEX = /[ㄱ-ㅎㅏ-ㅣ가-힣]/g
+
 /** 이메일이 형식에 맞는지 검사한다 */
 export function isValidEmail(value: string): boolean {
   return EMAIL_REGEX.test(value)
 }
 
-// ─── Password Rule (샘플) ────────────────────────────────────────────────────
-// 영문, 숫자, 특수문자를 각 1개 이상 포함한 8~64자. NIST SP 800-63B 권고에 따라 최대 길이를
-// 64자로 설정 — 비밀번호 관리자 생성 값·패스프레이즈 사용을 막지 않기 위함. 실제 정책 확정 시 이 파일만 교체하면 됨.
+/** 입력값에서 한글(완성형 음절 + 자모)을 제거한다 (이메일 입력 시 한글 실시간 차단용) */
+export function removeHangul(value: string): string {
+  return value.replace(HANGUL_REGEX, '')
+}
 
-export const PASSWORD_REGEX =
-  /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).{8,64}$/
+// ─── Password Rule ────────────────────────────────────────────────────────────
+// 영문 대소문자·숫자·특수기호만 허용하며 최소 8자 이상이어야 한다.
+// (기존에는 조합 필수 + 최대 64자 규칙을 임시로 적용했으나, 정책 확정에 따라 삭제됨)
 
-export const PASSWORD_RULE_MESSAGE = '영문, 숫자, 특수문자를 포함하여 8~64자로 입력해주세요.'
+export const PASSWORD_MIN_LENGTH = 8
 
-/** 비밀번호가 정책을 만족하는지 검사한다 */
+// 공백을 제외한 출력 가능 ASCII 문자(영문 대소문자, 숫자, 특수기호)만 허용
+export const PASSWORD_ALLOWED_CHAR_REGEX = /^[\x21-\x7E]*$/
+
+export const PASSWORD_RULE_MESSAGE = '비밀번호는 최소 8자리 이상입니다.'
+
+/** 비밀번호가 정책(영문 대소문자·숫자·특수기호, 8자 이상)을 만족하는지 검사한다 */
 export function isValidPassword(value: string): boolean {
-  return PASSWORD_REGEX.test(value)
+  return value.length >= PASSWORD_MIN_LENGTH && PASSWORD_ALLOWED_CHAR_REGEX.test(value)
+}
+
+/** 입력값에서 허용되지 않는 문자(한글, 공백 등)를 제거한다 (비밀번호 입력 시 실시간 차단용) */
+export function sanitizePasswordInput(value: string): string {
+  return value.replace(/[^\x21-\x7E]/g, '')
 }
 
 // ─── Business Registration Number Rule ──────────────────────────────────────
@@ -57,22 +72,35 @@ export function isValidRepresentativeName(value: string): boolean {
 }
 
 // ─── Business Registration File Rule ────────────────────────────────────────
-// 사업자등록증 스캔본은 보통 PDF 또는 사진(JPG/PNG)으로 제출되므로 해당 형식만 허용한다.
+// 사업자등록증은 위변조를 막기 위해 스캔 이미지(JPG/PNG)는 받지 않고 PDF만 허용한다.
 // 과도한 용량의 파일이 업로드되어 요청이 지연·실패하는 것을 막기 위해 용량 상한도 둔다.
 // ⚠️ 아래 검사는 클라이언트 UX용이며 devtools 등으로 우회 가능하므로, 서버에서도 동일한
 // 형식·용량 검증(가능하면 매직 바이트 기준)을 반드시 수행해야 한다.
 
-export const BUSINESS_REGISTRATION_FILE_ACCEPT = '.pdf,.jpg,.jpeg,.png'
+export const BUSINESS_REGISTRATION_FILE_ACCEPT = '.pdf'
 
-const BUSINESS_REGISTRATION_FILE_ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png']
+const BUSINESS_REGISTRATION_FILE_ALLOWED_TYPES = ['application/pdf']
 
 export const BUSINESS_REGISTRATION_FILE_MAX_SIZE_BYTES = 10 * 1024 * 1024 // 10MB
 
 export const BUSINESS_REGISTRATION_FILE_RULE_MESSAGE =
-  'PDF, JPG, PNG 파일만 첨부할 수 있으며, 최대 10MB까지 업로드할 수 있습니다.'
+  'PDF 파일만 첨부할 수 있으며, 최대 10MB까지 업로드할 수 있습니다.'
 
 /** 사업자등록증 첨부파일이 허용된 형식·용량인지 검사한다 */
 export function isValidBusinessRegistrationFile(file: File): boolean {
   if (file.size <= 0 || file.size > BUSINESS_REGISTRATION_FILE_MAX_SIZE_BYTES) return false
   return BUSINESS_REGISTRATION_FILE_ALLOWED_TYPES.includes(file.type)
+}
+
+// ─── Email Verification Code Rule ────────────────────────────────────────────
+
+export const EMAIL_CODE_LENGTH = 6
+
+export const EMAIL_CODE_REGEX = /^\d{6}$/
+
+export const EMAIL_CODE_RULE_MESSAGE = '인증번호 6자리를 숫자로 입력해주세요.'
+
+/** 이메일 인증번호가 6자리 숫자 형식인지 검사한다 */
+export function isValidEmailCode(value: string): boolean {
+  return EMAIL_CODE_REGEX.test(value)
 }

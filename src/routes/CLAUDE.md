@@ -8,13 +8,12 @@
 
 ## 파일명 → URL 매핑
 
-| 파일                | URL                         |
-| ------------------- | --------------------------- |
-| `index.tsx`         | `/`                         |
-| `login.tsx`         | `/login`                    |
-| `main.tsx`          | `/main`                     |
-| `zustand/index.tsx` | `/zustand`                  |
-| `__root.tsx`        | 전체 라우트의 루트 레이아웃 |
+| 파일         | URL                         |
+| ------------ | --------------------------- |
+| `index.tsx`  | `/`                         |
+| `login.tsx`  | `/login`                    |
+| `main.tsx`   | `/main`                     |
+| `__root.tsx` | 전체 라우트의 루트 레이아웃 |
 
 ## 인증 보호 라우트 템플릿
 
