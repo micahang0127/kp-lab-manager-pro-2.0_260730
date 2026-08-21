@@ -5,7 +5,7 @@ import { server } from '../test/mocks/server'
 import {
   changePassword,
   login,
-  otpLogin,
+  loginWithEmailVerificationCode,
   sendEmailVerificationCode,
   signup,
   verifyEmailVerificationCode,
@@ -491,7 +491,7 @@ describe('changePassword API', () => {
   })
 })
 
-describe('otpLogin API', () => {
+describe('loginWithEmailVerificationCode API', () => {
   beforeEach(() => {
     sessionStorage.clear()
     server.resetHandlers()
@@ -499,33 +499,33 @@ describe('otpLogin API', () => {
 
   it('성공 시 token을 포함한 응답을 반환한다', async () => {
     server.use(
-      http.post('*/user/otplogin', () =>
+      http.post('*/user/email-verification-login', () =>
         HttpResponse.json({
           result: true,
           statusCode: 200,
-          data: { token: 'otp-token-xyz' },
+          data: { token: 'email-verification-token-xyz' },
           message: [],
         })
       )
     )
 
-    const result = await otpLogin(
-      { email: 'test@test.com', otpCode: '123456', deviceType: 'WEB' },
+    const result = await loginWithEmailVerificationCode(
+      { email: 'test@test.com', code: '123456', deviceType: 'WEB' },
       null
     )
     expect(result.statusCode).toBe(200)
-    expect(result.data?.token).toBe('otp-token-xyz')
+    expect(result.data?.token).toBe('email-verification-token-xyz')
   })
 
-  it('잘못된 OTP 코드 시 에러를 던진다', async () => {
+  it('잘못된 인증번호 시 에러를 던진다', async () => {
     server.use(
-      http.post('*/user/otplogin', () =>
+      http.post('*/user/email-verification-login', () =>
         HttpResponse.json(
           {
             result: false,
             statusCode: 400,
             data: null,
-            message: ['잘못된 OTP 코드입니다.'],
+            message: ['잘못된 인증번호입니다.'],
           },
           { status: 400 }
         )
@@ -533,13 +533,16 @@ describe('otpLogin API', () => {
     )
 
     await expect(
-      otpLogin({ email: 'test@test.com', otpCode: '000000', deviceType: 'WEB' }, null)
-    ).rejects.toThrow('잘못된 OTP 코드입니다.')
+      loginWithEmailVerificationCode(
+        { email: 'test@test.com', code: '000000', deviceType: 'WEB' },
+        null
+      )
+    ).rejects.toThrow('잘못된 인증번호입니다.')
   })
 
-  it('OTP 만료 시 에러를 던진다', async () => {
+  it('인증번호 만료 시 에러를 던진다', async () => {
     server.use(
-      http.post('*/user/otplogin', () =>
+      http.post('*/user/email-verification-login', () =>
         HttpResponse.json(
           {
             result: false,
@@ -553,14 +556,17 @@ describe('otpLogin API', () => {
     )
 
     await expect(
-      otpLogin({ email: 'test@test.com', otpCode: '123456', deviceType: 'WEB' }, null)
+      loginWithEmailVerificationCode(
+        { email: 'test@test.com', code: '123456', deviceType: 'WEB' },
+        null
+      )
     ).rejects.toThrow('인증번호가 만료되었습니다.')
   })
 
   it('KPMFP 헤더가 요청에 포함될 수 있다', async () => {
     let capturedHeader: string | null = null
     server.use(
-      http.post('*/user/otplogin', ({ request }) => {
+      http.post('*/user/email-verification-login', ({ request }) => {
         capturedHeader = request.headers.get('KPMFP')
         return HttpResponse.json({
           result: true,
@@ -571,18 +577,18 @@ describe('otpLogin API', () => {
       })
     )
 
-    await otpLogin(
-      { email: 'test@test.com', otpCode: '123456', deviceType: 'WEB' },
+    await loginWithEmailVerificationCode(
+      { email: 'test@test.com', code: '123456', deviceType: 'WEB' },
       'mock-fp-abc123'
     )
     expect(capturedHeader).toBe('mock-fp-abc123')
   })
 
-  it('OTP 로그인 요청에 Authorization 헤더가 포함되지 않는다', async () => {
+  it('이메일 인증 로그인 요청에 Authorization 헤더가 포함되지 않는다', async () => {
     sessionStorage.setItem('accessToken', 'existing-token')
     let authHeader: string | null = null
     server.use(
-      http.post('*/user/otplogin', ({ request }) => {
+      http.post('*/user/email-verification-login', ({ request }) => {
         authHeader = request.headers.get('Authorization')
         return HttpResponse.json({
           result: true,
@@ -593,7 +599,10 @@ describe('otpLogin API', () => {
       })
     )
 
-    await otpLogin({ email: 'test@test.com', otpCode: '123456', deviceType: 'WEB' }, null)
+    await loginWithEmailVerificationCode(
+      { email: 'test@test.com', code: '123456', deviceType: 'WEB' },
+      null
+    )
     expect(authHeader).toBeNull()
   })
 })

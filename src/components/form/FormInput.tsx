@@ -24,7 +24,7 @@ interface FormInputProps {
   message?: string
   /** message 색상 (기본값 'red') */
   messageColor?: FormInputMessageColor
-  /** 기본 input 스타일에 덧붙일 클래스 (예: OTP 입력의 text-center font-mono tracking-widest) */
+  /** 기본 input 스타일에 덧붙일 클래스 (예: 이메일 인증번호 입력의 text-center font-mono tracking-widest) */
   inputClassName?: string
   /** input 옆에 표시할 보조 요소 (예: 사업장 소재지의 주소검색 버튼) */
   addon?: React.ReactNode

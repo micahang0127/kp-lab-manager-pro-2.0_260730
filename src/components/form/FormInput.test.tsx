@@ -59,10 +59,10 @@ describe('FormInput', () => {
     expect(screen.getByText('성공 문구')).toHaveClass('text-green-600')
   })
 
-  it('maxLength/inputMode/inputClassName이 input에 그대로 적용된다 (OTP 입력 등 특수 케이스)', () => {
+  it('maxLength/inputMode/inputClassName이 input에 그대로 적용된다 (이메일 인증번호 입력 등 특수 케이스)', () => {
     render(
       <FormInput
-        id="otp-code"
+        id="email-code"
         label="인증번호"
         value=""
         onChange={vi.fn()}

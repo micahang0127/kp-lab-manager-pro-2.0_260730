@@ -4,8 +4,10 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useAuthStore } from '../stores/authStore'
+import { useSavedEmailStore } from '../stores/savedEmailStore'
 import { server } from '../test/mocks/server'
 import { render, screen } from '../test/test-utils'
+import { getCookie } from '../utils/cookie'
 import { isAuthValid } from '../utils/requireAuth'
 import { LoginPage } from './LoginPage'
 
@@ -43,7 +45,9 @@ vi.mock('@marsidev/react-turnstile', () => ({
 describe('LoginPage', () => {
   beforeEach(() => {
     sessionStorage.clear()
+    document.cookie = 'savedEmail=; max-age=0; path=/'
     useAuthStore.setState({ isLoggedIn: false })
+    useSavedEmailStore.setState({ savedEmail: null })
     vi.mocked(useNavigate).mockReturnValue(mockNavigate)
     vi.clearAllMocks()
     server.resetHandlers()
@@ -61,7 +65,7 @@ describe('LoginPage', () => {
 
       // 이메일/비밀번호 입력 (HTML5 validation 통과를 위함)
       await userEvent.type(screen.getByLabelText(/이메일/), 'test@test.com')
-      await userEvent.type(screen.getByLabelText(/비밀번호/), 'password')
+      await userEvent.type(screen.getByLabelText(/비밀번호/), 'password1')
 
       // 처음에는 토큰 없이 제출 시도하여 에러 발생시킴
       const submitButton = screen.getByRole('button', { name: /^로그인$/ })
@@ -157,14 +161,14 @@ describe('LoginPage', () => {
     it('이메일/비밀번호 입력란에 안내 placeholder가 표시된다', () => {
       render(<LoginPage />)
 
-      expect(screen.getByPlaceholderText('이메일을 입력하세요.')).toBeInTheDocument()
-      expect(screen.getByPlaceholderText('비밀번호 8자리 이상 입력하세요')).toBeInTheDocument()
+      expect(screen.getByPlaceholderText('이메일을 입력해 주세요')).toBeInTheDocument()
+      expect(screen.getByPlaceholderText('비밀번호를 입력해 주세요')).toBeInTheDocument()
     })
 
-    it('라벨 옆에 필수 입력 표시(*)가 렌더링되지 않는다', () => {
-      const { container } = render(<LoginPage />)
+    it('이메일/비밀번호 라벨 옆에 필수 입력 표시(*)가 렌더링된다', () => {
+      render(<LoginPage />)
 
-      expect(container.textContent).not.toContain('*')
+      expect(screen.getAllByText('*')).toHaveLength(2)
     })
 
     it('이메일 입력 시 한글은 즉시 제거된다', async () => {
@@ -183,6 +187,64 @@ describe('LoginPage', () => {
       await userEvent.type(passwordInput, 'abc 한글123!@')
 
       expect(passwordInput.value).toBe('abc123!@')
+    })
+
+    it('이메일에 한글(한글 키보드) 입력을 시도하면 입력란 아래에 오류 메시지가 표시된다', async () => {
+      render(<LoginPage />)
+      const emailInput = screen.getByLabelText(/이메일/)
+
+      await userEvent.type(emailInput, 'test한글')
+
+      expect(await screen.findByText('한글은 입력불가합니다.')).toBeInTheDocument()
+    })
+
+    it('한글 입력 시도 후 정상 문자를 입력하면 한글 오류 메시지가 사라진다', async () => {
+      render(<LoginPage />)
+      const emailInput = screen.getByLabelText(/이메일/)
+
+      await userEvent.type(emailInput, 'test한글')
+      expect(await screen.findByText('한글은 입력불가합니다.')).toBeInTheDocument()
+
+      await userEvent.type(emailInput, 'abc')
+
+      expect(screen.queryByText('한글은 입력불가합니다.')).not.toBeInTheDocument()
+    })
+
+    it('이메일 형식이 아니면 입력란 아래에 오류 메시지가 표시된다', async () => {
+      render(<LoginPage />)
+      const emailInput = screen.getByLabelText(/이메일/)
+
+      await userEvent.type(emailInput, 'invalid-email')
+
+      expect(await screen.findByText('이메일 형식에 맞지 않습니다.')).toBeInTheDocument()
+    })
+
+    it('이메일 형식이 올바르면 오류 메시지가 표시되지 않는다', async () => {
+      render(<LoginPage />)
+      const emailInput = screen.getByLabelText(/이메일/)
+
+      await userEvent.type(emailInput, 'user@test.com')
+
+      expect(screen.queryByText('이메일 형식에 맞지 않습니다.')).not.toBeInTheDocument()
+    })
+
+    it('비밀번호가 정규식(영문+숫자 조합, 8자 이상)에 맞지 않으면 입력란 아래에 오류 메시지가 표시된다', async () => {
+      render(<LoginPage />)
+      const passwordInput = screen.getByLabelText(/비밀번호/)
+
+      // 영문만 입력 (숫자 미포함)
+      await userEvent.type(passwordInput, 'abcdefgh')
+
+      expect(await screen.findByText('비밀번호 형식에 맞지 않습니다.')).toBeInTheDocument()
+    })
+
+    it('비밀번호가 정규식에 맞으면 오류 메시지가 표시되지 않는다', async () => {
+      render(<LoginPage />)
+      const passwordInput = screen.getByLabelText(/비밀번호/)
+
+      await userEvent.type(passwordInput, 'password1')
+
+      expect(screen.queryByText('비밀번호 형식에 맞지 않습니다.')).not.toBeInTheDocument()
     })
 
     // [TEMP] 26.07.27 백엔드 미연동 — 로그인 API가 항상 성공한다고 가정한 스텁 동작 검증.
@@ -209,7 +271,7 @@ describe('LoginPage', () => {
       })
     })
 
-    it('이메일 형식이 아니면 alert로 안내하고 로그인 요청을 보내지 않는다', async () => {
+    it('이메일 형식이 아니면 alert 없이 인라인 메시지만 표시하고 로그인 요청을 보내지 않는다', async () => {
       const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
       render(<LoginPage />)
 
@@ -218,27 +280,73 @@ describe('LoginPage', () => {
       await userEvent.type(screen.getByLabelText(/비밀번호/), 'password123')
       await userEvent.click(screen.getByRole('button', { name: /^로그인$/ }))
 
-      expect(alertSpy).toHaveBeenCalledWith('이메일 형식이 아닙니다.')
+      expect(screen.getByText('이메일 형식에 맞지 않습니다.')).toBeInTheDocument()
+      expect(alertSpy).not.toHaveBeenCalled()
       expect(sessionStorage.getItem('accessToken')).toBeNull()
       expect(mockNavigate).not.toHaveBeenCalled()
     })
 
-    it('비밀번호가 8자 미만이면 alert로 안내하고 로그인 요청을 보내지 않는다', async () => {
+    it('비밀번호가 8자 미만이면 alert 없이 인라인 메시지만 표시하고 로그인 요청을 보내지 않는다', async () => {
       const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
       render(<LoginPage />)
 
       fireEvent.click(screen.getByText('turnstile-success'))
       await userEvent.type(screen.getByLabelText(/이메일/), 'user@test.com')
-      await userEvent.type(screen.getByLabelText(/비밀번호/), '1234567')
+      await userEvent.type(screen.getByLabelText(/비밀번호/), 'pass1')
       await userEvent.click(screen.getByRole('button', { name: /^로그인$/ }))
 
-      expect(alertSpy).toHaveBeenCalledWith('비밀번호는 최소 8자리 이상입니다.')
+      expect(screen.getByText('비밀번호 형식에 맞지 않습니다.')).toBeInTheDocument()
+      expect(alertSpy).not.toHaveBeenCalled()
+      expect(sessionStorage.getItem('accessToken')).toBeNull()
+      expect(mockNavigate).not.toHaveBeenCalled()
+    })
+
+    it('비밀번호가 영문/숫자 조합이 아니면 alert 없이 인라인 메시지만 표시하고 로그인 요청을 보내지 않는다', async () => {
+      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
+      render(<LoginPage />)
+
+      fireEvent.click(screen.getByText('turnstile-success'))
+      await userEvent.type(screen.getByLabelText(/이메일/), 'user@test.com')
+      await userEvent.type(screen.getByLabelText(/비밀번호/), '12345678')
+      await userEvent.click(screen.getByRole('button', { name: /^로그인$/ }))
+
+      expect(screen.getByText('비밀번호 형식에 맞지 않습니다.')).toBeInTheDocument()
+      expect(alertSpy).not.toHaveBeenCalled()
       expect(sessionStorage.getItem('accessToken')).toBeNull()
       expect(mockNavigate).not.toHaveBeenCalled()
     })
 
     // [FUTURE WORK] 백엔드 연동 후 주석 해제
-    // it('로그인 실패(잘못된 비밀번호) 시 alert로 안내한다', async () => {
+    // it('로그인 실패(이메일 또는 비밀번호 불일치) 시 비밀번호 입력란 아래에 실패 횟수와 함께 안내한다', async () => {
+    //   server.use(
+    //     http.post('*/user/login', () =>
+    //       HttpResponse.json(
+    //         {
+    //           result: false,
+    //           statusCode: 401,
+    //           data: null,
+    //           message: ['이메일 또는 비밀번호가 틀렸습니다.'],
+    //         },
+    //         { status: 401 }
+    //       )
+    //     )
+    //   )
+    //
+    //   render(<LoginPage />)
+    //
+    //   fireEvent.click(screen.getByText('turnstile-success'))
+    //   await userEvent.type(screen.getByLabelText(/이메일/), 'user@test.com')
+    //   await userEvent.type(screen.getByLabelText(/비밀번호/), 'wrongpass1')
+    //   await userEvent.click(screen.getByRole('button', { name: /^로그인$/ }))
+    //
+    //   expect(
+    //     await screen.findByText('이메일 또는 비밀번호를 확인해 주세요. (실패 1/5)')
+    //   ).toBeInTheDocument()
+    //   expect(sessionStorage.getItem('accessToken')).toBeNull()
+    //   expect(mockNavigate).not.toHaveBeenCalled()
+    // })
+    //
+    // it('로그인을 5회 실패하면 alert로 일시적 제한을 안내한다', async () => {
     //   server.use(
     //     http.post('*/user/login', () =>
     //       HttpResponse.json(
@@ -259,11 +367,18 @@ describe('LoginPage', () => {
     //   fireEvent.click(screen.getByText('turnstile-success'))
     //   await userEvent.type(screen.getByLabelText(/이메일/), 'user@test.com')
     //   await userEvent.type(screen.getByLabelText(/비밀번호/), 'wrongpass1')
-    //   await userEvent.click(screen.getByRole('button', { name: /^로그인$/ }))
     //
-    //   await waitFor(() => {
-    //     expect(alertSpy).toHaveBeenCalledWith('올바른 비밀번호가 아닙니다.')
-    //   })
+    //   const submitButton = screen.getByRole('button', { name: /^로그인$/ })
+    //   for (let i = 0; i < 5; i++) {
+    //     await userEvent.click(submitButton)
+    //     await waitFor(() => {
+    //       expect(
+    //         screen.getByText(`이메일 또는 비밀번호를 확인해 주세요. (실패 ${i + 1}/5)`)
+    //       ).toBeInTheDocument()
+    //     })
+    //   }
+    //
+    //   expect(alertSpy).toHaveBeenCalledWith('로그인이 일시적으로 제한되었습니다.')
     //   expect(sessionStorage.getItem('accessToken')).toBeNull()
     //   expect(mockNavigate).not.toHaveBeenCalled()
     // })
@@ -298,39 +413,9 @@ describe('LoginPage', () => {
     //   })
     // })
     //
-    // it('로그인 실패 시 에러 메시지를 표시한다', async () => {
-    //   server.use(
-    //     http.post('*/user/login', () =>
-    //       HttpResponse.json(
-    //         {
-    //           result: false,
-    //           statusCode: 401,
-    //           data: null,
-    //           message: ['이메일 또는 비밀번호가 틀렸습니다.'],
-    //         },
-    //         { status: 401 }
-    //       )
-    //     )
-    //   )
-    //
-    //   render(<LoginPage />)
-    //
-    //   fireEvent.click(screen.getByText('turnstile-success'))
-    //   const emailInput = screen.getByLabelText(/이메일/)
-    //   const passwordInput = screen.getByLabelText(/비밀번호/)
-    //   const submitButton = screen.getByRole('button', { name: /^로그인$/ })
-    //
-    //   await userEvent.type(emailInput, 'wrong@test.com')
-    //   await userEvent.type(passwordInput, 'wrong')
-    //   await userEvent.click(submitButton)
-    //
-    //   expect(await screen.findByText(/이메일 또는 비밀번호가 틀렸습니다./)).toBeInTheDocument()
-    //
-    //   await waitFor(() => {
-    //     expect(sessionStorage.getItem('accessToken')).toBeNull()
-    //     expect(mockNavigate).not.toHaveBeenCalled()
-    //   })
-    // })
+    // ('로그인 실패 시 에러 메시지를 표시한다' 테스트는 위쪽 '로그인 실패(이메일 또는 비밀번호
+    // 불일치) 시 비밀번호 입력란 아래에 실패 횟수와 함께 안내한다' 테스트로 대체됨 — 실제 안내
+    // 문구는 서버 message가 아니라 고정된 "실패 N/5" 카운트 문구를 사용하기 때문)
     //
     // it('로그인 중에는 버튼이 disabled 상태다', async () => {
     //   let resolveLogin: () => void = () => {}
@@ -370,11 +455,60 @@ describe('LoginPage', () => {
     // })
   })
 
-  // ─── OTP Login Tests (Future Work) ──────────────────────────────────────────
+  // ─── Save Email (아이디 저장) Tests ──────────────────────────────────────────
+
+  describe('아이디 저장', () => {
+    it('"아이디 저장" 체크박스가 렌더링된다', () => {
+      render(<LoginPage />)
+
+      expect(screen.getByLabelText('아이디 저장')).toBeInTheDocument()
+    })
+
+    // [TEMP] 26.07.27 백엔드 미연동 — 로그인 API가 항상 성공한다고 가정한 스텁 동작 기준으로 검증.
+    // 연동 완료 시 실제 로그인 성공 응답 기준으로 재검증할 것
+    it('체크박스를 체크하고 로그인하면 이메일이 쿠키에 저장된다', async () => {
+      render(<LoginPage />)
+
+      fireEvent.click(screen.getByText('turnstile-success'))
+      await userEvent.type(screen.getByLabelText(/이메일/), 'user@test.com')
+      await userEvent.type(screen.getByLabelText(/비밀번호/), 'password123')
+      await userEvent.click(screen.getByLabelText('아이디 저장'))
+      await userEvent.click(screen.getByRole('button', { name: /^로그인$/ }))
+
+      await waitFor(() => {
+        expect(getCookie('savedEmail')).toBe('user@test.com')
+      })
+    })
+
+    it('체크박스를 체크하지 않고 로그인하면 저장된 이메일이 없다', async () => {
+      render(<LoginPage />)
+
+      fireEvent.click(screen.getByText('turnstile-success'))
+      await userEvent.type(screen.getByLabelText(/이메일/), 'user@test.com')
+      await userEvent.type(screen.getByLabelText(/비밀번호/), 'password123')
+      await userEvent.click(screen.getByRole('button', { name: /^로그인$/ }))
+
+      await waitFor(() => {
+        expect(sessionStorage.getItem('accessToken')).toBeTruthy()
+      })
+      expect(getCookie('savedEmail')).toBeNull()
+    })
+
+    it('이전에 저장된 이메일이 있으면 이메일 입력란에 자동으로 채워지고 체크박스가 체크된 상태로 시작한다', () => {
+      useSavedEmailStore.setState({ savedEmail: 'saved@test.com' })
+
+      render(<LoginPage />)
+
+      expect(screen.getByLabelText(/이메일/)).toHaveValue('saved@test.com')
+      expect(screen.getByLabelText('아이디 저장')).toBeChecked()
+    })
+  })
+
+  // ─── 이메일 인증 로그인 Tests (Future Work) ──────────────────────────────────
 
   // [FUTURE WORK] 백엔드 연동 후 주석 해제
-  // describe('로그인 폼 (신규 기기, OTP 플로우)', () => {
-  //   it('type O 응답 시 OTP 입력 UI가 표시된다', async () => {
+  // describe('로그인 폼 (신규 기기, 이메일 인증 플로우)', () => {
+  //   it('type O 응답 시 이메일 인증 입력 UI가 표시된다', async () => {
   //     server.use(
   //       http.post('*/user/login', () =>
   //         HttpResponse.json({
@@ -397,13 +531,13 @@ describe('LoginPage', () => {
   //     await userEvent.type(passwordInput, 'password123')
   //     await userEvent.click(submitButton)
   //
-  //     // OTP 입력 UI가 표시되어야 함
+  //     // 이메일 인증 입력 UI가 표시되어야 함
   //     expect(await screen.findByLabelText(/인증번호/)).toBeInTheDocument()
   //     expect(await screen.findByText(/남은 시간/)).toBeInTheDocument()
-  //     expect(screen.getByRole('button', { name: /OTP 인증/ })).toBeInTheDocument()
+  //     expect(screen.getByRole('button', { name: /이메일 인증/ })).toBeInTheDocument()
   //   })
   //
-  //   it('OTP 6자리 입력 후 제출 시 /main으로 이동한다', async () => {
+  //   it('인증번호 6자리 입력 후 제출 시 /main으로 이동한다', async () => {
   //     server.use(
   //       http.post('*/user/login', () =>
   //         HttpResponse.json({
@@ -413,11 +547,11 @@ describe('LoginPage', () => {
   //           message: [],
   //         })
   //       ),
-  //       http.post('*/user/otplogin', () =>
+  //       http.post('*/user/email-verification-login', () =>
   //         HttpResponse.json({
   //           result: true,
   //           statusCode: 200,
-  //           data: { token: 'otp-token-456' },
+  //           data: { token: 'email-verification-token-456' },
   //           message: [],
   //         })
   //       )
@@ -431,22 +565,22 @@ describe('LoginPage', () => {
   //     await userEvent.type(screen.getByLabelText(/비밀번호/), 'password123')
   //     await userEvent.click(screen.getByRole('button', { name: /^로그인$/ }))
   //
-  //     // OTP 입력
-  //     const otpInput = await screen.findByLabelText(/인증번호/)
-  //     await userEvent.type(otpInput, '123456')
+  //     // 이메일 인증번호 입력
+  //     const emailCodeInput = await screen.findByLabelText(/인증번호/)
+  //     await userEvent.type(emailCodeInput, '123456')
   //
-  //     // OTP 제출
-  //     const otpButton = screen.getByRole('button', { name: /OTP 인증/ })
-  //     await userEvent.click(otpButton)
+  //     // 이메일 인증 제출
+  //     const emailCodeButton = screen.getByRole('button', { name: /이메일 인증/ })
+  //     await userEvent.click(emailCodeButton)
   //
   //     await waitFor(() => {
-  //       expect(sessionStorage.getItem('accessToken')).toBe('otp-token-456')
+  //       expect(sessionStorage.getItem('accessToken')).toBe('email-verification-token-456')
   //       expect(useAuthStore.getState().isLoggedIn).toBe(true)
   //       expect(mockNavigate).toHaveBeenCalledWith({ to: '/main' })
   //     })
   //   })
   //
-  //   it('OTP 입력 중에는 숫자만 입력된다', async () => {
+  //   it('이메일 인증번호 입력 중에는 숫자만 입력된다', async () => {
   //     server.use(
   //       http.post('*/user/login', () =>
   //         HttpResponse.json({
@@ -465,14 +599,14 @@ describe('LoginPage', () => {
   //     await userEvent.type(screen.getByLabelText(/비밀번호/), 'password123')
   //     await userEvent.click(screen.getByRole('button', { name: /^로그인$/ }))
   //
-  //     const otpInput = (await screen.findByLabelText(/인증번호/)) as HTMLInputElement
-  //     await userEvent.type(otpInput, 'abc123def')
+  //     const emailCodeInput = (await screen.findByLabelText(/인증번호/)) as HTMLInputElement
+  //     await userEvent.type(emailCodeInput, 'abc123def')
   //
   //     // 숫자만 입력되어야 함
-  //     expect(otpInput.value).toBe('123')
+  //     expect(emailCodeInput.value).toBe('123')
   //   })
   //
-  //   it('OTP 6자리 미만이면 제출 버튼이 disabled다', async () => {
+  //   it('인증번호 6자리 미만이면 제출 버튼이 disabled다', async () => {
   //     server.use(
   //       http.post('*/user/login', () =>
   //         HttpResponse.json({
@@ -491,19 +625,19 @@ describe('LoginPage', () => {
   //     await userEvent.type(screen.getByLabelText(/비밀번호/), 'password123')
   //     await userEvent.click(screen.getByRole('button', { name: /^로그인$/ }))
   //
-  //     const otpInput = await screen.findByLabelText(/인증번호/)
-  //     const otpButton = screen.getByRole('button', { name: /OTP 인증/ })
+  //     const emailCodeInput = await screen.findByLabelText(/인증번호/)
+  //     const emailCodeButton = screen.getByRole('button', { name: /이메일 인증/ })
   //
   //     // 5자리 입력
-  //     await userEvent.type(otpInput, '12345')
-  //     expect(otpButton).toBeDisabled()
+  //     await userEvent.type(emailCodeInput, '12345')
+  //     expect(emailCodeButton).toBeDisabled()
   //
   //     // 6자리 입력
-  //     await userEvent.type(otpInput, '6')
-  //     expect(otpButton).not.toBeDisabled()
+  //     await userEvent.type(emailCodeInput, '6')
+  //     expect(emailCodeButton).not.toBeDisabled()
   //   })
   //
-  //   it('OTP 오류 시 에러 메시지를 표시한다', async () => {
+  //   it('이메일 인증 오류 시 에러 메시지를 표시한다', async () => {
   //     server.use(
   //       http.post('*/user/login', () =>
   //         HttpResponse.json({
@@ -513,13 +647,13 @@ describe('LoginPage', () => {
   //           message: [],
   //         })
   //       ),
-  //       http.post('*/user/otplogin', () =>
+  //       http.post('*/user/email-verification-login', () =>
   //         HttpResponse.json(
   //           {
   //             result: false,
   //             statusCode: 400,
   //             data: null,
-  //             message: ['잘못된 OTP 코드입니다.'],
+  //             message: ['잘못된 인증번호입니다.'],
   //           },
   //           { status: 400 }
   //         )
@@ -533,11 +667,11 @@ describe('LoginPage', () => {
   //     await userEvent.type(screen.getByLabelText(/비밀번호/), 'password123')
   //     await userEvent.click(screen.getByRole('button', { name: /^로그인$/ }))
   //
-  //     const otpInput = await screen.findByLabelText(/인증번호/)
-  //     await userEvent.type(otpInput, '000000')
-  //     await userEvent.click(screen.getByRole('button', { name: /OTP 인증/ }))
+  //     const emailCodeInput = await screen.findByLabelText(/인증번호/)
+  //     await userEvent.type(emailCodeInput, '000000')
+  //     await userEvent.click(screen.getByRole('button', { name: /이메일 인증/ }))
   //
-  //     expect(await screen.findByText(/잘못된 OTP 코드입니다./)).toBeInTheDocument()
+  //     expect(await screen.findByText(/잘못된 인증번호입니다./)).toBeInTheDocument()
   //   })
   //
   //   it('"처음부터 시작" 버튼을 클릭하면 자격증명 폼으로 돌아간다', async () => {
@@ -559,7 +693,7 @@ describe('LoginPage', () => {
   //     await userEvent.type(screen.getByLabelText(/비밀번호/), 'password123')
   //     await userEvent.click(screen.getByRole('button', { name: /^로그인$/ }))
   //
-  //     // OTP 단계 확인
+  //     // 이메일 인증 단계 확인
   //     expect(await screen.findByLabelText(/인증번호/)).toBeInTheDocument()
   //
   //     // "처음부터 시작" 버튼 클릭
@@ -570,10 +704,10 @@ describe('LoginPage', () => {
   //     expect(screen.getByLabelText(/^비밀번호/)).toBeInTheDocument()
   //   })
   //
-  //   it('OTP 중에는 제출 버튼이 disabled다', async () => {
-  //     let resolveOtp: () => void = () => {}
-  //     const otpPromise = new Promise<void>((resolve) => {
-  //       resolveOtp = resolve
+  //   it('이메일 인증 중에는 제출 버튼이 disabled다', async () => {
+  //     let resolveEmailCode: () => void = () => {}
+  //     const emailCodePromise = new Promise<void>((resolve) => {
+  //       resolveEmailCode = resolve
   //     })
   //
   //     server.use(
@@ -585,8 +719,8 @@ describe('LoginPage', () => {
   //           message: [],
   //         })
   //       ),
-  //       http.post('*/user/otplogin', async () => {
-  //         await otpPromise
+  //       http.post('*/user/email-verification-login', async () => {
+  //         await emailCodePromise
   //         return HttpResponse.json({
   //           result: true,
   //           statusCode: 200,
@@ -603,18 +737,18 @@ describe('LoginPage', () => {
   //     await userEvent.type(screen.getByLabelText(/비밀번호/), 'password123')
   //     await userEvent.click(screen.getByRole('button', { name: /^로그인$/ }))
   //
-  //     const otpInput = await screen.findByLabelText(/인증번호/)
-  //     await userEvent.type(otpInput, '123456')
+  //     const emailCodeInput = await screen.findByLabelText(/인증번호/)
+  //     await userEvent.type(emailCodeInput, '123456')
   //
-  //     const otpButton = screen.getByRole('button', { name: /OTP 인증/ })
-  //     await userEvent.click(otpButton)
+  //     const emailCodeButton = screen.getByRole('button', { name: /이메일 인증/ })
+  //     await userEvent.click(emailCodeButton)
   //
-  //     expect(otpButton).toBeDisabled()
-  //     expect(otpButton).toHaveTextContent(/OTP 확인 중/)
+  //     expect(emailCodeButton).toBeDisabled()
+  //     expect(emailCodeButton).toHaveTextContent(/이메일 인증 확인 중/)
   //
-  //     resolveOtp()
-  //     // OTP 완료까지 대기하여 act 경고 방지
-  //     await waitFor(() => expect(otpButton).not.toBeDisabled())
+  //     resolveEmailCode()
+  //     // 이메일 인증 완료까지 대기하여 act 경고 방지
+  //     await waitFor(() => expect(emailCodeButton).not.toBeDisabled())
   //   })
   // })
 

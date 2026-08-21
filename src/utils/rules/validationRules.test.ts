@@ -4,6 +4,7 @@ import {
   BUSINESS_NUMBER_RULE_MESSAGE,
   BUSINESS_REGISTRATION_FILE_MAX_SIZE_BYTES,
   BUSINESS_REGISTRATION_FILE_RULE_MESSAGE,
+  containsHangul,
   EMAIL_CODE_RULE_MESSAGE,
   EMAIL_RULE_MESSAGE,
   isValidBusinessNumber,
@@ -60,12 +61,41 @@ describe('validationRules', () => {
     })
   })
 
+  describe('containsHangul', () => {
+    it('한글 음절이 포함되면 true를 반환한다', () => {
+      expect(containsHangul('test한글')).toBe(true)
+    })
+
+    it('한글 자모가 포함되면 true를 반환한다', () => {
+      expect(containsHangul('testㄱㅏ')).toBe(true)
+    })
+
+    it('한글이 없으면 false를 반환한다', () => {
+      expect(containsHangul('test@example.com')).toBe(false)
+    })
+
+    it('반복 호출해도 정상적으로 동작한다 (전역 플래그 lastIndex 이슈 없음)', () => {
+      expect(containsHangul('test한글')).toBe(true)
+      expect(containsHangul('test한글')).toBe(true)
+    })
+  })
+
   describe('isValidPassword', () => {
-    it('영문 대소문자·숫자·특수문자만 포함한 8자 이상은 조합과 무관하게 통과한다', () => {
-      expect(isValidPassword('abcdefgh')).toBe(true)
-      expect(isValidPassword('12345678')).toBe(true)
-      expect(isValidPassword('!@#$%^&*')).toBe(true)
+    it('영문+숫자를 포함한 8자 이상은 통과한다', () => {
+      expect(isValidPassword('abcdefg1')).toBe(true)
       expect(isValidPassword('Password1!')).toBe(true)
+    })
+
+    it('영문만 포함되면 실패한다 (숫자 미포함)', () => {
+      expect(isValidPassword('abcdefgh')).toBe(false)
+    })
+
+    it('숫자만 포함되면 실패한다 (영문 미포함)', () => {
+      expect(isValidPassword('12345678')).toBe(false)
+    })
+
+    it('특수문자만 포함되면 실패한다', () => {
+      expect(isValidPassword('!@#$%^&*')).toBe(false)
     })
 
     it('8자 미만이면 실패한다', () => {
@@ -77,15 +107,15 @@ describe('validationRules', () => {
     })
 
     it('한글이 포함되면 실패한다', () => {
-      expect(isValidPassword('abcdefg가')).toBe(false)
+      expect(isValidPassword('abcdefg1가')).toBe(false)
     })
 
     it('공백이 포함되면 실패한다', () => {
       expect(isValidPassword('abcd efg1')).toBe(false)
     })
 
-    it('길이 상한 없이 통과한다 (조합/최대 길이 필수 규칙 삭제됨)', () => {
-      expect(isValidPassword('a'.repeat(100))).toBe(true)
+    it('길이 상한 없이 통과한다 (최대 길이 제한 없음)', () => {
+      expect(isValidPassword('a1'.repeat(50))).toBe(true)
     })
   })
 

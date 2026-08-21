@@ -4,29 +4,50 @@ import { useNavigate } from '@tanstack/react-router'
 import { useEffect, useRef, useState } from 'react'
 
 import type { ApiResponse } from '../api'
-// [TEMP] 26.07.27 백엔드 미연동 — 로그인/OTP API 연동 전까지 주석 처리. 연동 완료 시 주석 해제
-// import { DEVICE_TYPE_WEB, login, otpLogin } from '../api/user'
-import type { LoginData, OtpLoginData } from '../api/user'
-import { FormInput } from '../components/form'
+// [TEMP] 26.07.27 백엔드 미연동 — 로그인/이메일 인증 API 연동 전까지 주석 처리. 연동 완료 시 주석 해제
+// import { DEVICE_TYPE_WEB, login, loginWithEmailVerificationCode } from '../api/user'
+import type { EmailVerificationLoginData, LoginData } from '../api/user'
+import { FormCheckbox, FormInput } from '../components/form'
 import { useAuthStore } from '../stores/authStore'
+import { useSavedEmailStore } from '../stores/savedEmailStore'
 import { getFingerprint } from '../utils/fingerprint'
 import {
+  containsHangul,
+  EMAIL_CODE_LENGTH,
   EMAIL_MAX_LENGTH,
   isValidEmail,
+  isValidEmailCode,
   isValidPassword,
-  PASSWORD_RULE_MESSAGE,
   removeHangul,
   sanitizePasswordInput,
 } from '../utils/rules/validationRules'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type LoginStep = { kind: 'credentials' } | { kind: 'otp'; email: string; expiresAt: number }
+type LoginStep =
+  | { kind: 'credentials' }
+  | { kind: 'emailVerification'; email: string; expiresAt: number }
 
 // ─── Validation ────────────────────────────────────────────────────────────────
+// 이메일/비밀번호 형식 오류는 alert가 아니라 입력란 하단 인라인 메시지로만 안내한다.
 
-const EMAIL_INVALID_MESSAGE = '이메일 형식이 아닙니다.'
-const PASSWORD_MISMATCH_MESSAGE = '올바른 비밀번호가 아닙니다.'
+const EMAIL_HANGUL_MESSAGE = '한글은 입력불가합니다.'
+const EMAIL_FORMAT_MESSAGE = '이메일 형식에 맞지 않습니다.'
+const PASSWORD_FORMAT_MESSAGE = '비밀번호 형식에 맞지 않습니다.'
+
+// ─── 로그인 실패 카운트 ───────────────────────────────────────────────────────────
+// 서버가 이메일/비밀번호 불일치로 로그인을 거부할 때마다(Turnstile 오류 제외) 카운트를 올리고,
+// 로그인 성공 시에만 0으로 리셋한다. 즉 이메일을 바꾸거나 페이지를 새로고침해도(컴포넌트 state가
+// 초기화되므로) 카운트는 유지되지 않지만, 같은 세션에서 계속 실패하는 한 5회까지 계속 누적된다.
+// ⚠️ 프런트엔드 단독 카운트이므로 새로고침·시크릿창 등으로 쉽게 우회 가능한 UX 안내용일 뿐이며,
+// 실질적인 브루트포스 방어(계정/IP 단위 잠금)는 반드시 백엔드에서 처리해야 한다.
+const LOGIN_FAIL_LIMIT = 5
+const LOGIN_LOCKED_MESSAGE = '로그인이 일시적으로 제한되었습니다.'
+
+/** 로그인 실패 횟수에 따른 안내 문구를 생성한다 (비밀번호 입력란 하단에 실시간으로 표시) */
+function getLoginFailMessage(count: number): string {
+  return `이메일 또는 비밀번호를 확인해 주세요. (실패 ${count}/${LOGIN_FAIL_LIMIT})`
+}
 
 // ─── TEMP: 백엔드 미연동 스텁 ────────────────────────────────────────────────────
 
@@ -45,6 +66,8 @@ function createTempAccessToken(): string {
 export function LoginPage() {
   const navigate = useNavigate()
   const setLoggedIn = useAuthStore((s) => s.setLoggedIn)
+  const saveEmail = useSavedEmailStore((s) => s.saveEmail)
+  const clearSavedEmail = useSavedEmailStore((s) => s.clearSavedEmail)
 
   // Turnstile 토큰 상태
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
@@ -53,11 +76,25 @@ export function LoginPage() {
   // 로그인 단계 상태
   const [step, setStep] = useState<LoginStep>({ kind: 'credentials' })
 
-  // 자격증명 폼 상태
-  const [form, setForm] = useState({ email: '', password: '' })
+  // 자격증명 폼 상태 (아이디 저장 기능으로 저장된 이메일이 있으면 초기값으로 채움)
+  // lazy initializer: 마운트 시 1회만 sessionStorage(스토어 경유)를 읽기 위함
+  const [form, setForm] = useState(() => ({
+    email: useSavedEmailStore.getState().savedEmail ?? '',
+    password: '',
+  }))
 
-  // OTP 입력 상태
-  const [otpCode, setOtpCode] = useState('')
+  // 아이디 저장 체크박스 상태
+  const [rememberId, setRememberId] = useState(() => !!useSavedEmailStore.getState().savedEmail)
+
+  // 이메일 입력 중 한글(한글 키보드) 입력을 시도했는지 여부 — removeHangul로 즉시 제거되므로
+  // form.email 값만으로는 판별 불가하여 별도 상태로 추적한다
+  const [emailHangulAttempted, setEmailHangulAttempted] = useState(false)
+
+  // 로그인 실패 횟수 (성공 시에만 0으로 리셋)
+  const [loginFailCount, setLoginFailCount] = useState(0)
+
+  // 이메일 인증번호 입력 상태
+  const [emailCode, setEmailCode] = useState('')
   const [timeLeft, setTimeLeft] = useState(0)
 
   // 핑거프린트 (두 mutation 간 공유)
@@ -72,10 +109,10 @@ export function LoginPage() {
     emailInputRef.current?.focus()
   }, [])
 
-  // ─── OTP 타이머 ───────────────────────────────────────────────────────────────
+  // ─── 이메일 인증 타이머 ───────────────────────────────────────────────────────
 
   useEffect(() => {
-    if (step.kind !== 'otp') return
+    if (step.kind !== 'emailVerification') return
 
     const tick = () => {
       const remaining = Math.max(0, Math.floor((step.expiresAt - Date.now()) / 1000))
@@ -113,13 +150,14 @@ export function LoginPage() {
       return stubResponse
     },
     onSuccess: (res) => {
+      setLoginFailCount(0)
       if (res.data?.type === 'T' && res.data.token) {
         sessionStorage.setItem('accessToken', res.data.token)
         setLoggedIn(true)
         void navigate({ to: '/main' })
       } else if (res.data?.type === 'O') {
         setStep({
-          kind: 'otp',
+          kind: 'emailVerification',
           email: form.email,
           expiresAt: Date.now() + 5 * 60 * 1000,
         })
@@ -130,18 +168,24 @@ export function LoginPage() {
         setTurnstileError('로봇 인증에 실패했습니다. 새로고침 후 다시 시도해주세요.')
         return
       }
-      alert(PASSWORD_MISMATCH_MESSAGE)
+      setLoginFailCount((prev) => {
+        const next = Math.min(prev + 1, LOGIN_FAIL_LIMIT)
+        if (next >= LOGIN_FAIL_LIMIT) {
+          alert(LOGIN_LOCKED_MESSAGE)
+        }
+        return next
+      })
     },
   })
 
-  const otpMutation = useMutation({
-    mutationFn: async (_vars: { otpCode: string; email: string }) => {
+  const emailCodeLoginMutation = useMutation({
+    mutationFn: async (_vars: { code: string; email: string }) => {
       // [TEMP] 26.07.27 백엔드 미연동 — 항상 성공 처리. 연동 완료 시 아래 주석 해제하고 스텁 제거
-      // return await otpLogin(
-      //   { email: vars.email, otpCode: vars.otpCode, deviceType: DEVICE_TYPE_WEB },
+      // return await loginWithEmailVerificationCode(
+      //   { email: vars.email, code: vars.code, deviceType: DEVICE_TYPE_WEB },
       //   fingerprintRef.current
       // )
-      const stubResponse: ApiResponse<OtpLoginData> = {
+      const stubResponse: ApiResponse<EmailVerificationLoginData> = {
         result: true,
         statusCode: 200,
         data: { token: createTempAccessToken() },
@@ -163,35 +207,60 @@ export function LoginPage() {
     e.preventDefault()
     setTurnstileError(null)
 
+    // 이메일/비밀번호 형식 오류는 입력란 하단 인라인 메시지로 이미 실시간 안내되므로 별도 alert
+    // 없이 제출만 막는다.
     if (!isValidEmail(form.email)) {
-      alert(EMAIL_INVALID_MESSAGE)
       return
     }
     if (!isValidPassword(form.password)) {
-      alert(PASSWORD_RULE_MESSAGE)
       return
     }
     if (!turnstileToken) {
       setTurnstileError('로봇 인증을 완료해주세요.')
       return
     }
+
+    if (rememberId) {
+      saveEmail(form.email)
+    } else {
+      clearSavedEmail()
+    }
+
     loginMutation.mutate({ ...form, cfTurnstileResponse: turnstileToken })
   }
 
-  const handleOtpSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleEmailCodeSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    if (step.kind !== 'otp') return
-    otpMutation.mutate({ otpCode, email: step.email })
+    if (step.kind !== 'emailVerification') return
+    emailCodeLoginMutation.mutate({ code: emailCode, email: step.email })
   }
 
   // ─── Render ───────────────────────────────────────────────────────────────────
-  // 자격증명 관련 에러(이메일 형식, 비밀번호 길이, 로그인 실패)는 alert()로 안내하므로
-  // 인라인 배너를 별도로 렌더링하지 않는다.
+  // 이메일/비밀번호 형식 오류는 입력란 하단에 실시간으로 안내한다. 로그인 실패(이메일/비밀번호
+  // 불일치 등 서버 응답 기반 에러)도 비밀번호 입력란 하단에 실패 횟수와 함께 안내하며, 5회에
+  // 도달하면 alert로 한 번 더 안내한다(위 loginMutation.onError 참고). 형식 오류가 있을 때는
+  // 형식 오류 메시지를 우선 표시한다.
 
-  const otpErrors = otpMutation.error instanceof Error ? [otpMutation.error.message] : []
+  const isEmailFormatInvalid = form.email.length > 0 && !isValidEmail(form.email)
+  const emailMessage = emailHangulAttempted
+    ? EMAIL_HANGUL_MESSAGE
+    : isEmailFormatInvalid
+      ? EMAIL_FORMAT_MESSAGE
+      : undefined
 
-  const isOtpExpired = timeLeft === 0 && step.kind === 'otp'
-  const canSubmitOtp = otpCode.length === 6 && !isOtpExpired && !otpMutation.isPending
+  const isPasswordFormatInvalid = form.password.length > 0 && !isValidPassword(form.password)
+  const passwordMessage = isPasswordFormatInvalid
+    ? PASSWORD_FORMAT_MESSAGE
+    : loginFailCount > 0
+      ? getLoginFailMessage(loginFailCount)
+      : undefined
+
+  const emailCodeErrors =
+    emailCodeLoginMutation.error instanceof Error ? [emailCodeLoginMutation.error.message] : []
+
+  const isEmailCodeExpired = timeLeft === 0 && step.kind === 'emailVerification'
+  const canSubmitEmailCode =
+    isValidEmailCode(emailCode) && !isEmailCodeExpired && !emailCodeLoginMutation.isPending
 
   return (
     <section className="mx-auto w-full max-w-sm">
@@ -208,23 +277,35 @@ export function LoginPage() {
               label="이메일"
               type="email"
               required
-              hideRequiredMark
-              placeholder="이메일을 입력하세요."
+              placeholder="이메일을 입력해 주세요"
               maxLength={EMAIL_MAX_LENGTH}
               value={form.email}
-              onChange={(e) => setForm((f) => ({ ...f, email: removeHangul(e.target.value) }))}
+              onChange={(e) => {
+                const rawValue = e.target.value
+                setEmailHangulAttempted(containsHangul(rawValue))
+                setForm((f) => ({ ...f, email: removeHangul(rawValue) }))
+              }}
+              message={emailMessage}
             />
             <FormInput
               id="password"
               label="비밀번호"
               type="password"
               required
-              hideRequiredMark
-              placeholder="비밀번호 8자리 이상 입력하세요"
+              placeholder="비밀번호를 입력해 주세요"
               value={form.password}
               onChange={(e) =>
                 setForm((f) => ({ ...f, password: sanitizePasswordInput(e.target.value) }))
               }
+              message={passwordMessage}
+            />
+
+            {/* 아이디 저장 */}
+            <FormCheckbox
+              id="remember-id"
+              label="아이디 저장"
+              checked={rememberId}
+              onChange={setRememberId}
             />
 
             {/* Turnstile 컴포넌트 */}
@@ -285,56 +366,56 @@ export function LoginPage() {
         </>
       ) : (
         <>
-          {/* OTP 폼 에러 */}
-          {otpErrors.length > 0 && (
+          {/* 이메일 인증 폼 에러 */}
+          {emailCodeErrors.length > 0 && (
             <ul className="mb-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-600">
-              {otpErrors.map((msg) => (
+              {emailCodeErrors.map((msg) => (
                 <li key={msg}>{msg}</li>
               ))}
             </ul>
           )}
 
-          {/* OTP 만료 알림 */}
-          {isOtpExpired && (
+          {/* 이메일 인증 만료 알림 */}
+          {isEmailCodeExpired && (
             <div className="mb-4 rounded border border-orange-200 bg-orange-50 p-3 text-sm text-orange-600">
               인증 시간이 만료되었습니다. 다시 로그인해주세요.
             </div>
           )}
 
-          {/* OTP 입력 폼 */}
-          <form className="space-y-4" onSubmit={handleOtpSubmit}>
+          {/* 이메일 인증 입력 폼 */}
+          <form className="space-y-4" onSubmit={handleEmailCodeSubmit}>
             <p className="text-sm text-gray-600">
               {step.email}로 발송된 6자리 인증번호를 입력해주세요.
             </p>
 
             <FormInput
-              id="otp-code"
+              id="email-code"
               label="인증번호"
               inputMode="numeric"
-              maxLength={6}
+              maxLength={EMAIL_CODE_LENGTH}
               required
               hideRequiredMark
-              value={otpCode}
-              onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+              value={emailCode}
+              onChange={(e) => setEmailCode(e.target.value.replace(/\D/g, ''))}
               inputClassName="text-center font-mono tracking-widest"
             />
 
-            {/* OTP 타이머 */}
+            {/* 이메일 인증 타이머 */}
             <div className="text-center text-sm text-gray-600">
               남은 시간:{' '}
-              <span className={isOtpExpired ? 'text-red-600' : ''}>
+              <span className={isEmailCodeExpired ? 'text-red-600' : ''}>
                 {String(Math.floor(timeLeft / 60)).padStart(2, '0')}:
                 {String(timeLeft % 60).padStart(2, '0')}
               </span>
             </div>
 
-            {/* OTP 제출 버튼 */}
+            {/* 이메일 인증 제출 버튼 */}
             <button
               type="submit"
-              disabled={!canSubmitOtp}
+              disabled={!canSubmitEmailCode}
               className="w-full rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
             >
-              {otpMutation.isPending ? 'OTP 확인 중...' : 'OTP 인증'}
+              {emailCodeLoginMutation.isPending ? '이메일 인증 확인 중...' : '이메일 인증'}
             </button>
 
             {/* 다시 로그인하기 */}
@@ -342,7 +423,7 @@ export function LoginPage() {
               type="button"
               onClick={() => {
                 setStep({ kind: 'credentials' })
-                setOtpCode('')
+                setEmailCode('')
                 setTimeLeft(0)
               }}
               className="w-full rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"

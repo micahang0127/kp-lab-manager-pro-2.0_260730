@@ -37,13 +37,13 @@ export interface LoginData {
   token?: string
 }
 
-export interface OtpLoginRequest {
+export interface EmailVerificationLoginRequest {
   email: string
-  otpCode: string
+  code: string
   deviceType: string
 }
 
-export interface OtpLoginData {
+export interface EmailVerificationLoginData {
   token: string
 }
 
@@ -77,12 +77,12 @@ export const login = (
     extraHeaders: fingerprint ? { KPMFP: fingerprint } : undefined,
   })
 
-/** OTP 로그인 — 인증 불필요(skipAuth), KPMFP 헤더 선택적 전송 */
-export const otpLogin = (
-  body: OtpLoginRequest,
+/** 이메일 인증번호 로그인 — 인증 불필요(skipAuth), KPMFP 헤더 선택적 전송 */
+export const loginWithEmailVerificationCode = (
+  body: EmailVerificationLoginRequest,
   fingerprint: string | null
-): Promise<ApiResponse<OtpLoginData>> =>
-  api.post<OtpLoginData>('/user/otplogin', body, {
+): Promise<ApiResponse<EmailVerificationLoginData>> =>
+  api.post<EmailVerificationLoginData>('/user/email-verification-login', body, {
     skipAuth: true,
     extraHeaders: fingerprint ? { KPMFP: fingerprint } : undefined,
   })
