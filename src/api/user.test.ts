@@ -30,15 +30,12 @@ describe('login API', () => {
       )
     )
 
-    const result = await login(
-      {
-        email: 'test@test.com',
-        password: '1234',
-        deviceType: 'WEB',
-        cfTurnstileResponse: 'mock-turnstile-token',
-      },
-      null
-    )
+    const result = await login({
+      email: 'test@test.com',
+      password: '1234',
+      deviceType: 'WEB',
+      cfTurnstileResponse: 'mock-turnstile-token',
+    })
     expect(result.statusCode).toBe(200)
     expect(result.data?.type).toBe('T')
     expect(result.data?.token).toBe('real-token-xyz')
@@ -56,15 +53,12 @@ describe('login API', () => {
       )
     )
 
-    const result = await login(
-      {
-        email: 'test@test.com',
-        password: '1234',
-        deviceType: 'WEB',
-        cfTurnstileResponse: 'mock-turnstile-token',
-      },
-      null
-    )
+    const result = await login({
+      email: 'test@test.com',
+      password: '1234',
+      deviceType: 'WEB',
+      cfTurnstileResponse: 'mock-turnstile-token',
+    })
     expect(result.statusCode).toBe(200)
     expect(result.data?.type).toBe('O')
     expect(result.data?.token).toBeUndefined()
@@ -86,15 +80,12 @@ describe('login API', () => {
     )
 
     await expect(
-      login(
-        {
-          email: 'wrong@test.com',
-          password: 'wrong',
-          deviceType: 'WEB',
-          cfTurnstileResponse: 'mock-turnstile-token',
-        },
-        null
-      )
+      login({
+        email: 'wrong@test.com',
+        password: 'wrong',
+        deviceType: 'WEB',
+        cfTurnstileResponse: 'mock-turnstile-token',
+      })
     ).rejects.toThrow('이메일 또는 비밀번호가 틀렸습니다.')
   })
 
@@ -114,42 +105,13 @@ describe('login API', () => {
     )
 
     await expect(
-      login(
-        {
-          email: 'test@test.com',
-          password: 'test',
-          deviceType: 'WEB',
-          cfTurnstileResponse: 'mock-turnstile-token',
-        },
-        null
-      )
-    ).rejects.toThrow('서버 오류가 발생했습니다.')
-  })
-
-  it('KPMFP 헤더가 요청에 포함된다', async () => {
-    let capturedHeader: string | null = null
-    server.use(
-      http.post('*/user/login', ({ request }) => {
-        capturedHeader = request.headers.get('KPMFP')
-        return HttpResponse.json({
-          result: true,
-          statusCode: 200,
-          data: { type: 'T', token: 'tok' },
-          message: [],
-        })
-      })
-    )
-
-    await login(
-      {
-        email: 'a@b.com',
-        password: 'pw',
+      login({
+        email: 'test@test.com',
+        password: 'test',
         deviceType: 'WEB',
         cfTurnstileResponse: 'mock-turnstile-token',
-      },
-      'mock-fp-abc123'
-    )
-    expect(capturedHeader).toBe('mock-fp-abc123')
+      })
+    ).rejects.toThrow('서버 오류가 발생했습니다.')
   })
 
   it('로그인 요청에 Authorization 헤더가 포함되지 않는다', async () => {
@@ -167,15 +129,12 @@ describe('login API', () => {
       })
     )
 
-    await login(
-      {
-        email: 'a@b.com',
-        password: 'pw',
-        deviceType: 'WEB',
-        cfTurnstileResponse: 'mock-turnstile-token',
-      },
-      null
-    )
+    await login({
+      email: 'a@b.com',
+      password: 'pw',
+      deviceType: 'WEB',
+      cfTurnstileResponse: 'mock-turnstile-token',
+    })
     expect(authHeader).toBeNull()
   })
 })
@@ -509,10 +468,13 @@ describe('loginWithEmailVerificationCode API', () => {
       )
     )
 
-    const result = await loginWithEmailVerificationCode(
-      { email: 'test@test.com', code: '123456', deviceType: 'WEB' },
-      null
-    )
+    const result = await loginWithEmailVerificationCode({
+      email: 'test@test.com',
+      code: '123456',
+      deviceType: 'WEB',
+      rememberDevice: false,
+      trustDurationDays: 30,
+    })
     expect(result.statusCode).toBe(200)
     expect(result.data?.token).toBe('email-verification-token-xyz')
   })
@@ -533,10 +495,13 @@ describe('loginWithEmailVerificationCode API', () => {
     )
 
     await expect(
-      loginWithEmailVerificationCode(
-        { email: 'test@test.com', code: '000000', deviceType: 'WEB' },
-        null
-      )
+      loginWithEmailVerificationCode({
+        email: 'test@test.com',
+        code: '000000',
+        deviceType: 'WEB',
+        rememberDevice: false,
+        trustDurationDays: 30,
+      })
     ).rejects.toThrow('잘못된 인증번호입니다.')
   })
 
@@ -556,18 +521,21 @@ describe('loginWithEmailVerificationCode API', () => {
     )
 
     await expect(
-      loginWithEmailVerificationCode(
-        { email: 'test@test.com', code: '123456', deviceType: 'WEB' },
-        null
-      )
+      loginWithEmailVerificationCode({
+        email: 'test@test.com',
+        code: '123456',
+        deviceType: 'WEB',
+        rememberDevice: false,
+        trustDurationDays: 30,
+      })
     ).rejects.toThrow('인증번호가 만료되었습니다.')
   })
 
-  it('KPMFP 헤더가 요청에 포함될 수 있다', async () => {
-    let capturedHeader: string | null = null
+  it('rememberDevice와 trustDurationDays 값이 요청 body에 포함된다', async () => {
+    let capturedBody: Record<string, unknown> | null = null
     server.use(
-      http.post('*/user/email-verification-login', ({ request }) => {
-        capturedHeader = request.headers.get('KPMFP')
+      http.post('*/user/email-verification-login', async ({ request }) => {
+        capturedBody = (await request.json()) as Record<string, unknown>
         return HttpResponse.json({
           result: true,
           statusCode: 200,
@@ -577,11 +545,14 @@ describe('loginWithEmailVerificationCode API', () => {
       })
     )
 
-    await loginWithEmailVerificationCode(
-      { email: 'test@test.com', code: '123456', deviceType: 'WEB' },
-      'mock-fp-abc123'
-    )
-    expect(capturedHeader).toBe('mock-fp-abc123')
+    await loginWithEmailVerificationCode({
+      email: 'test@test.com',
+      code: '123456',
+      deviceType: 'WEB',
+      rememberDevice: true,
+      trustDurationDays: 30,
+    })
+    expect(capturedBody).toMatchObject({ rememberDevice: true, trustDurationDays: 30 })
   })
 
   it('이메일 인증 로그인 요청에 Authorization 헤더가 포함되지 않는다', async () => {
@@ -599,10 +570,13 @@ describe('loginWithEmailVerificationCode API', () => {
       })
     )
 
-    await loginWithEmailVerificationCode(
-      { email: 'test@test.com', code: '123456', deviceType: 'WEB' },
-      null
-    )
+    await loginWithEmailVerificationCode({
+      email: 'test@test.com',
+      code: '123456',
+      deviceType: 'WEB',
+      rememberDevice: false,
+      trustDurationDays: 30,
+    })
     expect(authHeader).toBeNull()
   })
 })

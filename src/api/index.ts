@@ -25,7 +25,7 @@ export interface ApiResponse<T> {
 }
 
 export interface RequestOptions {
-  extraHeaders?: Record<string, string> // 커스텀 헤더 (예: KPMFP)
+  extraHeaders?: Record<string, string> // 커스텀 헤더
   skipAuth?: boolean // true면 Authorization 헤더 미포함
 }
 
@@ -70,9 +70,15 @@ async function request<T>(
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT)
 
   try {
+    // [팀 합의 필요] credentials: 'include' — 신규 기기 로그인 판별용 device-trust 쿠키(백엔드가
+    // 이메일 인증 성공 시 발급)를 브라우저가 요청에 실어 보내도록 하기 위해 추가함. API 서버가
+    // 프론트와 동일 origin이면 없어도 동작에 차이가 없으나, 별도 서브도메인(cross-origin)이면
+    // 이 옵션이 없으면 쿠키가 전송되지 않는다. VITE_API_BASE_URL이 로컬에 비어있어 실제 배포
+    // 환경이 동일 origin인지 이 리포에서 확인 불가 — PR 리뷰에서 백엔드/인프라 확인 필요.
     const res = await fetch(`${BASE_URL}${endpoint}`, {
       method,
       headers,
+      credentials: 'include',
       signal: controller.signal,
       ...(body !== undefined && { body: JSON.stringify(body) }),
     })

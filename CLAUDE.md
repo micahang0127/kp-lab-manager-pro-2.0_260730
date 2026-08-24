@@ -111,7 +111,7 @@
 - 응답 타입: `ApiResponse<T>` = `{ result, data: T | null, message: string[], statusCode }` (백엔드 `CommonResponsePayload<T>`와 동일 구조) — `data` 접근 시 옵셔널 체이닝(`?.`) 필수
 - 토큰: `sessionStorage.getItem('accessToken')` 자동 주입
 - 인증 헤더 생략: `{ skipAuth: true }` 옵션
-- 커스텀 헤더 (예: KPMFP 핑거프린트): `{ extraHeaders: {...} }`
+- 커스텀 헤더 필요 시: `{ extraHeaders: {...} }`
 - 401 처리: 만료 감지 시 자동 로그아웃 + `/login` 리다이렉트 (컴포넌트에서 별도 처리 불필요)
 - 에러: `ApiError` 인스턴스가 throw됨 (`.statusCode`, `.message`)
 
@@ -142,12 +142,12 @@ ESLint `simple-import-sort` 플러그인이 자동 정렬합니다. 수동 조�
 
 ### 파일명 규칙
 
-| 대상            | 규칙                       | 예시                               |
-| --------------- | -------------------------- | ---------------------------------- |
-| 컴포넌트/페이지 | PascalCase                 | `LoginPage.tsx`, `Header.tsx`      |
-| 스토어          | camelCase + `Store` 접미사 | `authStore.ts`                     |
-| 유틸/훅         | camelCase                  | `requireAuth.ts`, `fingerprint.ts` |
-| 테스트          | `{원본}.test.{ts,tsx}`     | `authStore.test.ts`                |
+| 대상            | 규칙                       | 예시                          |
+| --------------- | -------------------------- | ----------------------------- |
+| 컴포넌트/페이지 | PascalCase                 | `LoginPage.tsx`, `Header.tsx` |
+| 스토어          | camelCase + `Store` 접미사 | `authStore.ts`                |
+| 유틸/훅         | camelCase                  | `requireAuth.ts`              |
+| 테스트          | `{원본}.test.{ts,tsx}`     | `authStore.test.ts`           |
 
 ### 주석 스타일
 
@@ -267,7 +267,7 @@ src/
   pages/        — 페이지 단위 컴포넌트
   routes/       — TanStack Router 파일 기반 라우트
   stores/       — Zustand 전역 상태
-  utils/        — 공통 유틸 (date, fingerprint, requireAuth 등)
+  utils/        — 공통 유틸 (date, requireAuth 등)
   test/         — MSW 핸들러, 테스트 setup, 커스텀 render
   styles/       — 전역 CSS
 ```

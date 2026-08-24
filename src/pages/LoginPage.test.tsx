@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useAuthStore } from '../stores/authStore'
+import { useLoginFlowStore } from '../stores/loginFlowStore'
 import { useSavedEmailStore } from '../stores/savedEmailStore'
 import { server } from '../test/mocks/server'
 import { render, screen } from '../test/test-utils'
@@ -17,10 +18,6 @@ const mockNavigate = vi.fn()
 
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: vi.fn(),
-}))
-
-vi.mock('../utils/fingerprint', () => ({
-  getFingerprint: vi.fn().mockResolvedValue('mock-fingerprint-abc123'),
 }))
 
 // Turnstile 컴포넌트 mock (jsdom 환경에서 실제 렌더 불가)
@@ -48,6 +45,7 @@ describe('LoginPage', () => {
     document.cookie = 'savedEmail=; max-age=0; path=/'
     useAuthStore.setState({ isLoggedIn: false })
     useSavedEmailStore.setState({ savedEmail: null })
+    useLoginFlowStore.setState({ pending: null })
     vi.mocked(useNavigate).mockReturnValue(mockNavigate)
     vi.clearAllMocks()
     server.resetHandlers()
@@ -504,11 +502,12 @@ describe('LoginPage', () => {
     })
   })
 
-  // ─── 이메일 인증 로그인 Tests (Future Work) ──────────────────────────────────
+  // ─── 신규 기기 로그인 → 이메일 인증 이동 Tests (Future Work) ──────────────────
 
-  // [FUTURE WORK] 백엔드 연동 후 주석 해제
-  // describe('로그인 폼 (신규 기기, 이메일 인증 플로우)', () => {
-  //   it('type O 응답 시 이메일 인증 입력 UI가 표시된다', async () => {
+  // [FUTURE WORK] 백엔드 연동 후 주석 해제 (실제 이메일 인증 입력/제출 케이스는
+  // EmailVerificationPage.test.tsx에서 검증한다 — 이 페이지는 /login/verify로의 이동만 담당)
+  // describe('로그인 폼 (신규 기기 판별)', () => {
+  //   it('type O 응답 시 이메일 인증 대기 상태를 저장하고 /login/verify로 이동한다', async () => {
   //     server.use(
   //       http.post('*/user/login', () =>
   //         HttpResponse.json({
@@ -523,232 +522,14 @@ describe('LoginPage', () => {
   //     render(<LoginPage />)
   //
   //     fireEvent.click(screen.getByText('turnstile-success'))
-  //     const emailInput = screen.getByLabelText(/이메일/)
-  //     const passwordInput = screen.getByLabelText(/비밀번호/)
-  //     const submitButton = screen.getByRole('button', { name: /^로그인$/ })
-  //
-  //     await userEvent.type(emailInput, 'user@test.com')
-  //     await userEvent.type(passwordInput, 'password123')
-  //     await userEvent.click(submitButton)
-  //
-  //     // 이메일 인증 입력 UI가 표시되어야 함
-  //     expect(await screen.findByLabelText(/인증번호/)).toBeInTheDocument()
-  //     expect(await screen.findByText(/남은 시간/)).toBeInTheDocument()
-  //     expect(screen.getByRole('button', { name: /이메일 인증/ })).toBeInTheDocument()
-  //   })
-  //
-  //   it('인증번호 6자리 입력 후 제출 시 /main으로 이동한다', async () => {
-  //     server.use(
-  //       http.post('*/user/login', () =>
-  //         HttpResponse.json({
-  //           result: true,
-  //           statusCode: 200,
-  //           data: { type: 'O' },
-  //           message: [],
-  //         })
-  //       ),
-  //       http.post('*/user/email-verification-login', () =>
-  //         HttpResponse.json({
-  //           result: true,
-  //           statusCode: 200,
-  //           data: { token: 'email-verification-token-456' },
-  //           message: [],
-  //         })
-  //       )
-  //     )
-  //
-  //     render(<LoginPage />)
-  //
-  //     fireEvent.click(screen.getByText('turnstile-success'))
-  //     // 자격증명 입력 및 제출
   //     await userEvent.type(screen.getByLabelText(/이메일/), 'user@test.com')
   //     await userEvent.type(screen.getByLabelText(/비밀번호/), 'password123')
   //     await userEvent.click(screen.getByRole('button', { name: /^로그인$/ }))
-  //
-  //     // 이메일 인증번호 입력
-  //     const emailCodeInput = await screen.findByLabelText(/인증번호/)
-  //     await userEvent.type(emailCodeInput, '123456')
-  //
-  //     // 이메일 인증 제출
-  //     const emailCodeButton = screen.getByRole('button', { name: /이메일 인증/ })
-  //     await userEvent.click(emailCodeButton)
   //
   //     await waitFor(() => {
-  //       expect(sessionStorage.getItem('accessToken')).toBe('email-verification-token-456')
-  //       expect(useAuthStore.getState().isLoggedIn).toBe(true)
-  //       expect(mockNavigate).toHaveBeenCalledWith({ to: '/main' })
+  //       expect(useLoginFlowStore.getState().pending?.email).toBe('user@test.com')
+  //       expect(mockNavigate).toHaveBeenCalledWith({ to: '/login/verify' })
   //     })
-  //   })
-  //
-  //   it('이메일 인증번호 입력 중에는 숫자만 입력된다', async () => {
-  //     server.use(
-  //       http.post('*/user/login', () =>
-  //         HttpResponse.json({
-  //           result: true,
-  //           statusCode: 200,
-  //           data: { type: 'O' },
-  //           message: [],
-  //         })
-  //       )
-  //     )
-  //
-  //     render(<LoginPage />)
-  //
-  //     fireEvent.click(screen.getByText('turnstile-success'))
-  //     await userEvent.type(screen.getByLabelText(/이메일/), 'user@test.com')
-  //     await userEvent.type(screen.getByLabelText(/비밀번호/), 'password123')
-  //     await userEvent.click(screen.getByRole('button', { name: /^로그인$/ }))
-  //
-  //     const emailCodeInput = (await screen.findByLabelText(/인증번호/)) as HTMLInputElement
-  //     await userEvent.type(emailCodeInput, 'abc123def')
-  //
-  //     // 숫자만 입력되어야 함
-  //     expect(emailCodeInput.value).toBe('123')
-  //   })
-  //
-  //   it('인증번호 6자리 미만이면 제출 버튼이 disabled다', async () => {
-  //     server.use(
-  //       http.post('*/user/login', () =>
-  //         HttpResponse.json({
-  //           result: true,
-  //           statusCode: 200,
-  //           data: { type: 'O' },
-  //           message: [],
-  //         })
-  //       )
-  //     )
-  //
-  //     render(<LoginPage />)
-  //
-  //     fireEvent.click(screen.getByText('turnstile-success'))
-  //     await userEvent.type(screen.getByLabelText(/이메일/), 'user@test.com')
-  //     await userEvent.type(screen.getByLabelText(/비밀번호/), 'password123')
-  //     await userEvent.click(screen.getByRole('button', { name: /^로그인$/ }))
-  //
-  //     const emailCodeInput = await screen.findByLabelText(/인증번호/)
-  //     const emailCodeButton = screen.getByRole('button', { name: /이메일 인증/ })
-  //
-  //     // 5자리 입력
-  //     await userEvent.type(emailCodeInput, '12345')
-  //     expect(emailCodeButton).toBeDisabled()
-  //
-  //     // 6자리 입력
-  //     await userEvent.type(emailCodeInput, '6')
-  //     expect(emailCodeButton).not.toBeDisabled()
-  //   })
-  //
-  //   it('이메일 인증 오류 시 에러 메시지를 표시한다', async () => {
-  //     server.use(
-  //       http.post('*/user/login', () =>
-  //         HttpResponse.json({
-  //           result: true,
-  //           statusCode: 200,
-  //           data: { type: 'O' },
-  //           message: [],
-  //         })
-  //       ),
-  //       http.post('*/user/email-verification-login', () =>
-  //         HttpResponse.json(
-  //           {
-  //             result: false,
-  //             statusCode: 400,
-  //             data: null,
-  //             message: ['잘못된 인증번호입니다.'],
-  //           },
-  //           { status: 400 }
-  //         )
-  //       )
-  //     )
-  //
-  //     render(<LoginPage />)
-  //
-  //     fireEvent.click(screen.getByText('turnstile-success'))
-  //     await userEvent.type(screen.getByLabelText(/이메일/), 'user@test.com')
-  //     await userEvent.type(screen.getByLabelText(/비밀번호/), 'password123')
-  //     await userEvent.click(screen.getByRole('button', { name: /^로그인$/ }))
-  //
-  //     const emailCodeInput = await screen.findByLabelText(/인증번호/)
-  //     await userEvent.type(emailCodeInput, '000000')
-  //     await userEvent.click(screen.getByRole('button', { name: /이메일 인증/ }))
-  //
-  //     expect(await screen.findByText(/잘못된 인증번호입니다./)).toBeInTheDocument()
-  //   })
-  //
-  //   it('"처음부터 시작" 버튼을 클릭하면 자격증명 폼으로 돌아간다', async () => {
-  //     server.use(
-  //       http.post('*/user/login', () =>
-  //         HttpResponse.json({
-  //           result: true,
-  //           statusCode: 200,
-  //           data: { type: 'O' },
-  //           message: [],
-  //         })
-  //       )
-  //     )
-  //
-  //     render(<LoginPage />)
-  //
-  //     fireEvent.click(screen.getByText('turnstile-success'))
-  //     await userEvent.type(screen.getByLabelText(/이메일/), 'user@test.com')
-  //     await userEvent.type(screen.getByLabelText(/비밀번호/), 'password123')
-  //     await userEvent.click(screen.getByRole('button', { name: /^로그인$/ }))
-  //
-  //     // 이메일 인증 단계 확인
-  //     expect(await screen.findByLabelText(/인증번호/)).toBeInTheDocument()
-  //
-  //     // "처음부터 시작" 버튼 클릭
-  //     await userEvent.click(screen.getByRole('button', { name: /처음부터 시작/ }))
-  //
-  //     // 자격증명 폼으로 돌아갔는지 확인
-  //     expect(await screen.findByLabelText(/^이메일/)).toBeInTheDocument()
-  //     expect(screen.getByLabelText(/^비밀번호/)).toBeInTheDocument()
-  //   })
-  //
-  //   it('이메일 인증 중에는 제출 버튼이 disabled다', async () => {
-  //     let resolveEmailCode: () => void = () => {}
-  //     const emailCodePromise = new Promise<void>((resolve) => {
-  //       resolveEmailCode = resolve
-  //     })
-  //
-  //     server.use(
-  //       http.post('*/user/login', () =>
-  //         HttpResponse.json({
-  //           result: true,
-  //           statusCode: 200,
-  //           data: { type: 'O' },
-  //           message: [],
-  //         })
-  //       ),
-  //       http.post('*/user/email-verification-login', async () => {
-  //         await emailCodePromise
-  //         return HttpResponse.json({
-  //           result: true,
-  //           statusCode: 200,
-  //           data: { token: 'tok' },
-  //           message: [],
-  //         })
-  //       })
-  //     )
-  //
-  //     render(<LoginPage />)
-  //
-  //     fireEvent.click(screen.getByText('turnstile-success'))
-  //     await userEvent.type(screen.getByLabelText(/이메일/), 'user@test.com')
-  //     await userEvent.type(screen.getByLabelText(/비밀번호/), 'password123')
-  //     await userEvent.click(screen.getByRole('button', { name: /^로그인$/ }))
-  //
-  //     const emailCodeInput = await screen.findByLabelText(/인증번호/)
-  //     await userEvent.type(emailCodeInput, '123456')
-  //
-  //     const emailCodeButton = screen.getByRole('button', { name: /이메일 인증/ })
-  //     await userEvent.click(emailCodeButton)
-  //
-  //     expect(emailCodeButton).toBeDisabled()
-  //     expect(emailCodeButton).toHaveTextContent(/이메일 인증 확인 중/)
-  //
-  //     resolveEmailCode()
-  //     // 이메일 인증 완료까지 대기하여 act 경고 방지
-  //     await waitFor(() => expect(emailCodeButton).not.toBeDisabled())
   //   })
   // })
 

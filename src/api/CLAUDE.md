@@ -57,13 +57,13 @@ interface ApiResponse<T> {
 
 ```typescript
 interface RequestOptions {
-  extraHeaders?: Record<string, string> // 예: KPMFP 핑거프린트
+  extraHeaders?: Record<string, string> // 커스텀 헤더
   skipAuth?: boolean // Authorization 헤더 생략
 }
 ```
 
 - 로그인 API 등 인증 전 호출: `api.post(endpoint, body, { skipAuth: true })`
-- 커스텀 헤더: `api.post(endpoint, body, { extraHeaders: { KPMFP: 'xxx' } })`
+- 커스텀 헤더: `api.post(endpoint, body, { extraHeaders: { 'X-Custom-Header': 'value' } })`
 
 ## 임시 코드 ([TEMP]) 패턴
 

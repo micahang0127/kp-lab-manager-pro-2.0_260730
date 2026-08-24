@@ -25,6 +25,7 @@ import { Route as SafetyMsdsRouteImport } from './routes/safety/msds'
 import { Route as SafetyHazardousQuantityRouteImport } from './routes/safety/hazardous-quantity'
 import { Route as SafetyHazardousChemicalRouteImport } from './routes/safety/hazardous-chemical'
 import { Route as ReservationPreparingRouteImport } from './routes/reservation/preparing'
+import { Route as LoginVerifyRouteImport } from './routes/login/verify'
 import { Route as ItemsRegisterRouteImport } from './routes/items/register'
 import { Route as ItemsPhotoPendingRouteImport } from './routes/items/photo-pending'
 import { Route as ItemsIncomingPendingRouteImport } from './routes/items/incoming-pending'
@@ -110,6 +111,11 @@ const ReservationPreparingRoute = ReservationPreparingRouteImport.update({
   path: '/reservation/preparing',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LoginVerifyRoute = LoginVerifyRouteImport.update({
+  id: '/verify',
+  path: '/verify',
+  getParentRoute: () => LoginRoute,
+} as any)
 const ItemsRegisterRoute = ItemsRegisterRouteImport.update({
   id: '/items/register',
   path: '/items/register',
@@ -134,13 +140,14 @@ const InventoryPreparingRoute = InventoryPreparingRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/find-account': typeof FindAccountRoute
-  '/login': typeof LoginRoute
+  '/login': typeof LoginRouteWithChildren
   '/main': typeof MainRoute
   '/register': typeof RegisterRoute
   '/inventory/preparing': typeof InventoryPreparingRoute
   '/items/incoming-pending': typeof ItemsIncomingPendingRoute
   '/items/photo-pending': typeof ItemsPhotoPendingRoute
   '/items/register': typeof ItemsRegisterRoute
+  '/login/verify': typeof LoginVerifyRoute
   '/reservation/preparing': typeof ReservationPreparingRoute
   '/safety/hazardous-chemical': typeof SafetyHazardousChemicalRoute
   '/safety/hazardous-quantity': typeof SafetyHazardousQuantityRoute
@@ -156,13 +163,14 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/find-account': typeof FindAccountRoute
-  '/login': typeof LoginRoute
+  '/login': typeof LoginRouteWithChildren
   '/main': typeof MainRoute
   '/register': typeof RegisterRoute
   '/inventory/preparing': typeof InventoryPreparingRoute
   '/items/incoming-pending': typeof ItemsIncomingPendingRoute
   '/items/photo-pending': typeof ItemsPhotoPendingRoute
   '/items/register': typeof ItemsRegisterRoute
+  '/login/verify': typeof LoginVerifyRoute
   '/reservation/preparing': typeof ReservationPreparingRoute
   '/safety/hazardous-chemical': typeof SafetyHazardousChemicalRoute
   '/safety/hazardous-quantity': typeof SafetyHazardousQuantityRoute
@@ -179,13 +187,14 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/find-account': typeof FindAccountRoute
-  '/login': typeof LoginRoute
+  '/login': typeof LoginRouteWithChildren
   '/main': typeof MainRoute
   '/register': typeof RegisterRoute
   '/inventory/preparing': typeof InventoryPreparingRoute
   '/items/incoming-pending': typeof ItemsIncomingPendingRoute
   '/items/photo-pending': typeof ItemsPhotoPendingRoute
   '/items/register': typeof ItemsRegisterRoute
+  '/login/verify': typeof LoginVerifyRoute
   '/reservation/preparing': typeof ReservationPreparingRoute
   '/safety/hazardous-chemical': typeof SafetyHazardousChemicalRoute
   '/safety/hazardous-quantity': typeof SafetyHazardousQuantityRoute
@@ -210,6 +219,7 @@ export interface FileRouteTypes {
     | '/items/incoming-pending'
     | '/items/photo-pending'
     | '/items/register'
+    | '/login/verify'
     | '/reservation/preparing'
     | '/safety/hazardous-chemical'
     | '/safety/hazardous-quantity'
@@ -232,6 +242,7 @@ export interface FileRouteTypes {
     | '/items/incoming-pending'
     | '/items/photo-pending'
     | '/items/register'
+    | '/login/verify'
     | '/reservation/preparing'
     | '/safety/hazardous-chemical'
     | '/safety/hazardous-quantity'
@@ -254,6 +265,7 @@ export interface FileRouteTypes {
     | '/items/incoming-pending'
     | '/items/photo-pending'
     | '/items/register'
+    | '/login/verify'
     | '/reservation/preparing'
     | '/safety/hazardous-chemical'
     | '/safety/hazardous-quantity'
@@ -270,7 +282,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   FindAccountRoute: typeof FindAccountRoute
-  LoginRoute: typeof LoginRoute
+  LoginRoute: typeof LoginRouteWithChildren
   MainRoute: typeof MainRoute
   RegisterRoute: typeof RegisterRoute
   InventoryPreparingRoute: typeof InventoryPreparingRoute
@@ -404,6 +416,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReservationPreparingRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/login/verify': {
+      id: '/login/verify'
+      path: '/verify'
+      fullPath: '/login/verify'
+      preLoaderRoute: typeof LoginVerifyRouteImport
+      parentRoute: typeof LoginRoute
+    }
     '/items/register': {
       id: '/items/register'
       path: '/items/register'
@@ -435,10 +454,20 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface LoginRouteChildren {
+  LoginVerifyRoute: typeof LoginVerifyRoute
+}
+
+const LoginRouteChildren: LoginRouteChildren = {
+  LoginVerifyRoute: LoginVerifyRoute,
+}
+
+const LoginRouteWithChildren = LoginRoute._addFileChildren(LoginRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   FindAccountRoute: FindAccountRoute,
-  LoginRoute: LoginRoute,
+  LoginRoute: LoginRouteWithChildren,
   MainRoute: MainRoute,
   RegisterRoute: RegisterRoute,
   InventoryPreparingRoute: InventoryPreparingRoute,
