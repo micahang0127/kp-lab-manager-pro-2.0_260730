@@ -95,7 +95,6 @@ export function LoginPage() {
       // const loginBody: LoginRequest = {
       //   email: vars.email,
       //   password: vars.password,
-      //   deviceType: DEVICE_TYPE_WEB,
       //   cfTurnstileResponse: vars.cfTurnstileResponse,
       // }
       // return login(loginBody)

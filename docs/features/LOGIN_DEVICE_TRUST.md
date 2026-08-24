@@ -88,7 +88,7 @@ emailCodeLoginMutation.mutate({
   rememberDevice: trustDevice,
   trustDurationDays: TRUST_DEVICE_DURATION_DAYS,
 })
-// → loginWithEmailVerificationCode({ email, code, deviceType, rememberDevice, trustDurationDays })
+// → loginWithEmailVerificationCode({ email, code, rememberDevice, trustDurationDays })
 // → api.post('/user/email-verification-login', body, { skipAuth: true })
 ```
 

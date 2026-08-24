@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 
 import type { ApiResponse } from '../api'
 // [TEMP] 26.07.27 백엔드 미연동 — 이메일 인증 API 연동 전까지 주석 처리. 연동 완료 시 주석 해제
-// import { DEVICE_TYPE_WEB, loginWithEmailVerificationCode } from '../api/user'
+// import { loginWithEmailVerificationCode } from '../api/user'
 import type { EmailVerificationLoginData } from '../api/user'
 import { FormCheckbox, FormInput } from '../components/form'
 import { useAuthStore } from '../stores/authStore'
@@ -65,7 +65,6 @@ export function EmailVerificationPage() {
       // return await loginWithEmailVerificationCode({
       //   email: vars.email,
       //   code: vars.code,
-      //   deviceType: DEVICE_TYPE_WEB,
       //   rememberDevice: vars.rememberDevice,
       //   trustDurationDays: vars.trustDurationDays,
       // })

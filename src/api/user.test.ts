@@ -33,7 +33,6 @@ describe('login API', () => {
     const result = await login({
       email: 'test@test.com',
       password: '1234',
-      deviceType: 'WEB',
       cfTurnstileResponse: 'mock-turnstile-token',
     })
     expect(result.statusCode).toBe(200)
@@ -56,7 +55,6 @@ describe('login API', () => {
     const result = await login({
       email: 'test@test.com',
       password: '1234',
-      deviceType: 'WEB',
       cfTurnstileResponse: 'mock-turnstile-token',
     })
     expect(result.statusCode).toBe(200)
@@ -83,7 +81,6 @@ describe('login API', () => {
       login({
         email: 'wrong@test.com',
         password: 'wrong',
-        deviceType: 'WEB',
         cfTurnstileResponse: 'mock-turnstile-token',
       })
     ).rejects.toThrow('이메일 또는 비밀번호가 틀렸습니다.')
@@ -108,7 +105,6 @@ describe('login API', () => {
       login({
         email: 'test@test.com',
         password: 'test',
-        deviceType: 'WEB',
         cfTurnstileResponse: 'mock-turnstile-token',
       })
     ).rejects.toThrow('서버 오류가 발생했습니다.')
@@ -132,7 +128,6 @@ describe('login API', () => {
     await login({
       email: 'a@b.com',
       password: 'pw',
-      deviceType: 'WEB',
       cfTurnstileResponse: 'mock-turnstile-token',
     })
     expect(authHeader).toBeNull()
@@ -471,7 +466,6 @@ describe('loginWithEmailVerificationCode API', () => {
     const result = await loginWithEmailVerificationCode({
       email: 'test@test.com',
       code: '123456',
-      deviceType: 'WEB',
       rememberDevice: false,
       trustDurationDays: 30,
     })
@@ -498,7 +492,6 @@ describe('loginWithEmailVerificationCode API', () => {
       loginWithEmailVerificationCode({
         email: 'test@test.com',
         code: '000000',
-        deviceType: 'WEB',
         rememberDevice: false,
         trustDurationDays: 30,
       })
@@ -524,7 +517,6 @@ describe('loginWithEmailVerificationCode API', () => {
       loginWithEmailVerificationCode({
         email: 'test@test.com',
         code: '123456',
-        deviceType: 'WEB',
         rememberDevice: false,
         trustDurationDays: 30,
       })
@@ -548,7 +540,6 @@ describe('loginWithEmailVerificationCode API', () => {
     await loginWithEmailVerificationCode({
       email: 'test@test.com',
       code: '123456',
-      deviceType: 'WEB',
       rememberDevice: true,
       trustDurationDays: 30,
     })
@@ -573,7 +564,6 @@ describe('loginWithEmailVerificationCode API', () => {
     await loginWithEmailVerificationCode({
       email: 'test@test.com',
       code: '123456',
-      deviceType: 'WEB',
       rememberDevice: false,
       trustDurationDays: 30,
     })

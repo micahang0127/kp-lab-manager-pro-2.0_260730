@@ -1,10 +1,6 @@
 import type { ApiResponse } from '.'
 import { api } from '.'
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-export const DEVICE_TYPE_WEB = 'WEB' as const
-
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface SignupRequest {
@@ -28,7 +24,6 @@ export interface SignupRequest {
 export interface LoginRequest {
   email: string
   password: string
-  deviceType: string
   cfTurnstileResponse: string
 }
 
@@ -40,7 +35,6 @@ export interface LoginData {
 export interface EmailVerificationLoginRequest {
   email: string
   code: string
-  deviceType: string
   /** true면 이 브라우저를 신뢰 기기로 등록 — 백엔드가 device-trust 쿠키를 발급하는 기준 */
   rememberDevice: boolean
   /** rememberDevice가 true일 때 신뢰를 유지할 기간(일). device-trust 쿠키의 Max-Age 산정 기준 */
