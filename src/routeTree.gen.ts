@@ -9,7 +9,6 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as RegisterRouteImport } from './routes/register'
 import { Route as MainRouteImport } from './routes/main'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as FindAccountRouteImport } from './routes/find-account'
@@ -31,11 +30,6 @@ import { Route as ItemsPhotoPendingRouteImport } from './routes/items/photo-pend
 import { Route as ItemsIncomingPendingRouteImport } from './routes/items/incoming-pending'
 import { Route as InventoryPreparingRouteImport } from './routes/inventory/preparing'
 
-const RegisterRoute = RegisterRouteImport.update({
-  id: '/register',
-  path: '/register',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const MainRoute = MainRouteImport.update({
   id: '/main',
   path: '/main',
@@ -142,7 +136,6 @@ export interface FileRoutesByFullPath {
   '/find-account': typeof FindAccountRoute
   '/login': typeof LoginRouteWithChildren
   '/main': typeof MainRoute
-  '/register': typeof RegisterRoute
   '/inventory/preparing': typeof InventoryPreparingRoute
   '/items/incoming-pending': typeof ItemsIncomingPendingRoute
   '/items/photo-pending': typeof ItemsPhotoPendingRoute
@@ -165,7 +158,6 @@ export interface FileRoutesByTo {
   '/find-account': typeof FindAccountRoute
   '/login': typeof LoginRouteWithChildren
   '/main': typeof MainRoute
-  '/register': typeof RegisterRoute
   '/inventory/preparing': typeof InventoryPreparingRoute
   '/items/incoming-pending': typeof ItemsIncomingPendingRoute
   '/items/photo-pending': typeof ItemsPhotoPendingRoute
@@ -189,7 +181,6 @@ export interface FileRoutesById {
   '/find-account': typeof FindAccountRoute
   '/login': typeof LoginRouteWithChildren
   '/main': typeof MainRoute
-  '/register': typeof RegisterRoute
   '/inventory/preparing': typeof InventoryPreparingRoute
   '/items/incoming-pending': typeof ItemsIncomingPendingRoute
   '/items/photo-pending': typeof ItemsPhotoPendingRoute
@@ -214,7 +205,6 @@ export interface FileRouteTypes {
     | '/find-account'
     | '/login'
     | '/main'
-    | '/register'
     | '/inventory/preparing'
     | '/items/incoming-pending'
     | '/items/photo-pending'
@@ -237,7 +227,6 @@ export interface FileRouteTypes {
     | '/find-account'
     | '/login'
     | '/main'
-    | '/register'
     | '/inventory/preparing'
     | '/items/incoming-pending'
     | '/items/photo-pending'
@@ -260,7 +249,6 @@ export interface FileRouteTypes {
     | '/find-account'
     | '/login'
     | '/main'
-    | '/register'
     | '/inventory/preparing'
     | '/items/incoming-pending'
     | '/items/photo-pending'
@@ -284,7 +272,6 @@ export interface RootRouteChildren {
   FindAccountRoute: typeof FindAccountRoute
   LoginRoute: typeof LoginRouteWithChildren
   MainRoute: typeof MainRoute
-  RegisterRoute: typeof RegisterRoute
   InventoryPreparingRoute: typeof InventoryPreparingRoute
   ItemsIncomingPendingRoute: typeof ItemsIncomingPendingRoute
   ItemsPhotoPendingRoute: typeof ItemsPhotoPendingRoute
@@ -304,13 +291,6 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/register': {
-      id: '/register'
-      path: '/register'
-      fullPath: '/register'
-      preLoaderRoute: typeof RegisterRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/main': {
       id: '/main'
       path: '/main'
@@ -469,7 +449,6 @@ const rootRouteChildren: RootRouteChildren = {
   FindAccountRoute: FindAccountRoute,
   LoginRoute: LoginRouteWithChildren,
   MainRoute: MainRoute,
-  RegisterRoute: RegisterRoute,
   InventoryPreparingRoute: InventoryPreparingRoute,
   ItemsIncomingPendingRoute: ItemsIncomingPendingRoute,
   ItemsPhotoPendingRoute: ItemsPhotoPendingRoute,
