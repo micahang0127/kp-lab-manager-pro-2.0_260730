@@ -89,7 +89,7 @@ export const createLab = (_body: CreateLabRequest): Promise<ApiResponse<Lab>> =>
   Promise.resolve({ result: true, statusCode: 200, data: createLabTemp, message: [] })
 ```
 
-실제 예시: `src/api/auth.ts`의 `confirmIdentityVerification` 참고.
+실제 예시: `src/api/storageLocation.ts`의 `getStorageLocations` 참고.
 
 ## 테스트 패턴
 

@@ -57,6 +57,10 @@ export function sanitizePasswordInput(value: string): string {
 
 export const EMAIL_CODE_LENGTH = 6
 
+// 이메일 인증코드 발송 API('/v1/user/email/sendCode') 응답에는 유효 시간이 내려오지 않아
+// 프론트에서 고정값으로 관리한다 — 화면의 "남은 시간" 타이머 기준값
+export const EMAIL_CODE_EXPIRES_IN_SECONDS = 180
+
 export const EMAIL_CODE_REGEX = /^\d{6}$/
 
 export const EMAIL_CODE_RULE_MESSAGE = '인증번호 6자리를 숫자로 입력해주세요.'

@@ -1,3 +1,5 @@
+import defaultTheme from 'tailwindcss/defaultTheme.js'
+
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
@@ -16,7 +18,14 @@ export default {
       tablet: '768px',
       web: '1024px',
     },
-    extend: {},
+    extend: {
+      // Pretendard(한국어 최적화 가변 서체)를 기본 sans-serif로 사용. `pretendard` 패키지의
+      // subset 가변 폰트를 src/index.css에서 로드하며, 미로드/미지원 환경 대비 기존 기본값을
+      // fallback으로 유지.
+      fontFamily: {
+        sans: ['Pretendard Variable', ...defaultTheme.fontFamily.sans],
+      },
+    },
   },
   plugins: [],
 }

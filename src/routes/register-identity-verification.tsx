@@ -1,0 +1,18 @@
+import { createFileRoute, redirect } from '@tanstack/react-router'
+
+import { RegisterIdentityVerificationPage } from '../pages/RegisterIdentityVerificationPage'
+import { useRegisterFlowStore } from '../stores/registerFlowStore'
+
+export const Route = createFileRoute('/register-identity-verification')({
+  beforeLoad: () => {
+    if (sessionStorage.getItem('accessToken')) {
+      return redirect({ to: '/main' })
+    }
+    // 1단계(가입 방법 선택)를 거치지 않고(예: 새로고침·직접 URL 접근) 들어온 경우
+    // 가입 방법 선택 단계로 돌려보낸다.
+    if (!useRegisterFlowStore.getState().registerMethod) {
+      return redirect({ to: '/register' })
+    }
+  },
+  component: RegisterIdentityVerificationPage,
+})
