@@ -28,13 +28,23 @@ interface RegisterFlowState {
   registerEmail: string | null
   setRegisterEmail: (email: string) => void
   clearRegisterEmail: () => void
+  /** 6단계(비밀번호 설정) 완료 시 입력한 비밀번호 — 최종 회원가입 제출 단계에서 사용 */
+  registerPassword: string | null
+  setRegisterPassword: (password: string) => void
+  clearRegisterPassword: () => void
+  /** 7단계(새 조직 등록) 완료 시 업로드한 사업자등록증 PDF 파일 — 최종 회원가입 제출 단계에서 사용.
+   *  registerMethod가 'new'일 때만 채워진다 */
+  businessRegistrationFile: File | null
+  setBusinessRegistrationFile: (file: File) => void
+  clearBusinessRegistrationFile: () => void
 }
 
 // ─── Store ────────────────────────────────────────────────────────────────────
 
 /**
  * 회원가입 1단계(가입 방법 선택) → 2단계(본인인증) → 3단계(가입 여부 안내) →
- * 4단계(이용약관 동의) → 5단계(이메일 인증) 사이에서 각 단계의 선택/입력 결과를 전달하는 store.
+ * 4단계(이용약관 동의) → 5단계(이메일 인증) → 6단계(비밀번호 설정) → 7단계(새 조직 등록,
+ * registerMethod가 'new'인 경우) 사이에서 각 단계의 선택/입력 결과를 전달하는 store.
  * 의도적으로 persist하지 않는다 — 새로고침하면 진행 중인 가입 플로우가 초기화되어
  * 1단계(`/register`)로 돌아가는 것이 기존 로그인 플로우(loginFlowStore)와 동일한 정책이다.
  */
@@ -51,4 +61,10 @@ export const useRegisterFlowStore = create<RegisterFlowState>((set) => ({
   registerEmail: null,
   setRegisterEmail: (email) => set({ registerEmail: email }),
   clearRegisterEmail: () => set({ registerEmail: null }),
+  registerPassword: null,
+  setRegisterPassword: (password) => set({ registerPassword: password }),
+  clearRegisterPassword: () => set({ registerPassword: null }),
+  businessRegistrationFile: null,
+  setBusinessRegistrationFile: (file) => set({ businessRegistrationFile: file }),
+  clearBusinessRegistrationFile: () => set({ businessRegistrationFile: null }),
 }))

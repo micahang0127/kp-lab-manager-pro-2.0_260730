@@ -125,6 +125,7 @@ export function EmailVerificationField({
             value={emailCode}
             onChange={setEmailCode}
             disabled={!isCodeSent || isCodeExpired}
+            error={Boolean(codeError)}
             ariaLabel={codeAriaLabel}
           />
           <div className="flex w-full items-center justify-between">
@@ -146,7 +147,14 @@ export function EmailVerificationField({
         {isCodeExpired && (
           <p className="text-[10px] text-red-600">인증 시간이 만료되었습니다. 재전송해 주세요.</p>
         )}
-        {codeError && <p className="text-[10px] text-red-600">{codeError}</p>}
+        {codeError && (
+          <>
+            <p className="text-[10px] text-red-600">{codeError}</p>
+            {/* [Figma] 396:11296 — "인증번호를 다시 확인해 주세요 (인증 실패 N/5)" 문구는
+                백엔드 message를 그대로 쓰기로 해 제외하고, 아래 제한 안내만 반영한다 */}
+            <p className="text-[10px] text-red-600">5회 실패 시 24시간 동안 인증이 제한됩니다.</p>
+          </>
+        )}
       </div>
     </>
   )

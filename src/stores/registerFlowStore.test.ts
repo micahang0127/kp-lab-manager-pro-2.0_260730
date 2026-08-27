@@ -19,6 +19,8 @@ describe('registerFlowStore', () => {
       identityVerifyResult: null,
       termsAgreement: null,
       registerEmail: null,
+      registerPassword: null,
+      businessRegistrationFile: null,
     })
   })
 
@@ -99,5 +101,44 @@ describe('registerFlowStore', () => {
     useRegisterFlowStore.getState().clearRegisterEmail()
 
     expect(useRegisterFlowStore.getState().registerEmail).toBeNull()
+  })
+
+  it('초기 상태는 registerPassword가 null이다', () => {
+    expect(useRegisterFlowStore.getState().registerPassword).toBeNull()
+  })
+
+  it('setRegisterPassword()로 입력한 비밀번호를 저장한다', () => {
+    useRegisterFlowStore.getState().setRegisterPassword('abcd1234')
+
+    expect(useRegisterFlowStore.getState().registerPassword).toBe('abcd1234')
+  })
+
+  it('clearRegisterPassword()로 상태를 초기화한다', () => {
+    useRegisterFlowStore.getState().setRegisterPassword('abcd1234')
+
+    useRegisterFlowStore.getState().clearRegisterPassword()
+
+    expect(useRegisterFlowStore.getState().registerPassword).toBeNull()
+  })
+
+  it('초기 상태는 businessRegistrationFile이 null이다', () => {
+    expect(useRegisterFlowStore.getState().businessRegistrationFile).toBeNull()
+  })
+
+  it('setBusinessRegistrationFile()로 업로드한 사업자등록증 파일을 저장한다', () => {
+    const file = new File(['dummy'], '사업자등록증.pdf', { type: 'application/pdf' })
+
+    useRegisterFlowStore.getState().setBusinessRegistrationFile(file)
+
+    expect(useRegisterFlowStore.getState().businessRegistrationFile).toBe(file)
+  })
+
+  it('clearBusinessRegistrationFile()로 상태를 초기화한다', () => {
+    const file = new File(['dummy'], '사업자등록증.pdf', { type: 'application/pdf' })
+    useRegisterFlowStore.getState().setBusinessRegistrationFile(file)
+
+    useRegisterFlowStore.getState().clearBusinessRegistrationFile()
+
+    expect(useRegisterFlowStore.getState().businessRegistrationFile).toBeNull()
   })
 })

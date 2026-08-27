@@ -133,10 +133,42 @@ describe('EmailVerificationField', () => {
     })
   })
 
-  it('codeError prop이 전달되면 최종 확인 에러 메시지를 표시한다', () => {
+  it('codeError prop이 전달되면 최종 확인 에러 메시지(백엔드 message)를 그대로 표시한다', () => {
     render(<TestHost sendCode={mockSendCode} codeError="잘못된 인증번호입니다." />)
 
     expect(screen.getByText('잘못된 인증번호입니다.')).toBeInTheDocument()
+  })
+
+  it('codeError prop이 전달되면 백엔드 메시지 밑에 인증 제한 안내 문구를 함께 표시한다', () => {
+    render(<TestHost sendCode={mockSendCode} codeError="잘못된 인증번호입니다." />)
+
+    expect(screen.getByText('5회 실패 시 24시간 동안 인증이 제한됩니다.')).toBeInTheDocument()
+  })
+
+  it('인증번호 전송 후 codeError가 전달되면 인증번호 입력칸이 빨간색 테두리로 강조된다', async () => {
+    const sendCode = vi.fn().mockResolvedValue({
+      result: true,
+      statusCode: 200,
+      data: { success: true },
+      message: [],
+    })
+    render(<TestHost sendCode={sendCode} codeError="잘못된 인증번호입니다." />)
+
+    await userEvent.type(screen.getByLabelText('그룹 이메일 *'), VALID_EMAIL)
+    await userEvent.click(screen.getByRole('button', { name: '인증번호 전송' }))
+
+    await waitFor(() => {
+      screen.getAllByLabelText(/인증번호 \d번째 자리/).forEach((box) => {
+        expect(box).not.toBeDisabled()
+        expect(box).toHaveClass('border-[#d44038]')
+      })
+    })
+  })
+
+  it('codeError prop이 없으면 인증 제한 안내 문구를 표시하지 않는다', () => {
+    render(<TestHost sendCode={mockSendCode} />)
+
+    expect(screen.queryByText('5회 실패 시 24시간 동안 인증이 제한됩니다.')).not.toBeInTheDocument()
   })
 
   it('한글을 입력하면 "한글 입력불가" 안내를 표시하고 입력값에서는 한글이 제거된다', async () => {

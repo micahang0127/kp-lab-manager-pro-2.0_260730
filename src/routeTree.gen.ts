@@ -10,6 +10,8 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as RegisterTermsRouteImport } from './routes/register-terms'
+import { Route as RegisterPasswordRouteImport } from './routes/register-password'
+import { Route as RegisterOrganizationRouteImport } from './routes/register-organization'
 import { Route as RegisterIdentityVerificationRouteImport } from './routes/register-identity-verification'
 import { Route as RegisterEmailVerificationRouteImport } from './routes/register-email-verification'
 import { Route as RegisterAccountExistsRouteImport } from './routes/register-account-exists'
@@ -39,6 +41,16 @@ import { Route as InventoryPreparingRouteImport } from './routes/inventory/prepa
 const RegisterTermsRoute = RegisterTermsRouteImport.update({
   id: '/register-terms',
   path: '/register-terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RegisterPasswordRoute = RegisterPasswordRouteImport.update({
+  id: '/register-password',
+  path: '/register-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RegisterOrganizationRoute = RegisterOrganizationRouteImport.update({
+  id: '/register-organization',
+  path: '/register-organization',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RegisterIdentityVerificationRoute =
@@ -179,6 +191,8 @@ export interface FileRoutesByFullPath {
   '/register-account-exists': typeof RegisterAccountExistsRoute
   '/register-email-verification': typeof RegisterEmailVerificationRoute
   '/register-identity-verification': typeof RegisterIdentityVerificationRoute
+  '/register-organization': typeof RegisterOrganizationRoute
+  '/register-password': typeof RegisterPasswordRoute
   '/register-terms': typeof RegisterTermsRoute
   '/inventory/preparing': typeof InventoryPreparingRoute
   '/items/incoming-pending': typeof ItemsIncomingPendingRoute
@@ -207,6 +221,8 @@ export interface FileRoutesByTo {
   '/register-account-exists': typeof RegisterAccountExistsRoute
   '/register-email-verification': typeof RegisterEmailVerificationRoute
   '/register-identity-verification': typeof RegisterIdentityVerificationRoute
+  '/register-organization': typeof RegisterOrganizationRoute
+  '/register-password': typeof RegisterPasswordRoute
   '/register-terms': typeof RegisterTermsRoute
   '/inventory/preparing': typeof InventoryPreparingRoute
   '/items/incoming-pending': typeof ItemsIncomingPendingRoute
@@ -236,6 +252,8 @@ export interface FileRoutesById {
   '/register-account-exists': typeof RegisterAccountExistsRoute
   '/register-email-verification': typeof RegisterEmailVerificationRoute
   '/register-identity-verification': typeof RegisterIdentityVerificationRoute
+  '/register-organization': typeof RegisterOrganizationRoute
+  '/register-password': typeof RegisterPasswordRoute
   '/register-terms': typeof RegisterTermsRoute
   '/inventory/preparing': typeof InventoryPreparingRoute
   '/items/incoming-pending': typeof ItemsIncomingPendingRoute
@@ -266,6 +284,8 @@ export interface FileRouteTypes {
     | '/register-account-exists'
     | '/register-email-verification'
     | '/register-identity-verification'
+    | '/register-organization'
+    | '/register-password'
     | '/register-terms'
     | '/inventory/preparing'
     | '/items/incoming-pending'
@@ -294,6 +314,8 @@ export interface FileRouteTypes {
     | '/register-account-exists'
     | '/register-email-verification'
     | '/register-identity-verification'
+    | '/register-organization'
+    | '/register-password'
     | '/register-terms'
     | '/inventory/preparing'
     | '/items/incoming-pending'
@@ -322,6 +344,8 @@ export interface FileRouteTypes {
     | '/register-account-exists'
     | '/register-email-verification'
     | '/register-identity-verification'
+    | '/register-organization'
+    | '/register-password'
     | '/register-terms'
     | '/inventory/preparing'
     | '/items/incoming-pending'
@@ -351,6 +375,8 @@ export interface RootRouteChildren {
   RegisterAccountExistsRoute: typeof RegisterAccountExistsRoute
   RegisterEmailVerificationRoute: typeof RegisterEmailVerificationRoute
   RegisterIdentityVerificationRoute: typeof RegisterIdentityVerificationRoute
+  RegisterOrganizationRoute: typeof RegisterOrganizationRoute
+  RegisterPasswordRoute: typeof RegisterPasswordRoute
   RegisterTermsRoute: typeof RegisterTermsRoute
   InventoryPreparingRoute: typeof InventoryPreparingRoute
   ItemsIncomingPendingRoute: typeof ItemsIncomingPendingRoute
@@ -376,6 +402,20 @@ declare module '@tanstack/react-router' {
       path: '/register-terms'
       fullPath: '/register-terms'
       preLoaderRoute: typeof RegisterTermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/register-password': {
+      id: '/register-password'
+      path: '/register-password'
+      fullPath: '/register-password'
+      preLoaderRoute: typeof RegisterPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/register-organization': {
+      id: '/register-organization'
+      path: '/register-organization'
+      fullPath: '/register-organization'
+      preLoaderRoute: typeof RegisterOrganizationRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/register-identity-verification': {
@@ -576,6 +616,8 @@ const rootRouteChildren: RootRouteChildren = {
   RegisterAccountExistsRoute: RegisterAccountExistsRoute,
   RegisterEmailVerificationRoute: RegisterEmailVerificationRoute,
   RegisterIdentityVerificationRoute: RegisterIdentityVerificationRoute,
+  RegisterOrganizationRoute: RegisterOrganizationRoute,
+  RegisterPasswordRoute: RegisterPasswordRoute,
   RegisterTermsRoute: RegisterTermsRoute,
   InventoryPreparingRoute: InventoryPreparingRoute,
   ItemsIncomingPendingRoute: ItemsIncomingPendingRoute,

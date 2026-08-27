@@ -2,7 +2,13 @@ import { http, HttpResponse } from 'msw'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { server } from '../test/mocks/server'
-import { changePassword, login, loginWithEmailVerificationCode, withdraw } from './user'
+import {
+  changePassword,
+  login,
+  loginWithEmailVerificationCode,
+  verifyTurnstile,
+  withdraw,
+} from './user'
 
 describe('login API', () => {
   beforeEach(() => {
@@ -25,7 +31,6 @@ describe('login API', () => {
     const result = await login({
       email: 'test@test.com',
       password: '1234',
-      cfTurnstileResponse: 'mock-turnstile-token',
     })
     expect(result.statusCode).toBe(200)
     expect(result.data?.type).toBe('T')
@@ -47,7 +52,6 @@ describe('login API', () => {
     const result = await login({
       email: 'test@test.com',
       password: '1234',
-      cfTurnstileResponse: 'mock-turnstile-token',
     })
     expect(result.statusCode).toBe(200)
     expect(result.data?.type).toBe('O')
@@ -73,7 +77,6 @@ describe('login API', () => {
       login({
         email: 'wrong@test.com',
         password: 'wrong',
-        cfTurnstileResponse: 'mock-turnstile-token',
       })
     ).rejects.toThrow('이메일 또는 비밀번호가 틀렸습니다.')
   })
@@ -97,7 +100,6 @@ describe('login API', () => {
       login({
         email: 'test@test.com',
         password: 'test',
-        cfTurnstileResponse: 'mock-turnstile-token',
       })
     ).rejects.toThrow('서버 오류가 발생했습니다.')
   })
@@ -120,8 +122,87 @@ describe('login API', () => {
     await login({
       email: 'a@b.com',
       password: 'pw',
-      cfTurnstileResponse: 'mock-turnstile-token',
     })
+    expect(authHeader).toBeNull()
+  })
+})
+
+describe('verifyTurnstile API', () => {
+  beforeEach(() => {
+    sessionStorage.clear()
+    server.resetHandlers()
+  })
+
+  it('검증 성공 시 isVerified: true를 반환한다', async () => {
+    server.use(
+      http.post('*/v1/user/turnstile/verify', () =>
+        HttpResponse.json({
+          result: true,
+          statusCode: 200,
+          data: { isVerified: true },
+          message: [],
+        })
+      )
+    )
+
+    const result = await verifyTurnstile({ token: 'mock-turnstile-token' })
+    expect(result.statusCode).toBe(200)
+    expect(result.data?.isVerified).toBe(true)
+  })
+
+  it('토큰 만료/재사용 시 isVerified: false와 errorCodes를 반환한다', async () => {
+    server.use(
+      http.post('*/v1/user/turnstile/verify', () =>
+        HttpResponse.json({
+          result: true,
+          statusCode: 200,
+          data: { isVerified: false, errorCodes: ['timeout-or-duplicate'] },
+          message: [],
+        })
+      )
+    )
+
+    const result = await verifyTurnstile({ token: 'expired-token' })
+    expect(result.data?.isVerified).toBe(false)
+    expect(result.data?.errorCodes).toEqual(['timeout-or-duplicate'])
+  })
+
+  it('Cloudflare와 통신 자체가 실패하면(502) 에러를 던진다', async () => {
+    server.use(
+      http.post('*/v1/user/turnstile/verify', () =>
+        HttpResponse.json(
+          {
+            result: false,
+            statusCode: 502,
+            data: null,
+            message: ['Cloudflare 서버와 통신에 실패했습니다.'],
+          },
+          { status: 502 }
+        )
+      )
+    )
+
+    await expect(verifyTurnstile({ token: 'mock-turnstile-token' })).rejects.toThrow(
+      'Cloudflare 서버와 통신에 실패했습니다.'
+    )
+  })
+
+  it('검증 요청에 Authorization 헤더가 포함되지 않는다', async () => {
+    sessionStorage.setItem('accessToken', 'existing-token')
+    let authHeader: string | null = null
+    server.use(
+      http.post('*/v1/user/turnstile/verify', ({ request }) => {
+        authHeader = request.headers.get('Authorization')
+        return HttpResponse.json({
+          result: true,
+          statusCode: 200,
+          data: { isVerified: true },
+          message: [],
+        })
+      })
+    )
+
+    await verifyTurnstile({ token: 'mock-turnstile-token' })
     expect(authHeader).toBeNull()
   })
 })

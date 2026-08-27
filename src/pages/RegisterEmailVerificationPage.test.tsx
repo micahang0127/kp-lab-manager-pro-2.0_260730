@@ -87,7 +87,7 @@ describe('RegisterEmailVerificationPage', () => {
     })
   })
 
-  it('인증번호 6자리를 입력하고 확인을 클릭하면 registerEmail을 저장한다', async () => {
+  it('인증번호 6자리를 입력하고 확인을 클릭하면 registerEmail을 저장하고 비밀번호 설정 단계로 이동한다', async () => {
     render(<RegisterEmailVerificationPage />)
 
     await userEvent.type(screen.getByLabelText('그룹 이메일 *'), VALID_EMAIL)
@@ -108,6 +108,7 @@ describe('RegisterEmailVerificationPage', () => {
     await waitFor(() => {
       expect(verifyRegisterEmailCode).toHaveBeenCalledWith({ email: VALID_EMAIL, code: '123456' })
       expect(useRegisterFlowStore.getState().registerEmail).toBe(VALID_EMAIL)
+      expect(mockNavigate).toHaveBeenCalledWith({ to: '/register-password' })
     })
   })
 
@@ -187,6 +188,110 @@ describe('RegisterEmailVerificationPage', () => {
 
       expect(await screen.findByText('잘못된 인증번호입니다.')).toBeInTheDocument()
       expect(useRegisterFlowStore.getState().registerEmail).toBeNull()
+    })
+
+    it('인증번호 확인 실패 후 재전송 없이 인증번호를 다시 입력하면 이전 에러 메시지와 빨간 강조가 사라진다', async () => {
+      vi.mocked(verifyRegisterEmailCode).mockRejectedValueOnce(new Error('잘못된 인증번호입니다.'))
+
+      render(<RegisterEmailVerificationPage />)
+
+      await userEvent.type(screen.getByLabelText('그룹 이메일 *'), VALID_EMAIL)
+      await userEvent.click(screen.getByRole('button', { name: '인증번호 전송' }))
+      await waitFor(() => {
+        expect(screen.getByText(/남은 시간 \d{2}:\d{2}/)).toBeInTheDocument()
+      })
+
+      await userEvent.type(screen.getByLabelText('인증번호 1번째 자리'), '1')
+      await userEvent.type(screen.getByLabelText('인증번호 2번째 자리'), '2')
+      await userEvent.type(screen.getByLabelText('인증번호 3번째 자리'), '3')
+      await userEvent.type(screen.getByLabelText('인증번호 4번째 자리'), '4')
+      await userEvent.type(screen.getByLabelText('인증번호 5번째 자리'), '5')
+      await userEvent.type(screen.getByLabelText('인증번호 6번째 자리'), '6')
+      await userEvent.click(screen.getByRole('button', { name: '인증번호 확인' }))
+
+      expect(await screen.findByText('잘못된 인증번호입니다.')).toBeInTheDocument()
+
+      // 재전송 없이, 틀린 인증번호의 마지막 자리를 지우고 다시 입력한다
+      await userEvent.type(screen.getByLabelText('인증번호 6번째 자리'), '{backspace}')
+
+      await waitFor(() => {
+        expect(screen.queryByText('잘못된 인증번호입니다.')).not.toBeInTheDocument()
+        expect(
+          screen.queryByText('5회 실패 시 24시간 동안 인증이 제한됩니다.')
+        ).not.toBeInTheDocument()
+        screen.getAllByLabelText(/인증번호 \d번째 자리/).forEach((box) => {
+          expect(box).not.toHaveClass('border-[#d44038]')
+        })
+      })
+
+      await userEvent.type(screen.getByLabelText('인증번호 6번째 자리'), '7')
+
+      expect(screen.queryByText('잘못된 인증번호입니다.')).not.toBeInTheDocument()
+    })
+
+    it('인증번호 확인 실패 후 "재전송"하면 이전 에러 메시지와 빨간 강조가 사라진다', async () => {
+      vi.mocked(verifyRegisterEmailCode).mockRejectedValueOnce(new Error('잘못된 인증번호입니다.'))
+
+      render(<RegisterEmailVerificationPage />)
+
+      await userEvent.type(screen.getByLabelText('그룹 이메일 *'), VALID_EMAIL)
+      await userEvent.click(screen.getByRole('button', { name: '인증번호 전송' }))
+      await waitFor(() => {
+        expect(screen.getByText(/남은 시간 \d{2}:\d{2}/)).toBeInTheDocument()
+      })
+
+      await userEvent.type(screen.getByLabelText('인증번호 1번째 자리'), '1')
+      await userEvent.type(screen.getByLabelText('인증번호 2번째 자리'), '2')
+      await userEvent.type(screen.getByLabelText('인증번호 3번째 자리'), '3')
+      await userEvent.type(screen.getByLabelText('인증번호 4번째 자리'), '4')
+      await userEvent.type(screen.getByLabelText('인증번호 5번째 자리'), '5')
+      await userEvent.type(screen.getByLabelText('인증번호 6번째 자리'), '6')
+      await userEvent.click(screen.getByRole('button', { name: '인증번호 확인' }))
+
+      expect(await screen.findByText('잘못된 인증번호입니다.')).toBeInTheDocument()
+
+      await userEvent.click(screen.getByRole('button', { name: '재전송' }))
+
+      await waitFor(() => {
+        expect(screen.queryByText('잘못된 인증번호입니다.')).not.toBeInTheDocument()
+        expect(
+          screen.queryByText('5회 실패 시 24시간 동안 인증이 제한됩니다.')
+        ).not.toBeInTheDocument()
+        screen.getAllByLabelText(/인증번호 \d번째 자리/).forEach((box) => {
+          expect(box).not.toHaveClass('border-[#d44038]')
+        })
+      })
+    })
+
+    it('인증번호 확인 실패 후 이메일을 새로 입력해 다시 전송하면 이전 에러 메시지가 사라진다', async () => {
+      vi.mocked(verifyRegisterEmailCode).mockRejectedValueOnce(new Error('잘못된 인증번호입니다.'))
+
+      render(<RegisterEmailVerificationPage />)
+
+      const emailInput = screen.getByLabelText('그룹 이메일 *')
+      await userEvent.type(emailInput, VALID_EMAIL)
+      await userEvent.click(screen.getByRole('button', { name: '인증번호 전송' }))
+      await waitFor(() => {
+        expect(screen.getByText(/남은 시간 \d{2}:\d{2}/)).toBeInTheDocument()
+      })
+
+      await userEvent.type(screen.getByLabelText('인증번호 1번째 자리'), '1')
+      await userEvent.type(screen.getByLabelText('인증번호 2번째 자리'), '2')
+      await userEvent.type(screen.getByLabelText('인증번호 3번째 자리'), '3')
+      await userEvent.type(screen.getByLabelText('인증번호 4번째 자리'), '4')
+      await userEvent.type(screen.getByLabelText('인증번호 5번째 자리'), '5')
+      await userEvent.type(screen.getByLabelText('인증번호 6번째 자리'), '6')
+      await userEvent.click(screen.getByRole('button', { name: '인증번호 확인' }))
+
+      expect(await screen.findByText('잘못된 인증번호입니다.')).toBeInTheDocument()
+
+      await userEvent.clear(emailInput)
+      await userEvent.type(emailInput, 'other@koreapetroleum.com')
+      await userEvent.click(screen.getByRole('button', { name: '인증번호 전송' }))
+
+      await waitFor(() => {
+        expect(screen.queryByText('잘못된 인증번호입니다.')).not.toBeInTheDocument()
+      })
     })
   })
 })

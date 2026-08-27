@@ -10,6 +10,8 @@ interface EmailCodeInputProps {
   value: string
   onChange: (value: string) => void
   disabled?: boolean
+  /** 인증번호 확인(최종 검증) 실패 시 true — 모든 칸을 빨간색 테두리/배경으로 강조한다 */
+  error?: boolean
   /** 각 입력칸의 aria-label 접두어 (예: '인증번호' → '인증번호 1번째 자리') */
   ariaLabel: string
 }
@@ -28,6 +30,7 @@ export function EmailCodeInput({
   value,
   onChange,
   disabled = false,
+  error = false,
   ariaLabel,
 }: EmailCodeInputProps) {
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
@@ -87,6 +90,7 @@ export function EmailCodeInput({
           }}
           ariaLabel={`${ariaLabel} ${index + 1}번째 자리`}
           disabled={disabled}
+          error={error}
           value={digit}
           onChange={(rawInput) => handleChange(index, rawInput)}
           onPaste={(pastedText) => handlePaste(index, pastedText)}

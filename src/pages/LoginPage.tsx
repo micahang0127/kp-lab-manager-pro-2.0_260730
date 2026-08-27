@@ -1,12 +1,10 @@
+import type { TurnstileInstance } from '@marsidev/react-turnstile'
 import { Turnstile } from '@marsidev/react-turnstile'
 import { useMutation } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { useEffect, useRef, useState } from 'react'
 
-import type { ApiResponse } from '../api'
-// [TEMP] 26.07.27 백엔드 미연동 — 로그인 API 연동 전까지 주석 처리. 연동 완료 시 주석 해제
-// import { login } from '../api/user'
-import type { LoginData } from '../api/user'
+import { login, verifyTurnstile } from '../api/user'
 import { FormCheckbox, FormInput } from '../components/form'
 import { useAuthStore } from '../stores/authStore'
 import { useLoginFlowStore } from '../stores/loginFlowStore'
@@ -19,7 +17,6 @@ import {
   removeHangul,
   sanitizePasswordInput,
 } from '../utils/rules/validationRules'
-import { createTempAccessToken } from '../utils/tempAccessToken'
 
 // ─── Validation ────────────────────────────────────────────────────────────────
 // 이메일/비밀번호 형식 오류는 alert가 아니라 입력란 하단 인라인 메시지로만 안내한다.
@@ -55,9 +52,11 @@ export function LoginPage() {
   const saveEmail = useSavedEmailStore((s) => s.saveEmail)
   const clearSavedEmail = useSavedEmailStore((s) => s.clearSavedEmail)
 
-  // Turnstile 토큰 상태
-  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
+  // Turnstile 검증 상태 — 서버(verifyTurnstile)가 위젯 토큰을 실제로 검증 완료했는지 여부
+  // (로그인 제출 허용 기준)
+  const [turnstileVerified, setTurnstileVerified] = useState(false)
   const [turnstileError, setTurnstileError] = useState<string | null>(null)
+  const turnstileRef = useRef<TurnstileInstance | null>(null)
 
   // 자격증명 폼 상태 (아이디 저장 기능으로 저장된 이메일이 있으면 초기값으로 채움)
   // lazy initializer: 마운트 시 1회만 sessionStorage(스토어 경유)를 읽기 위함
@@ -87,25 +86,29 @@ export function LoginPage() {
 
   // ─── Mutations ─────────────────────────────────────────────────────────────────
 
-  // [TEMP] 26.07.27 백엔드 미연동 — 아래 실제 구현 참고용 타입/로직은 주석 처리. 연동 완료 시 주석 해제
-  // import type { LoginRequest } from '../api/user'
-  const loginMutation = useMutation({
-    mutationFn: (_vars: { email: string; password: string; cfTurnstileResponse: string }) => {
-      // [TEMP] 26.07.27 백엔드 미연동 — 항상 성공 처리. 연동 완료 시 아래 주석 해제하고 스텁 제거
-      // const loginBody: LoginRequest = {
-      //   email: vars.email,
-      //   password: vars.password,
-      //   cfTurnstileResponse: vars.cfTurnstileResponse,
-      // }
-      // return login(loginBody)
-      const stubResponse: ApiResponse<LoginData> = {
-        result: true,
-        statusCode: 200,
-        data: { type: 'T', token: createTempAccessToken() },
-        message: [],
+  // Turnstile 위젯이 토큰을 발급하는 즉시(onSuccess) 호출 — 토큰은 일회용·300초 만료이므로
+  // 로그인 폼 제출을 기다리지 않고 최대한 빨리 서버 검증을 받아 실패를 미리 감지한다.
+  const verifyTurnstileMutation = useMutation({
+    mutationFn: (token: string) => verifyTurnstile({ token }),
+    onSuccess: (res) => {
+      if (res.data?.isVerified) {
+        setTurnstileVerified(true)
+        setTurnstileError(null)
+        return
       }
-      return Promise.resolve(stubResponse)
+      setTurnstileVerified(false)
+      setTurnstileError('로봇 인증에 실패했습니다. 새로고침 후 다시 시도해주세요.')
+      turnstileRef.current?.reset()
     },
+    onError: () => {
+      setTurnstileVerified(false)
+      setTurnstileError('로봇 인증 확인 중 오류가 발생했습니다. 새로고침 후 다시 시도해주세요.')
+      turnstileRef.current?.reset()
+    },
+  })
+
+  const loginMutation = useMutation({
+    mutationFn: (vars: { email: string; password: string }) => login(vars),
     onSuccess: (res) => {
       setLoginFailCount(0)
       if (res.data?.type === 'T' && res.data.token) {
@@ -122,11 +125,7 @@ export function LoginPage() {
         void navigate({ to: '/login/verify' })
       }
     },
-    onError: (err: unknown) => {
-      if (err instanceof Error && err.message.includes('cf-turnstile')) {
-        setTurnstileError('로봇 인증에 실패했습니다. 새로고침 후 다시 시도해주세요.')
-        return
-      }
+    onError: () => {
       setLoginFailCount((prev) => {
         const next = Math.min(prev + 1, LOGIN_FAIL_LIMIT)
         if (next >= LOGIN_FAIL_LIMIT) {
@@ -151,7 +150,7 @@ export function LoginPage() {
     if (!isValidPassword(form.password)) {
       return
     }
-    if (!turnstileToken) {
+    if (!turnstileVerified) {
       setTurnstileError('로봇 인증을 완료해주세요.')
       return
     }
@@ -162,7 +161,7 @@ export function LoginPage() {
       clearSavedEmail()
     }
 
-    loginMutation.mutate({ ...form, cfTurnstileResponse: turnstileToken })
+    loginMutation.mutate(form)
   }
 
   // ─── Render ───────────────────────────────────────────────────────────────────
@@ -231,17 +230,18 @@ export function LoginPage() {
         {/* Turnstile 컴포넌트 */}
         <div>
           <Turnstile
+            ref={turnstileRef}
             siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY ?? ''}
             onSuccess={(token: string) => {
-              setTurnstileToken(token)
               setTurnstileError(null)
+              verifyTurnstileMutation.mutate(token)
             }}
             onError={() => {
-              setTurnstileToken(null)
+              setTurnstileVerified(false)
               setTurnstileError('로봇 인증에 실패했습니다. 새로고침 후 다시 시도해주세요.')
             }}
             onExpire={() => {
-              setTurnstileToken(null)
+              setTurnstileVerified(false)
               setTurnstileError('로봇 인증이 만료되었습니다. 새로고침 후 다시 시도해주세요.')
             }}
             options={{ theme: 'light', appearance: 'interaction-only' }}
@@ -256,7 +256,7 @@ export function LoginPage() {
 
         <button
           type="submit"
-          disabled={loginMutation.isPending}
+          disabled={loginMutation.isPending || verifyTurnstileMutation.isPending}
           className="w-full rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
         >
           {loginMutation.isPending ? '로그인 중...' : '로그인'}

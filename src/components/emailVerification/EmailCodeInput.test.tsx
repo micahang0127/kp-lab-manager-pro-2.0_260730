@@ -79,6 +79,15 @@ describe('EmailCodeInput', () => {
     expect(screen.getByLabelText('인증번호 6번째 자리')).toHaveFocus()
   })
 
+  it('error가 true면 모든 칸이 빨간색 테두리와 배경으로 표시된다', () => {
+    render(<EmailCodeInput value="12" onChange={vi.fn()} ariaLabel="인증번호" error />)
+
+    screen.getAllByRole('textbox').forEach((box) => {
+      expect(box).toHaveClass('border-[#d44038]')
+      expect(box).toHaveClass('bg-[#d44038]/20')
+    })
+  })
+
   it('disabled면 모든 입력칸이 비활성화된다', () => {
     render(<EmailCodeInput value="" onChange={vi.fn()} ariaLabel="인증번호" disabled />)
 

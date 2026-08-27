@@ -50,6 +50,38 @@ describe('EmailCodeDigitInput', () => {
     expect(input).toHaveClass('bg-[#fec741]/20')
   })
 
+  it('error가 true면 값이 있어도 빨간색 테두리와 배경으로 표시된다', () => {
+    render(
+      <EmailCodeDigitInput
+        value="1"
+        onChange={vi.fn()}
+        onKeyDown={vi.fn()}
+        onPaste={vi.fn()}
+        ariaLabel="인증번호 1번째 자리"
+        error
+      />
+    )
+
+    const input = screen.getByLabelText('인증번호 1번째 자리')
+    expect(input).toHaveClass('border-[#d44038]')
+    expect(input).toHaveClass('bg-[#d44038]/20')
+  })
+
+  it('error가 true면 값이 없어도 빨간색으로 표시된다', () => {
+    render(
+      <EmailCodeDigitInput
+        value=""
+        onChange={vi.fn()}
+        onKeyDown={vi.fn()}
+        onPaste={vi.fn()}
+        ariaLabel="인증번호 1번째 자리"
+        error
+      />
+    )
+
+    expect(screen.getByLabelText('인증번호 1번째 자리')).toHaveClass('border-[#d44038]')
+  })
+
   it('값이 없으면 회색 테두리로 표시된다', () => {
     render(
       <EmailCodeDigitInput

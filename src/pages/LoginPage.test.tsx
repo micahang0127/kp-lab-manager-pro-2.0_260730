@@ -1,6 +1,8 @@
 import { useNavigate } from '@tanstack/react-router'
 import { cleanup, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { http, HttpResponse } from 'msw'
+import { forwardRef, useImperativeHandle } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useAuthStore } from '../stores/authStore'
@@ -9,7 +11,6 @@ import { useSavedEmailStore } from '../stores/savedEmailStore'
 import { server } from '../test/mocks/server'
 import { render, screen } from '../test/test-utils'
 import { getCookie } from '../utils/cookie'
-import { isAuthValid } from '../utils/requireAuth'
 import { LoginPage } from './LoginPage'
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
@@ -20,21 +21,25 @@ vi.mock('@tanstack/react-router', () => ({
   useNavigate: vi.fn(),
 }))
 
-// Turnstile 컴포넌트 mock (jsdom 환경에서 실제 렌더 불가)
+// Turnstile 컴포넌트 mock (jsdom 환경에서 실제 렌더 불가). LoginPage가 검증 실패 시
+// ref.reset()을 호출하므로 useImperativeHandle로 최소 구현을 제공한다.
 vi.mock('@marsidev/react-turnstile', () => ({
-  Turnstile: ({ onSuccess, onError, onExpire }: any) => (
-    <div>
-      <button type="button" onClick={() => onSuccess && onSuccess('mock-token')}>
-        turnstile-success
-      </button>
-      <button type="button" onClick={() => onError && onError()}>
-        turnstile-error
-      </button>
-      <button type="button" onClick={() => onExpire && onExpire()}>
-        turnstile-expire
-      </button>
-    </div>
-  ),
+  Turnstile: forwardRef(({ onSuccess, onError, onExpire }: any, ref: any) => {
+    useImperativeHandle(ref, () => ({ reset: vi.fn() }))
+    return (
+      <div>
+        <button type="button" onClick={() => onSuccess && onSuccess('mock-token')}>
+          turnstile-success
+        </button>
+        <button type="button" onClick={() => onError && onError()}>
+          turnstile-error
+        </button>
+        <button type="button" onClick={() => onExpire && onExpire()}>
+          turnstile-expire
+        </button>
+      </div>
+    )
+  }),
 }))
 
 // ─── Setup ─────────────────────────────────────────────────────────────────────
@@ -49,6 +54,17 @@ describe('LoginPage', () => {
     vi.mocked(useNavigate).mockReturnValue(mockNavigate)
     vi.clearAllMocks()
     server.resetHandlers()
+    // Turnstile 검증 API 기본 성공 핸들러 — 개별 테스트에서 실패 케이스를 검증할 때만 재정의
+    server.use(
+      http.post('*/v1/user/turnstile/verify', () =>
+        HttpResponse.json({
+          result: true,
+          statusCode: 200,
+          data: { isVerified: true },
+          message: [],
+        })
+      )
+    )
   })
 
   afterEach(() => {
@@ -105,33 +121,46 @@ describe('LoginPage', () => {
       expect(await screen.findByText(/로봇 인증을 완료해주세요/)).toBeInTheDocument()
     })
 
-    // [TEMP] 백엔드 연동 후 주석 해제
-    // it('Turnstile 토큰이 잘못되면 서버에서 에러 메시지를 반환한다', async () => {
-    //   server.use(
-    //     http.post('*/user/login', () =>
-    //       HttpResponse.json(
-    //         {
-    //           result: false,
-    //           statusCode: 401,
-    //           data: null,
-    //           message: ['로봇 인증에 실패했습니다.'],
-    //         },
-    //         { status: 401 }
-    //       )
-    //     )
-    //   )
-    //
-    //   render(<LoginPage />)
-    //   const successBtn = screen.getByText('turnstile-success')
-    //   fireEvent.click(successBtn)
-    //   const emailInput = screen.getByLabelText(/이메일/)
-    //   const passwordInput = screen.getByLabelText(/비밀번호/)
-    //   const submitButton = screen.getByRole('button', { name: /^로그인$/ })
-    //   await userEvent.type(emailInput, 'user@test.com')
-    //   await userEvent.type(passwordInput, 'password123')
-    //   await userEvent.click(submitButton)
-    //   expect(await screen.findByText(/로봇 인증에 실패했습니다/)).toBeInTheDocument()
-    // })
+    it('Turnstile 검증 API가 isVerified: false를 반환하면 에러 메시지가 표시된다', async () => {
+      server.use(
+        http.post('*/v1/user/turnstile/verify', () =>
+          HttpResponse.json({
+            result: true,
+            statusCode: 200,
+            data: { isVerified: false, errorCodes: ['timeout-or-duplicate'] },
+            message: [],
+          })
+        )
+      )
+
+      render(<LoginPage />)
+      const successBtn = screen.getByText('turnstile-success')
+      fireEvent.click(successBtn)
+
+      expect(await screen.findByText(/로봇 인증에 실패했습니다/)).toBeInTheDocument()
+    })
+
+    it('Cloudflare와 통신 자체가 실패하면(502) 에러 메시지가 표시된다', async () => {
+      server.use(
+        http.post('*/v1/user/turnstile/verify', () =>
+          HttpResponse.json(
+            {
+              result: false,
+              statusCode: 502,
+              data: null,
+              message: ['Cloudflare 서버와 통신에 실패했습니다.'],
+            },
+            { status: 502 }
+          )
+        )
+      )
+
+      render(<LoginPage />)
+      const successBtn = screen.getByText('turnstile-success')
+      fireEvent.click(successBtn)
+
+      expect(await screen.findByText(/로봇 인증 확인 중 오류가 발생했습니다/)).toBeInTheDocument()
+    })
   })
 
   // ─── Credential Login Tests ──────────────────────────────────────────────────
@@ -245,30 +274,6 @@ describe('LoginPage', () => {
       expect(screen.queryByText('비밀번호 형식에 맞지 않습니다.')).not.toBeInTheDocument()
     })
 
-    // [TEMP] 26.07.27 백엔드 미연동 — 로그인 API가 항상 성공한다고 가정한 스텁 동작 검증.
-    // 연동 완료 시 이 테스트를 삭제하고 아래 [FUTURE WORK] 테스트들의 주석을 해제할 것
-    it('TEMP: 이메일과 비밀번호를 입력하고 제출하면 항상 로그인에 성공하여 /main으로 이동한다', async () => {
-      render(<LoginPage />)
-
-      fireEvent.click(screen.getByText('turnstile-success'))
-      const emailInput = screen.getByLabelText(/이메일/)
-      const passwordInput = screen.getByLabelText(/비밀번호/)
-      const submitButton = screen.getByRole('button', { name: /^로그인$/ })
-
-      await userEvent.type(emailInput, 'user@test.com')
-      await userEvent.type(passwordInput, 'password123')
-      await userEvent.click(submitButton)
-
-      await waitFor(() => {
-        const token = sessionStorage.getItem('accessToken')
-        expect(token).toBeTruthy()
-        // requireAuth 라우트 가드(JWT 형식 + 만료 검증)를 통과하는 토큰이어야 함
-        expect(isAuthValid()).toBe(true)
-        expect(useAuthStore.getState().isLoggedIn).toBe(true)
-        expect(mockNavigate).toHaveBeenCalledWith({ to: '/main' })
-      })
-    })
-
     it('이메일 형식이 아니면 alert 없이 인라인 메시지만 표시하고 로그인 요청을 보내지 않는다', async () => {
       const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
       render(<LoginPage />)
@@ -314,143 +319,142 @@ describe('LoginPage', () => {
       expect(mockNavigate).not.toHaveBeenCalled()
     })
 
-    // [FUTURE WORK] 백엔드 연동 후 주석 해제
-    // it('로그인 실패(이메일 또는 비밀번호 불일치) 시 비밀번호 입력란 아래에 실패 횟수와 함께 안내한다', async () => {
-    //   server.use(
-    //     http.post('*/user/login', () =>
-    //       HttpResponse.json(
-    //         {
-    //           result: false,
-    //           statusCode: 401,
-    //           data: null,
-    //           message: ['이메일 또는 비밀번호가 틀렸습니다.'],
-    //         },
-    //         { status: 401 }
-    //       )
-    //     )
-    //   )
-    //
-    //   render(<LoginPage />)
-    //
-    //   fireEvent.click(screen.getByText('turnstile-success'))
-    //   await userEvent.type(screen.getByLabelText(/이메일/), 'user@test.com')
-    //   await userEvent.type(screen.getByLabelText(/비밀번호/), 'wrongpass1')
-    //   await userEvent.click(screen.getByRole('button', { name: /^로그인$/ }))
-    //
-    //   expect(
-    //     await screen.findByText('이메일 또는 비밀번호를 확인해 주세요. (실패 1/5)')
-    //   ).toBeInTheDocument()
-    //   expect(sessionStorage.getItem('accessToken')).toBeNull()
-    //   expect(mockNavigate).not.toHaveBeenCalled()
-    // })
-    //
-    // it('로그인을 5회 실패하면 alert로 일시적 제한을 안내한다', async () => {
-    //   server.use(
-    //     http.post('*/user/login', () =>
-    //       HttpResponse.json(
-    //         {
-    //           result: false,
-    //           statusCode: 401,
-    //           data: null,
-    //           message: ['이메일 또는 비밀번호가 틀렸습니다.'],
-    //         },
-    //         { status: 401 }
-    //       )
-    //     )
-    //   )
-    //   const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
-    //
-    //   render(<LoginPage />)
-    //
-    //   fireEvent.click(screen.getByText('turnstile-success'))
-    //   await userEvent.type(screen.getByLabelText(/이메일/), 'user@test.com')
-    //   await userEvent.type(screen.getByLabelText(/비밀번호/), 'wrongpass1')
-    //
-    //   const submitButton = screen.getByRole('button', { name: /^로그인$/ })
-    //   for (let i = 0; i < 5; i++) {
-    //     await userEvent.click(submitButton)
-    //     await waitFor(() => {
-    //       expect(
-    //         screen.getByText(`이메일 또는 비밀번호를 확인해 주세요. (실패 ${i + 1}/5)`)
-    //       ).toBeInTheDocument()
-    //     })
-    //   }
-    //
-    //   expect(alertSpy).toHaveBeenCalledWith('로그인이 일시적으로 제한되었습니다.')
-    //   expect(sessionStorage.getItem('accessToken')).toBeNull()
-    //   expect(mockNavigate).not.toHaveBeenCalled()
-    // })
-    //
-    // it('이메일과 비밀번호를 입력하고 로그인할 수 있다', async () => {
-    //   server.use(
-    //     http.post('*/user/login', () =>
-    //       HttpResponse.json({
-    //         result: true,
-    //         statusCode: 200,
-    //         data: { type: 'T', token: 'new-token-123' },
-    //         message: [],
-    //       })
-    //     )
-    //   )
-    //
-    //   render(<LoginPage />)
-    //
-    //   fireEvent.click(screen.getByText('turnstile-success'))
-    //   const emailInput = screen.getByLabelText(/이메일/)
-    //   const passwordInput = screen.getByLabelText(/비밀번호/)
-    //   const submitButton = screen.getByRole('button', { name: /^로그인$/ })
-    //
-    //   await userEvent.type(emailInput, 'user@test.com')
-    //   await userEvent.type(passwordInput, 'password123')
-    //   await userEvent.click(submitButton)
-    //
-    //   await waitFor(() => {
-    //     expect(sessionStorage.getItem('accessToken')).toBe('new-token-123')
-    //     expect(useAuthStore.getState().isLoggedIn).toBe(true)
-    //     expect(mockNavigate).toHaveBeenCalledWith({ to: '/main' })
-    //   })
-    // })
-    //
+    it('로그인 실패(이메일 또는 비밀번호 불일치) 시 비밀번호 입력란 아래에 실패 횟수와 함께 안내한다', async () => {
+      server.use(
+        http.post('*/user/login', () =>
+          HttpResponse.json(
+            {
+              result: false,
+              statusCode: 401,
+              data: null,
+              message: ['이메일 또는 비밀번호가 틀렸습니다.'],
+            },
+            { status: 401 }
+          )
+        )
+      )
+
+      render(<LoginPage />)
+
+      fireEvent.click(screen.getByText('turnstile-success'))
+      await userEvent.type(screen.getByLabelText(/이메일/), 'user@test.com')
+      await userEvent.type(screen.getByLabelText(/비밀번호/), 'wrongpass1')
+      await userEvent.click(screen.getByRole('button', { name: /^로그인$/ }))
+
+      expect(
+        await screen.findByText('이메일 또는 비밀번호를 확인해 주세요. (실패 1/5)')
+      ).toBeInTheDocument()
+      expect(sessionStorage.getItem('accessToken')).toBeNull()
+      expect(mockNavigate).not.toHaveBeenCalled()
+    })
+
+    it('로그인을 5회 실패하면 alert로 일시적 제한을 안내한다', async () => {
+      server.use(
+        http.post('*/user/login', () =>
+          HttpResponse.json(
+            {
+              result: false,
+              statusCode: 401,
+              data: null,
+              message: ['이메일 또는 비밀번호가 틀렸습니다.'],
+            },
+            { status: 401 }
+          )
+        )
+      )
+      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {})
+
+      render(<LoginPage />)
+
+      fireEvent.click(screen.getByText('turnstile-success'))
+      await userEvent.type(screen.getByLabelText(/이메일/), 'user@test.com')
+      await userEvent.type(screen.getByLabelText(/비밀번호/), 'wrongpass1')
+
+      const submitButton = screen.getByRole('button', { name: /^로그인$/ })
+      for (let i = 0; i < 5; i++) {
+        await userEvent.click(submitButton)
+        await waitFor(() => {
+          expect(
+            screen.getByText(`이메일 또는 비밀번호를 확인해 주세요. (실패 ${i + 1}/5)`)
+          ).toBeInTheDocument()
+        })
+      }
+
+      expect(alertSpy).toHaveBeenCalledWith('로그인이 일시적으로 제한되었습니다.')
+      expect(sessionStorage.getItem('accessToken')).toBeNull()
+      expect(mockNavigate).not.toHaveBeenCalled()
+    })
+
+    it('이메일과 비밀번호를 입력하고 로그인할 수 있다', async () => {
+      server.use(
+        http.post('*/user/login', () =>
+          HttpResponse.json({
+            result: true,
+            statusCode: 200,
+            data: { type: 'T', token: 'new-token-123' },
+            message: [],
+          })
+        )
+      )
+
+      render(<LoginPage />)
+
+      fireEvent.click(screen.getByText('turnstile-success'))
+      const emailInput = screen.getByLabelText(/이메일/)
+      const passwordInput = screen.getByLabelText(/비밀번호/)
+      const submitButton = screen.getByRole('button', { name: /^로그인$/ })
+
+      await userEvent.type(emailInput, 'user@test.com')
+      await userEvent.type(passwordInput, 'password123')
+      await userEvent.click(submitButton)
+
+      await waitFor(() => {
+        expect(sessionStorage.getItem('accessToken')).toBe('new-token-123')
+        expect(useAuthStore.getState().isLoggedIn).toBe(true)
+        expect(mockNavigate).toHaveBeenCalledWith({ to: '/main' })
+      })
+    })
+
     // ('로그인 실패 시 에러 메시지를 표시한다' 테스트는 위쪽 '로그인 실패(이메일 또는 비밀번호
     // 불일치) 시 비밀번호 입력란 아래에 실패 횟수와 함께 안내한다' 테스트로 대체됨 — 실제 안내
     // 문구는 서버 message가 아니라 고정된 "실패 N/5" 카운트 문구를 사용하기 때문)
-    //
-    // it('로그인 중에는 버튼이 disabled 상태다', async () => {
-    //   let resolveLogin: () => void = () => {}
-    //   const loginPromise = new Promise<void>((resolve) => {
-    //     resolveLogin = resolve
-    //   })
-    //
-    //   server.use(
-    //     http.post('*/user/login', async () => {
-    //       await loginPromise
-    //       return HttpResponse.json({
-    //         result: true,
-    //         statusCode: 200,
-    //         data: { type: 'T', token: 'token' },
-    //         message: [],
-    //       })
-    //     })
-    //   )
-    //
-    //   render(<LoginPage />)
-    //
-    //   fireEvent.click(screen.getByText('turnstile-success'))
-    //   const emailInput = screen.getByLabelText(/이메일/)
-    //   const passwordInput = screen.getByLabelText(/비밀번호/)
-    //   const submitButton = screen.getByRole('button', { name: /^로그인$/ })
-    //
-    //   await userEvent.type(emailInput, 'user@test.com')
-    //   await userEvent.type(passwordInput, 'password123')
-    //   await userEvent.click(submitButton)
-    //
-    //   expect(submitButton).toBeDisabled()
-    //   expect(submitButton).toHaveTextContent(/로그인 중/)
-    //
-    //   resolveLogin()
-    //   // 로그인 완료까지 대기하여 act 경고 방지
-    //   await waitFor(() => expect(submitButton).not.toBeDisabled())
-    // })
+
+    it('로그인 중에는 버튼이 disabled 상태다', async () => {
+      let resolveLogin: () => void = () => {}
+      const loginPromise = new Promise<void>((resolve) => {
+        resolveLogin = resolve
+      })
+
+      server.use(
+        http.post('*/user/login', async () => {
+          await loginPromise
+          return HttpResponse.json({
+            result: true,
+            statusCode: 200,
+            data: { type: 'T', token: 'token' },
+            message: [],
+          })
+        })
+      )
+
+      render(<LoginPage />)
+
+      fireEvent.click(screen.getByText('turnstile-success'))
+      const emailInput = screen.getByLabelText(/이메일/)
+      const passwordInput = screen.getByLabelText(/비밀번호/)
+      const submitButton = screen.getByRole('button', { name: /^로그인$/ })
+
+      await userEvent.type(emailInput, 'user@test.com')
+      await userEvent.type(passwordInput, 'password123')
+      await userEvent.click(submitButton)
+
+      expect(submitButton).toBeDisabled()
+      expect(submitButton).toHaveTextContent(/로그인 중/)
+
+      resolveLogin()
+      // 로그인 완료까지 대기하여 act 경고 방지
+      await waitFor(() => expect(submitButton).not.toBeDisabled())
+    })
   })
 
   // ─── Save Email (아이디 저장) Tests ──────────────────────────────────────────
@@ -462,9 +466,18 @@ describe('LoginPage', () => {
       expect(screen.getByLabelText('아이디 저장')).toBeInTheDocument()
     })
 
-    // [TEMP] 26.07.27 백엔드 미연동 — 로그인 API가 항상 성공한다고 가정한 스텁 동작 기준으로 검증.
-    // 연동 완료 시 실제 로그인 성공 응답 기준으로 재검증할 것
     it('체크박스를 체크하고 로그인하면 이메일이 쿠키에 저장된다', async () => {
+      server.use(
+        http.post('*/user/login', () =>
+          HttpResponse.json({
+            result: true,
+            statusCode: 200,
+            data: { type: 'T', token: 'token' },
+            message: [],
+          })
+        )
+      )
+
       render(<LoginPage />)
 
       fireEvent.click(screen.getByText('turnstile-success'))
@@ -479,6 +492,17 @@ describe('LoginPage', () => {
     })
 
     it('체크박스를 체크하지 않고 로그인하면 저장된 이메일이 없다', async () => {
+      server.use(
+        http.post('*/user/login', () =>
+          HttpResponse.json({
+            result: true,
+            statusCode: 200,
+            data: { type: 'T', token: 'token' },
+            message: [],
+          })
+        )
+      )
+
       render(<LoginPage />)
 
       fireEvent.click(screen.getByText('turnstile-success'))
@@ -502,36 +526,36 @@ describe('LoginPage', () => {
     })
   })
 
-  // ─── 신규 기기 로그인 → 이메일 인증 이동 Tests (Future Work) ──────────────────
+  // ─── 신규 기기 로그인 → 이메일 인증 이동 Tests ────────────────────────────────
+  // 실제 이메일 인증 입력/제출 케이스는 EmailVerificationPage.test.tsx에서 검증한다 —
+  // 이 페이지는 /login/verify로의 이동만 담당
 
-  // [FUTURE WORK] 백엔드 연동 후 주석 해제 (실제 이메일 인증 입력/제출 케이스는
-  // EmailVerificationPage.test.tsx에서 검증한다 — 이 페이지는 /login/verify로의 이동만 담당)
-  // describe('로그인 폼 (신규 기기 판별)', () => {
-  //   it('type O 응답 시 이메일 인증 대기 상태를 저장하고 /login/verify로 이동한다', async () => {
-  //     server.use(
-  //       http.post('*/user/login', () =>
-  //         HttpResponse.json({
-  //           result: true,
-  //           statusCode: 200,
-  //           data: { type: 'O' },
-  //           message: [],
-  //         })
-  //       )
-  //     )
-  //
-  //     render(<LoginPage />)
-  //
-  //     fireEvent.click(screen.getByText('turnstile-success'))
-  //     await userEvent.type(screen.getByLabelText(/이메일/), 'user@test.com')
-  //     await userEvent.type(screen.getByLabelText(/비밀번호/), 'password123')
-  //     await userEvent.click(screen.getByRole('button', { name: /^로그인$/ }))
-  //
-  //     await waitFor(() => {
-  //       expect(useLoginFlowStore.getState().pending?.email).toBe('user@test.com')
-  //       expect(mockNavigate).toHaveBeenCalledWith({ to: '/login/verify' })
-  //     })
-  //   })
-  // })
+  describe('로그인 폼 (신규 기기 판별)', () => {
+    it('type O 응답 시 이메일 인증 대기 상태를 저장하고 /login/verify로 이동한다', async () => {
+      server.use(
+        http.post('*/user/login', () =>
+          HttpResponse.json({
+            result: true,
+            statusCode: 200,
+            data: { type: 'O' },
+            message: [],
+          })
+        )
+      )
+
+      render(<LoginPage />)
+
+      fireEvent.click(screen.getByText('turnstile-success'))
+      await userEvent.type(screen.getByLabelText(/이메일/), 'user@test.com')
+      await userEvent.type(screen.getByLabelText(/비밀번호/), 'password123')
+      await userEvent.click(screen.getByRole('button', { name: /^로그인$/ }))
+
+      await waitFor(() => {
+        expect(useLoginFlowStore.getState().pending?.email).toBe('user@test.com')
+        expect(mockNavigate).toHaveBeenCalledWith({ to: '/login/verify' })
+      })
+    })
+  })
 
   // ─── Register Navigation Tests ───────────────────────────────────────────────
   // 본인인증(핸드폰인증) 기능은 회원가입 페이지로 이동됨 — src/components/identityVerification 참고

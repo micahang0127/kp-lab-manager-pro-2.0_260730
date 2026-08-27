@@ -1,5 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
+import { useEffect } from 'react'
 
 import { sendRegisterEmailCode, verifyRegisterEmailCode } from '../api/auth'
 import checkCircleIcon from '../assets/icons/register/check-circle.svg'
@@ -12,7 +13,8 @@ import { isValidEmailCode } from '../utils/rules/validationRules'
 /**
  * 회원가입 5단계 — 이메일 인증.
  * 4단계(이용약관 동의) 완료 후 진입한다. 그룹 이메일을 입력해 인증번호 전송을 요청하고,
- * 발송된 6자리 인증번호를 입력해 확인하면 registerFlowStore에 인증된 이메일을 저장한다.
+ * 발송된 6자리 인증번호를 입력해 확인하면 registerFlowStore에 인증된 이메일을 저장하고
+ * 6단계(비밀번호 설정)로 이동한다.
  */
 export function RegisterEmailVerificationPage() {
   const navigate = useNavigate()
@@ -21,7 +23,7 @@ export function RegisterEmailVerificationPage() {
   const verification = useEmailVerification({
     sendCode: (email) => sendRegisterEmailCode({ email }),
   })
-  const { email, emailCode, isCodeSent, isCodeExpired } = verification
+  const { email, emailCode, isCodeSent, isCodeExpired, sendSuccessCount } = verification
 
   // ─── Mutation ──────────────────────────────────────────────────────────────────
 
@@ -30,10 +32,18 @@ export function RegisterEmailVerificationPage() {
     onSuccess: (res) => {
       if (!res.data?.success) return
       setRegisterEmail(email)
-      // [TEMP] 26.08.25 6단계(회원가입 정보 입력) Figma 디자인이 아직 없어 이동 로직은 보류.
-      // 다음 화면 디자인이 나오면 registerEmail을 이용해 가입 정보 입력 폼으로 라우팅을 연결한다.
+      void navigate({ to: '/register-password' })
     },
   })
+
+  // 이전 확인 실패 상태(에러 메시지 + 입력칸 빨간 강조)가 그대로 남아있던 문제를 막기 위해,
+  // 아래 두 경우 모두 이전 검증 실패 상태를 초기화한다
+  // 1) 인증번호를 다시 보냄 (이메일을 새로 입력해 최초 전송하거나 "재전송" 버튼을 누르거나)
+  // 2) 인증번호를 다시 입력하기 시작함 (틀린 코드를 지우고 새로 입력)
+  const { reset: resetVerifyCode } = verifyCodeMutation
+  useEffect(() => {
+    resetVerifyCode()
+  }, [sendSuccessCount, emailCode, resetVerifyCode])
 
   // ─── Event Handlers ───────────────────────────────────────────────────────────
 

@@ -27,6 +27,11 @@ export interface UseEmailVerificationResult {
   setEmailCode: (value: string) => void
   /** 인증번호를 전송한 적이 있는지 여부 (이메일 입력칸 비활성화 등에 사용) */
   isCodeSent: boolean
+  /** 인증번호 발송(최초 전송/재전송 모두 포함)에 성공한 횟수. 호출 측이 이 값의 변화를
+   *  감지해 자체 인증번호 확인(verify) mutation의 이전 실패 상태(에러 메시지 등)를
+   *  초기화하는 데 사용한다 — 재전송해도 이전 "인증번호가 틀렸습니다" 에러 UI가
+   *  그대로 남아있는 문제를 막기 위함 */
+  sendSuccessCount: number
   /** 남은 유효 시간(초) */
   timeLeft: number
   /** 유효 시간이 만료되었는지 여부 */
@@ -57,6 +62,7 @@ export function useEmailVerification({
   // 이 값과 달라지므로, isCodeSent가 자동으로 false가 되어 "인증번호 전송" 버튼이
   // 재활성화되고("재전송"이 아닌 최초 전송으로 취급) 인증번호 입력칸도 다시 잠긴다
   const [sentEmail, setSentEmail] = useState<string | null>(null)
+  const [sendSuccessCount, setSendSuccessCount] = useState(0)
 
   const isEmailValid = isValidEmail(email)
   const isCodeSent = expiresAt !== null && email === sentEmail
@@ -84,6 +90,7 @@ export function useEmailVerification({
       setEmailCode('')
       setSentEmail(email)
       setExpiresAt(Date.now() + expiresInSeconds * 1000)
+      setSendSuccessCount((count) => count + 1)
     },
   })
 
@@ -104,6 +111,7 @@ export function useEmailVerification({
     emailCode,
     setEmailCode,
     isCodeSent,
+    sendSuccessCount,
     timeLeft,
     isCodeExpired,
     sendCode,
