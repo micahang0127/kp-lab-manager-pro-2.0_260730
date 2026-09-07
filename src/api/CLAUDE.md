@@ -41,16 +41,19 @@ export const createLab = (body: CreateLabRequest): Promise<ApiResponse<Lab>> =>
 백엔드 공통 응답 포맷(`CommonResponsePayload<T>`)과 동일한 구조를 그대로 사용한다.
 
 ```typescript
+type ApiErrorMessage = string[] | Record<string, string[]>
+
 interface ApiResponse<T> {
   result: boolean // 요청 성공 여부 — 성공/실패 판단의 단일 기준
   data: T | null // 성공 시 응답 데이터, 실패 시 null
-  message: string[] // 에러 메시지 목록. 성공 시 빈 배열
+  message: ApiErrorMessage | null // 에러 메시지. 성공 시 null
   statusCode: number // HTTP 상태 코드
 }
 ```
 
 - 성공: `response.data`에서 추출 — **`data`는 `T | null` 타입이므로 접근 시 옵셔널 체이닝(`?.`) 또는 널 가드 필수**
 - 실패: `ApiError` throw됨 — `.statusCode`, `.message`로 접근 (`request()` 내부에서 `result`가 `false`면 자동으로 throw하므로, `res.result`가 `true`인 응답만 컴포넌트에 도달함)
+- **`message`는 두 가지 형태가 온다** — 서비스 로직이 직접 던진 에러는 문자열 배열(`['...']`), `ValidationPipe`(DTO) 검증 실패는 `{ 필드명: ['...'] }` 객체. `request()`가 내부 `extractErrorMessage()`로 두 형태를 통일해서 첫 메시지를 `ApiError.message`에 담아주므로, 도메인 API 함수·컴포넌트는 형태를 신경 쓸 필요 없이 `err.message`만 쓰면 된다
 - **401 자동 처리**: 만료 감지 시 자동 로그아웃 + `/login` 리다이렉트. 컴포넌트에서 별도 처리 금지
 
 ## 옵션

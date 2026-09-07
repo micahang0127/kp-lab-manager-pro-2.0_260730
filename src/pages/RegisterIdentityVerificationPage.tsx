@@ -17,9 +17,11 @@ import { useRegisterFlowStore } from '../stores/registerFlowStore'
 export function RegisterIdentityVerificationPage() {
   const navigate = useNavigate()
   const setIdentityVerifyResult = useRegisterFlowStore((s) => s.setIdentityVerifyResult)
+  const setIdentityVerificationCode = useRegisterFlowStore((s) => s.setIdentityVerificationCode)
 
-  const handleVerified = (result: VerifyIdentityResult) => {
+  const handleVerified = (result: VerifyIdentityResult, identityVerificationId: string) => {
     setIdentityVerifyResult(result)
+    setIdentityVerificationCode(identityVerificationId)
 
     if (result.hasExistingAccount) {
       void navigate({ to: '/register-account-exists' })
@@ -55,11 +57,14 @@ export function RegisterIdentityVerificationPage() {
             <button
               type="button"
               onClick={() => {
-                handleVerified({
-                  isVerified: true,
-                  hasExistingAccount: false,
-                  maskedName: '홍길*',
-                })
+                handleVerified(
+                  {
+                    isVerified: true,
+                    hasExistingAccount: false,
+                    maskedName: '홍길*',
+                  },
+                  'temp-skip-verification-id'
+                )
               }}
               className="w-full rounded border border-dashed border-red-400 bg-red-50 py-[13px] text-center text-xs font-medium text-red-500 hover:bg-red-100"
             >

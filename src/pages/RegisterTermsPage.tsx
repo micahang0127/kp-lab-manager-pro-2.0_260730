@@ -58,11 +58,17 @@ function TermsCheckboxRow({ label, checked, onToggle, onView }: TermsCheckboxRow
  */
 export function RegisterTermsPage() {
   const navigate = useNavigate()
+  const termsAgreementInStore = useRegisterFlowStore((s) => s.termsAgreement)
   const setTermsAgreement = useRegisterFlowStore((s) => s.setTermsAgreement)
 
-  const [agreedTerms, setAgreedTerms] = useState(false)
-  const [agreedPrivacy, setAgreedPrivacy] = useState(false)
-  const [agreedMarketing, setAgreedMarketing] = useState(false)
+  // '이전' 버튼으로 되돌아온 경우 store에 남아있는 이전 동의 상태를 복원한다. termsAgreement는
+  // 필수 약관(이용약관/개인정보 수집·이용)에 모두 동의해야만 저장되므로, 존재 여부만으로 두
+  // 필수 항목을 복원할 수 있다
+  const [agreedTerms, setAgreedTerms] = useState(!!termsAgreementInStore)
+  const [agreedPrivacy, setAgreedPrivacy] = useState(!!termsAgreementInStore)
+  const [agreedMarketing, setAgreedMarketing] = useState(
+    termsAgreementInStore?.marketingOptIn ?? false
+  )
   const [isTermsPreviewExpanded, setIsTermsPreviewExpanded] = useState(false)
 
   const allAgreed = agreedTerms && agreedPrivacy && agreedMarketing

@@ -4,8 +4,12 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { server } from '../test/mocks/server'
 import {
   changePassword,
+  checkEmailDuplicate,
+  getInvitedOrgs,
+  issueFingerprint,
   login,
   loginWithEmailVerificationCode,
+  signUp,
   verifyTurnstile,
   withdraw,
 } from './user'
@@ -365,8 +369,6 @@ describe('loginWithEmailVerificationCode API', () => {
     const result = await loginWithEmailVerificationCode({
       email: 'test@test.com',
       code: '123456',
-      rememberDevice: false,
-      trustDurationDays: 30,
     })
     expect(result.statusCode).toBe(200)
     expect(result.data?.token).toBe('email-verification-token-xyz')
@@ -391,8 +393,6 @@ describe('loginWithEmailVerificationCode API', () => {
       loginWithEmailVerificationCode({
         email: 'test@test.com',
         code: '000000',
-        rememberDevice: false,
-        trustDurationDays: 30,
       })
     ).rejects.toThrow('잘못된 인증번호입니다.')
   })
@@ -416,33 +416,8 @@ describe('loginWithEmailVerificationCode API', () => {
       loginWithEmailVerificationCode({
         email: 'test@test.com',
         code: '123456',
-        rememberDevice: false,
-        trustDurationDays: 30,
       })
     ).rejects.toThrow('인증번호가 만료되었습니다.')
-  })
-
-  it('rememberDevice와 trustDurationDays 값이 요청 body에 포함된다', async () => {
-    let capturedBody: Record<string, unknown> | null = null
-    server.use(
-      http.post('*/user/email-verification-login', async ({ request }) => {
-        capturedBody = (await request.json()) as Record<string, unknown>
-        return HttpResponse.json({
-          result: true,
-          statusCode: 200,
-          data: { token: 'tok' },
-          message: [],
-        })
-      })
-    )
-
-    await loginWithEmailVerificationCode({
-      email: 'test@test.com',
-      code: '123456',
-      rememberDevice: true,
-      trustDurationDays: 30,
-    })
-    expect(capturedBody).toMatchObject({ rememberDevice: true, trustDurationDays: 30 })
   })
 
   it('이메일 인증 로그인 요청에 Authorization 헤더가 포함되지 않는다', async () => {
@@ -463,8 +438,537 @@ describe('loginWithEmailVerificationCode API', () => {
     await loginWithEmailVerificationCode({
       email: 'test@test.com',
       code: '123456',
-      rememberDevice: false,
-      trustDurationDays: 30,
+    })
+    expect(authHeader).toBeNull()
+  })
+})
+
+describe('issueFingerprint API', () => {
+  beforeEach(() => {
+    sessionStorage.clear()
+    server.resetHandlers()
+  })
+
+  it('성공 시 fingerprintCode를 반환한다', async () => {
+    server.use(
+      http.get('*/v1/user/fingerprint', () =>
+        HttpResponse.json({
+          result: true,
+          statusCode: 200,
+          data: { fingerprintCode: '904eT9hCwnwkSmjiDYeGnxmLdkMuHNQs' },
+          message: [],
+        })
+      )
+    )
+
+    const result = await issueFingerprint()
+    expect(result.statusCode).toBe(200)
+    expect(result.data?.fingerprintCode).toBe('904eT9hCwnwkSmjiDYeGnxmLdkMuHNQs')
+  })
+
+  it('서버 오류 시 에러를 던진다', async () => {
+    server.use(
+      http.get('*/v1/user/fingerprint', () =>
+        HttpResponse.json(
+          {
+            result: false,
+            statusCode: 500,
+            data: null,
+            message: ['핑거프린트 발급 중 오류가 발생했습니다.'],
+          },
+          { status: 500 }
+        )
+      )
+    )
+
+    await expect(issueFingerprint()).rejects.toThrow('핑거프린트 발급 중 오류가 발생했습니다.')
+  })
+
+  it('발급 요청에 Authorization 헤더가 포함되지 않는다', async () => {
+    sessionStorage.setItem('accessToken', 'existing-token')
+    let authHeader: string | null = null
+    server.use(
+      http.get('*/v1/user/fingerprint', ({ request }) => {
+        authHeader = request.headers.get('Authorization')
+        return HttpResponse.json({
+          result: true,
+          statusCode: 200,
+          data: { fingerprintCode: 'mock-fingerprint-code' },
+          message: [],
+        })
+      })
+    )
+
+    await issueFingerprint()
+    expect(authHeader).toBeNull()
+  })
+})
+
+describe('checkEmailDuplicate API', () => {
+  beforeEach(() => {
+    sessionStorage.clear()
+    server.resetHandlers()
+  })
+
+  it('가입되지 않은 이메일이면 isDuplicated: false를 반환한다', async () => {
+    server.use(
+      http.post('*/v1/user/email/duplicate', () =>
+        HttpResponse.json({
+          result: true,
+          statusCode: 201,
+          data: { isDuplicated: false },
+          message: [],
+        })
+      )
+    )
+
+    const result = await checkEmailDuplicate({ email: 'new@koreapetroleum.com' })
+    expect(result.statusCode).toBe(201)
+    expect(result.data?.isDuplicated).toBe(false)
+  })
+
+  it('이미 가입된 이메일이면 isDuplicated: true를 반환한다', async () => {
+    server.use(
+      http.post('*/v1/user/email/duplicate', () =>
+        HttpResponse.json({
+          result: true,
+          statusCode: 201,
+          data: { isDuplicated: true },
+          message: [],
+        })
+      )
+    )
+
+    const result = await checkEmailDuplicate({ email: 'existing@koreapetroleum.com' })
+    expect(result.data?.isDuplicated).toBe(true)
+  })
+
+  it('이메일 형식이 올바르지 않으면(400) 에러를 던진다', async () => {
+    server.use(
+      http.post('*/v1/user/email/duplicate', () =>
+        HttpResponse.json(
+          {
+            result: false,
+            statusCode: 400,
+            data: null,
+            message: { email: ['올바른 이메일 형식이 아닙니다'] },
+          },
+          { status: 400 }
+        )
+      )
+    )
+
+    await expect(checkEmailDuplicate({ email: 'invalid-email' })).rejects.toThrow(
+      '올바른 이메일 형식이 아닙니다'
+    )
+  })
+
+  it('이메일을 입력하지 않으면(400) 에러를 던진다', async () => {
+    server.use(
+      http.post('*/v1/user/email/duplicate', () =>
+        HttpResponse.json(
+          {
+            result: false,
+            statusCode: 400,
+            data: null,
+            message: { email: ['이메일을 입력해주세요'] },
+          },
+          { status: 400 }
+        )
+      )
+    )
+
+    await expect(checkEmailDuplicate({ email: '' })).rejects.toThrow('이메일을 입력해주세요')
+  })
+
+  it('확인 요청에 Authorization 헤더가 포함되지 않는다', async () => {
+    sessionStorage.setItem('accessToken', 'existing-token')
+    let authHeader: string | null = null
+    server.use(
+      http.post('*/v1/user/email/duplicate', ({ request }) => {
+        authHeader = request.headers.get('Authorization')
+        return HttpResponse.json({
+          result: true,
+          statusCode: 201,
+          data: { isDuplicated: false },
+          message: [],
+        })
+      })
+    )
+
+    await checkEmailDuplicate({ email: 'new@koreapetroleum.com' })
+    expect(authHeader).toBeNull()
+  })
+})
+
+describe('getInvitedOrgs API', () => {
+  beforeEach(() => {
+    sessionStorage.clear()
+    server.resetHandlers()
+  })
+
+  it('대기중인 초대가 있으면 invites 목록을 반환한다', async () => {
+    server.use(
+      http.post('*/v1/user/invite/me', () =>
+        HttpResponse.json({
+          result: true,
+          statusCode: 201,
+          data: {
+            invites: [
+              {
+                invitedIdx: '12',
+                orgIdx: '3',
+                orgName: '테스트회사',
+                orgGrade: 'MEMBER',
+                invitedAt: '2026-09-04T01:23:45.000Z',
+              },
+            ],
+          },
+          message: [],
+        })
+      )
+    )
+
+    const result = await getInvitedOrgs({ email: 'test@koreapetroleum.com', code: '123456' })
+    expect(result.statusCode).toBe(201)
+    expect(result.data?.invites).toEqual([
+      {
+        invitedIdx: '12',
+        orgIdx: '3',
+        orgName: '테스트회사',
+        orgGrade: 'MEMBER',
+        invitedAt: '2026-09-04T01:23:45.000Z',
+      },
+    ])
+  })
+
+  it('대기중인 초대가 없으면 빈 배열을 반환한다', async () => {
+    server.use(
+      http.post('*/v1/user/invite/me', () =>
+        HttpResponse.json({
+          result: true,
+          statusCode: 201,
+          data: { invites: [] },
+          message: [],
+        })
+      )
+    )
+
+    const result = await getInvitedOrgs({ email: 'test@koreapetroleum.com', code: '123456' })
+    expect(result.data?.invites).toEqual([])
+  })
+
+  it('요청 값 검증 실패(400) 시 에러를 던진다', async () => {
+    server.use(
+      http.post('*/v1/user/invite/me', () =>
+        HttpResponse.json(
+          {
+            result: false,
+            statusCode: 400,
+            data: null,
+            message: { code: ['인증코드는 6자리여야 합니다'] },
+          },
+          { status: 400 }
+        )
+      )
+    )
+
+    await expect(getInvitedOrgs({ email: 'test@koreapetroleum.com', code: '1' })).rejects.toThrow(
+      '인증코드는 6자리여야 합니다'
+    )
+  })
+
+  it('이메일 인증을 완료하지 않았으면(401) 에러를 던진다', async () => {
+    server.use(
+      http.post('*/v1/user/invite/me', () =>
+        HttpResponse.json(
+          {
+            result: false,
+            statusCode: 401,
+            data: null,
+            message: ['이메일 인증을 먼저 완료해주세요'],
+          },
+          { status: 401 }
+        )
+      )
+    )
+
+    await expect(
+      getInvitedOrgs({ email: 'test@koreapetroleum.com', code: '123456' })
+    ).rejects.toThrow('이메일 인증을 먼저 완료해주세요')
+  })
+
+  it('예상하지 못한 서버 오류(500) 시 고정 메시지로 에러를 던진다', async () => {
+    server.use(
+      http.post('*/v1/user/invite/me', () =>
+        HttpResponse.json(
+          { result: false, statusCode: 500, data: null, message: ['서버 오류가 발생했습니다'] },
+          { status: 500 }
+        )
+      )
+    )
+
+    await expect(
+      getInvitedOrgs({ email: 'test@koreapetroleum.com', code: '123456' })
+    ).rejects.toThrow('서버 오류가 발생했습니다')
+  })
+
+  it('조회 요청에 Authorization 헤더가 포함되지 않는다', async () => {
+    sessionStorage.setItem('accessToken', 'existing-token')
+    let authHeader: string | null = null
+    server.use(
+      http.post('*/v1/user/invite/me', ({ request }) => {
+        authHeader = request.headers.get('Authorization')
+        return HttpResponse.json({
+          result: true,
+          statusCode: 201,
+          data: { invites: [] },
+          message: [],
+        })
+      })
+    )
+
+    await getInvitedOrgs({ email: 'test@koreapetroleum.com', code: '123456' })
+    expect(authHeader).toBeNull()
+  })
+})
+
+describe('signUp API', () => {
+  beforeEach(() => {
+    sessionStorage.clear()
+    server.resetHandlers()
+  })
+
+  it('새 조직 만들기(regFile)로 회원가입에 성공하면 userIdx/email을 반환한다', async () => {
+    server.use(
+      http.post('*/v1/user/signUp', () =>
+        HttpResponse.json({
+          result: true,
+          statusCode: 201,
+          data: { userIdx: '1', email: 'test@koreapetroleum.com' },
+          message: [],
+        })
+      )
+    )
+
+    const result = await signUp({
+      email: 'test@koreapetroleum.com',
+      password: 'abcd1234',
+      verificationCode: 'identity-verification-abc123',
+      regFile: 'PRODUCTION/BusinessRegistration/260901/xxxxxxxx.pdf',
+      orgName: 'KP한석화학 주식회사',
+      regNo: '123-45-67890',
+      ceoName: '홍길동',
+      address: '서울시 ...',
+      bizItem: '석유제품',
+      bizType: '도매',
+    })
+
+    expect(result.statusCode).toBe(201)
+    expect(result.data?.userIdx).toBe('1')
+    expect(result.data?.email).toBe('test@koreapetroleum.com')
+  })
+
+  it('요청 값 검증 실패(400) 시 에러를 던진다', async () => {
+    server.use(
+      http.post('*/v1/user/signUp', () =>
+        HttpResponse.json(
+          {
+            result: false,
+            statusCode: 400,
+            data: null,
+            message: { verificationCode: ['본인인증 키를 입력해주세요'] },
+          },
+          { status: 400 }
+        )
+      )
+    )
+
+    await expect(
+      signUp({
+        email: 'test@koreapetroleum.com',
+        password: 'abcd1234',
+        verificationCode: '',
+        regFile: 'PRODUCTION/BusinessRegistration/260901/xxxxxxxx.pdf',
+      })
+    ).rejects.toThrow('본인인증 키를 입력해주세요')
+  })
+
+  it('본인인증 결과가 VERIFIED가 아니면(409) 서버 메시지로 에러를 던진다', async () => {
+    server.use(
+      http.post('*/v1/user/signUp', () =>
+        HttpResponse.json(
+          { result: false, statusCode: 409, data: null, message: ['본인인증에 실패했습니다'] },
+          { status: 409 }
+        )
+      )
+    )
+
+    await expect(
+      signUp({
+        email: 'test@koreapetroleum.com',
+        password: 'abcd1234',
+        verificationCode: 'identity-verification-abc123',
+        regFile: 'PRODUCTION/BusinessRegistration/260901/xxxxxxxx.pdf',
+      })
+    ).rejects.toThrow('본인인증에 실패했습니다')
+  })
+
+  it('이미 가입된 사용자(이메일/CI 중복)면(409) 서버 메시지로 에러를 던진다', async () => {
+    server.use(
+      http.post('*/v1/user/signUp', () =>
+        HttpResponse.json(
+          { result: false, statusCode: 409, data: null, message: ['이미 가입된 사용자입니다'] },
+          { status: 409 }
+        )
+      )
+    )
+
+    await expect(
+      signUp({
+        email: 'test@koreapetroleum.com',
+        password: 'abcd1234',
+        verificationCode: 'identity-verification-abc123',
+        regFile: 'PRODUCTION/BusinessRegistration/260901/xxxxxxxx.pdf',
+      })
+    ).rejects.toThrow('이미 가입된 사용자입니다')
+  })
+
+  it('초대받은 조직을 찾을 수 없으면(409) 서버 메시지로 에러를 던진다', async () => {
+    server.use(
+      http.post('*/v1/user/signUp', () =>
+        HttpResponse.json(
+          { result: false, statusCode: 409, data: null, message: ['존재하지 않는 회사입니다'] },
+          { status: 409 }
+        )
+      )
+    )
+
+    await expect(
+      signUp({
+        email: 'test@koreapetroleum.com',
+        password: 'abcd1234',
+        verificationCode: 'identity-verification-abc123',
+        orgIdx: 1,
+        invitedIdx: 1,
+      })
+    ).rejects.toThrow('존재하지 않는 회사입니다')
+  })
+
+  it('예상하지 못한 서버 오류(500) 시 고정 메시지로 에러를 던진다', async () => {
+    server.use(
+      http.post('*/v1/user/signUp', () =>
+        HttpResponse.json(
+          { result: false, statusCode: 500, data: null, message: ['서버 오류가 발생했습니다'] },
+          { status: 500 }
+        )
+      )
+    )
+
+    await expect(
+      signUp({
+        email: 'test@koreapetroleum.com',
+        password: 'abcd1234',
+        verificationCode: 'identity-verification-abc123',
+        regFile: 'PRODUCTION/BusinessRegistration/260901/xxxxxxxx.pdf',
+      })
+    ).rejects.toThrow('서버 오류가 발생했습니다')
+  })
+
+  it('orgIdx와 regFile을 모두 입력하면(XOR 위반) 요청 전에 에러를 던진다', async () => {
+    await expect(
+      signUp({
+        email: 'test@koreapetroleum.com',
+        password: 'abcd1234',
+        verificationCode: 'identity-verification-abc123',
+        orgIdx: 1,
+        invitedIdx: 1,
+        regFile: 'PRODUCTION/BusinessRegistration/260901/xxxxxxxx.pdf',
+      })
+    ).rejects.toThrow(
+      'orgIdx(기존 조직에 가입)와 regFile(새 조직 만들기) 중 정확히 하나만 입력해야 합니다.'
+    )
+  })
+
+  it('orgIdx와 regFile을 둘 다 입력하지 않으면(XOR 위반) 요청 전에 에러를 던진다', async () => {
+    await expect(
+      signUp({
+        email: 'test@koreapetroleum.com',
+        password: 'abcd1234',
+        verificationCode: 'identity-verification-abc123',
+      })
+    ).rejects.toThrow(
+      'orgIdx(기존 조직에 가입)와 regFile(새 조직 만들기) 중 정확히 하나만 입력해야 합니다.'
+    )
+  })
+
+  it('orgIdx만 입력하고 invitedIdx를 입력하지 않으면 요청 전에 에러를 던진다', async () => {
+    await expect(
+      signUp({
+        email: 'test@koreapetroleum.com',
+        password: 'abcd1234',
+        verificationCode: 'identity-verification-abc123',
+        orgIdx: 1,
+      })
+    ).rejects.toThrow('orgIdx로 가입할 때는 invitedIdx를 반드시 함께 입력해야 합니다.')
+  })
+
+  it('orgIdx 없이 invitedIdx만 입력하면 요청 전에 에러를 던진다', async () => {
+    await expect(
+      signUp({
+        email: 'test@koreapetroleum.com',
+        password: 'abcd1234',
+        verificationCode: 'identity-verification-abc123',
+        invitedIdx: 1,
+      })
+    ).rejects.toThrow(
+      'orgIdx(기존 조직에 가입)와 regFile(새 조직 만들기) 중 정확히 하나만 입력해야 합니다.'
+    )
+  })
+
+  it('orgIdx와 invitedIdx를 함께 입력하면(regFile 없이) 정상적으로 요청을 보낸다', async () => {
+    server.use(
+      http.post('*/v1/user/signUp', () =>
+        HttpResponse.json({
+          result: true,
+          statusCode: 201,
+          data: { userIdx: '1', email: 'test@koreapetroleum.com' },
+          message: [],
+        })
+      )
+    )
+
+    const result = await signUp({
+      email: 'test@koreapetroleum.com',
+      password: 'abcd1234',
+      verificationCode: 'identity-verification-abc123',
+      orgIdx: 1,
+      invitedIdx: 1,
+    })
+
+    expect(result.statusCode).toBe(201)
+  })
+
+  it('요청에 Authorization 헤더가 포함되지 않는다', async () => {
+    sessionStorage.setItem('accessToken', 'existing-token')
+    let authHeader: string | null = null
+    server.use(
+      http.post('*/v1/user/signUp', ({ request }) => {
+        authHeader = request.headers.get('Authorization')
+        return HttpResponse.json({
+          result: true,
+          statusCode: 201,
+          data: { userIdx: '1', email: 'test@koreapetroleum.com' },
+          message: [],
+        })
+      })
+    )
+
+    await signUp({
+      email: 'test@koreapetroleum.com',
+      password: 'abcd1234',
+      verificationCode: 'identity-verification-abc123',
+      regFile: 'PRODUCTION/BusinessRegistration/260901/xxxxxxxx.pdf',
     })
     expect(authHeader).toBeNull()
   })

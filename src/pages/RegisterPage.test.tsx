@@ -79,6 +79,21 @@ describe('RegisterPage', () => {
     expect(mockNavigate).toHaveBeenCalledWith({ to: '/login' })
   })
 
+  it('"이전" 버튼으로 되돌아와 store에 이미 선택된 방법이 남아있으면 해당 카드가 선택 상태로 복원된다', () => {
+    useRegisterFlowStore.setState({ registerMethod: 'new' })
+
+    render(<RegisterPage />)
+
+    expect(screen.getByRole('button', { name: /기존 조직에 가입/ })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    )
+    expect(screen.getByRole('button', { name: /새 조직 만들기/ })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+  })
+
   it('"기존 조직에 가입" 카드를 클릭하면 registerFlowStore에 저장하고 본인인증 페이지로 이동한다', async () => {
     render(<RegisterPage />)
 

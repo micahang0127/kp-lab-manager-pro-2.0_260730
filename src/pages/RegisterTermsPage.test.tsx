@@ -103,6 +103,40 @@ describe('RegisterTermsPage', () => {
     expect(useRegisterFlowStore.getState().termsAgreement).toEqual({ marketingOptIn: true })
   })
 
+  it('"이전" 버튼으로 되돌아와 store에 이미 동의한 내역이 남아있으면 체크 상태가 복원된다', () => {
+    useRegisterFlowStore.setState({ termsAgreement: { marketingOptIn: true } })
+
+    render(<RegisterTermsPage />)
+
+    expect(screen.getByRole('button', { name: '(필수) 이용약관 동의' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+    expect(
+      screen.getByRole('button', { name: '(필수) 개인정보 수집 및 이용 동의' })
+    ).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: '(선택) 마케팅 정보 수신 동의' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+    expect(screen.getByRole('button', { name: '동의' })).not.toBeDisabled()
+  })
+
+  it('"이전" 버튼으로 되돌아와 store에 마케팅 수신 미동의로 남아있으면 필수 항목만 복원된다', () => {
+    useRegisterFlowStore.setState({ termsAgreement: { marketingOptIn: false } })
+
+    render(<RegisterTermsPage />)
+
+    expect(screen.getByRole('button', { name: '(필수) 이용약관 동의' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+    expect(screen.getByRole('button', { name: '(선택) 마케팅 정보 수신 동의' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    )
+  })
+
   it('"← 이전" 버튼을 클릭하면 3단계(가입 여부 안내)로 이동한다', async () => {
     render(<RegisterTermsPage />)
 

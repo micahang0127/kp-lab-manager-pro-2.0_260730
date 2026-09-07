@@ -2,82 +2,13 @@ import { useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 
 import checkCircleIcon from '../assets/icons/register/check-circle.svg'
-import clearCircleIcon from '../assets/icons/register/clear-circle.svg'
-import eyeHideIcon from '../assets/icons/register/eye-hide.svg'
-import eyeShowIcon from '../assets/icons/register/eye-show.svg'
+import { PasswordField } from '../components/password'
 import { useRegisterFlowStore } from '../stores/registerFlowStore'
-import {
-  isValidPassword,
-  PASSWORD_RULE_MESSAGE,
-  sanitizePasswordInput,
-} from '../utils/rules/validationRules'
+import { isValidPassword, PASSWORD_RULE_MESSAGE } from '../utils/rules/validationRules'
 
 // ─── Message ───────────────────────────────────────────────────────────────────
 
 const PASSWORD_MISMATCH_MESSAGE = '비밀번호가 일치하지 않습니다.'
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface PasswordFieldProps {
-  id: string
-  label: string
-  value: string
-  onChange: (value: string) => void
-  error?: string | null
-}
-
-// ─── Sub Components ───────────────────────────────────────────────────────────
-
-/**
- * 비밀번호 입력칸 한 줄 — 눈 아이콘으로 평문/마스킹 표시를 전환하고, 값이 있을 때만
- * 지우기(x) 아이콘을 보여준다. 형식/일치 오류가 있으면 테두리를 빨간색으로 강조하고
- * 입력칸 아래에 오류 문구를 표시한다
- */
-function PasswordField({ id, label, value, onChange, error }: PasswordFieldProps) {
-  const [isVisible, setIsVisible] = useState(false)
-  const hasError = Boolean(error)
-
-  return (
-    <div className="flex w-full flex-col items-start gap-1">
-      <label htmlFor={id} className="text-xs font-medium text-[#6b6b66]">
-        {label}
-      </label>
-      <div
-        className={`flex h-10 w-full items-center gap-2 rounded border bg-white px-3 ${
-          hasError ? 'border-[#d44038]' : 'border-[#c9c9c4]'
-        }`}
-      >
-        <input
-          id={id}
-          type={isVisible ? 'text' : 'password'}
-          value={value}
-          onChange={(e) => onChange(sanitizePasswordInput(e.target.value))}
-          placeholder="비밀번호를 입력해 주세요"
-          className="flex-1 text-xs text-[#1a1a17] outline-none"
-        />
-        {value && (
-          <button
-            type="button"
-            aria-label="입력값 지우기"
-            onClick={() => onChange('')}
-            className="flex size-4 shrink-0 items-center justify-center"
-          >
-            <img src={clearCircleIcon} alt="" aria-hidden className="size-3" />
-          </button>
-        )}
-        <button
-          type="button"
-          aria-label={isVisible ? '비밀번호 숨기기' : '비밀번호 표시'}
-          onClick={() => setIsVisible((prev) => !prev)}
-          className="flex size-4 shrink-0 items-center justify-center"
-        >
-          <img src={isVisible ? eyeShowIcon : eyeHideIcon} alt="" aria-hidden className="size-4" />
-        </button>
-      </div>
-      {hasError && <p className="text-[10px] text-red-600">{error}</p>}
-    </div>
-  )
-}
 
 // ─── Component ─────────────────────────────────────────────────────────────────
 
@@ -89,10 +20,13 @@ function PasswordField({ id, label, value, onChange, error }: PasswordFieldProps
  */
 export function RegisterPasswordPage() {
   const navigate = useNavigate()
+  const registerPasswordInStore = useRegisterFlowStore((s) => s.registerPassword)
   const setRegisterPassword = useRegisterFlowStore((s) => s.setRegisterPassword)
 
-  const [newPassword, setNewPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
+  // '이전' 버튼으로 되돌아온 경우, store에 이미 저장된 비밀번호가 있으면 화면에도 복원한다
+  // (제출 시 두 입력값이 일치해야만 저장되므로 하나의 값으로 양쪽 다 복원할 수 있다)
+  const [newPassword, setNewPassword] = useState(registerPasswordInStore ?? '')
+  const [confirmPassword, setConfirmPassword] = useState(registerPasswordInStore ?? '')
 
   const isNewPasswordInvalid = newPassword.length > 0 && !isValidPassword(newPassword)
   const isConfirmMismatch = confirmPassword.length > 0 && confirmPassword !== newPassword
@@ -139,6 +73,7 @@ export function RegisterPasswordPage() {
                 value={newPassword}
                 onChange={setNewPassword}
                 error={isNewPasswordInvalid ? PASSWORD_RULE_MESSAGE : null}
+                hint={PASSWORD_RULE_MESSAGE}
               />
               <PasswordField
                 id="register-confirm-password"

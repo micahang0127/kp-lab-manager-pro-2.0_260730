@@ -12,6 +12,10 @@ interface FormInputProps {
   type?: React.HTMLInputTypeAttribute
   value: string
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+  /** 한글(IME) 조합 시작 시 호출 (useHangulGuardedInput과 함께 쓰기 위함) */
+  onCompositionStart?: () => void
+  /** 한글(IME) 조합 종료 시 호출 (useHangulGuardedInput과 함께 쓰기 위함) */
+  onCompositionEnd?: (e: React.CompositionEvent<HTMLInputElement>) => void
   required?: boolean
   /** required가 true여도 라벨 옆 필수 표시(*)를 숨긴다 (예: 로그인 폼처럼 표시가 불필요한 경우) */
   hideRequiredMark?: boolean
@@ -51,6 +55,8 @@ export const FormInput = forwardRef<HTMLInputElement, FormInputProps>(function F
     type = 'text',
     value,
     onChange,
+    onCompositionStart,
+    onCompositionEnd,
     required = false,
     hideRequiredMark = false,
     disabled = false,
@@ -76,6 +82,8 @@ export const FormInput = forwardRef<HTMLInputElement, FormInputProps>(function F
       placeholder={placeholder}
       value={value}
       onChange={onChange}
+      onCompositionStart={onCompositionStart}
+      onCompositionEnd={onCompositionEnd}
       className={inputClassName ? `${INPUT_CLASS_NAME} ${inputClassName}` : INPUT_CLASS_NAME}
     />
   )

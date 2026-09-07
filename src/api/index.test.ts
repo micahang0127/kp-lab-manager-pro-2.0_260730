@@ -1,4 +1,4 @@
-import { http, HttpResponse } from 'msw'
+import { delay, http, HttpResponse } from 'msw'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { server } from '../test/mocks/server'
@@ -113,5 +113,71 @@ describe('api client', () => {
     )
 
     await expect(api.get('/test')).rejects.toThrow('알 수 없는 오류가 발생했습니다.')
+  })
+
+  it('DTO 검증 실패 응답(message가 { 필드명: [메시지] } 객체)이면 첫 번째 필드의 첫 메시지를 던진다', async () => {
+    server.use(
+      http.post('*/test', () =>
+        HttpResponse.json(
+          {
+            result: false,
+            statusCode: 400,
+            data: null,
+            message: { email: ['올바른 이메일 형식이 아닙니다'] },
+          },
+          { status: 400 }
+        )
+      )
+    )
+
+    await expect(api.post('/test', {})).rejects.toThrow('올바른 이메일 형식이 아닙니다')
+  })
+
+  it('message가 null이어도(정상 흐름에서는 성공 응답에만 오지만) 안전하게 기본 에러 메시지로 대체한다', async () => {
+    server.use(
+      http.get('*/test', () =>
+        HttpResponse.json(
+          { result: false, statusCode: 400, data: null, message: null },
+          { status: 400 }
+        )
+      )
+    )
+
+    await expect(api.get('/test')).rejects.toThrow('알 수 없는 오류가 발생했습니다.')
+  })
+
+  it('성공 응답의 message가 null이어도 정상적으로 data를 반환한다', async () => {
+    server.use(
+      http.get('*/test', () =>
+        HttpResponse.json({ result: true, statusCode: 200, data: { ok: true }, message: null })
+      )
+    )
+
+    const res = await api.get<{ ok: boolean }>('/test')
+    expect(res.data?.ok).toBe(true)
+  })
+
+  it('timeoutMs를 넘겨주면 그 시간을 기준으로 타임아웃한다', async () => {
+    server.use(
+      http.get('*/test', async () => {
+        await delay(100)
+        return HttpResponse.json({ result: true, statusCode: 200, data: null, message: [] })
+      })
+    )
+
+    await expect(api.get('/test', { timeoutMs: 20 })).rejects.toThrow(
+      '요청 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.'
+    )
+  })
+
+  it('timeoutMs를 생략하면 기본 타임아웃(10초) 안에 끝나는 요청은 정상적으로 완료된다', async () => {
+    server.use(
+      http.get('*/test', () =>
+        HttpResponse.json({ result: true, statusCode: 200, data: { ok: true }, message: [] })
+      )
+    )
+
+    const res = await api.get<{ ok: boolean }>('/test')
+    expect(res.data?.ok).toBe(true)
   })
 })

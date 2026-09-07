@@ -110,10 +110,19 @@ describe('validationRules', () => {
     it('길이 상한 없이 통과한다 (최대 길이 제한 없음)', () => {
       expect(isValidPassword('a1'.repeat(50))).toBe(true)
     })
+
+    it("작은따옴표(')가 포함되면 실패한다", () => {
+      expect(isValidPassword("abcdefg1'")).toBe(false)
+    })
+
+    it('대문자로만 구성되어도 영문+숫자 조합이면 통과한다 (대소문자 구분 없음)', () => {
+      expect(isValidPassword('ABCDEFG1')).toBe(true)
+    })
   })
 
   it('PASSWORD_RULE_MESSAGE는 규칙 안내 문구를 담고 있다', () => {
     expect(PASSWORD_RULE_MESSAGE).toContain('8자리 이상')
+    expect(PASSWORD_RULE_MESSAGE).toContain("'")
   })
 
   describe('sanitizePasswordInput', () => {
@@ -125,7 +134,11 @@ describe('validationRules', () => {
       expect(sanitizePasswordInput('abc 123')).toBe('abc123')
     })
 
-    it('영문·숫자·특수문자는 그대로 유지한다', () => {
+    it("작은따옴표(')가 포함되면 제거한다", () => {
+      expect(sanitizePasswordInput("abc123'")).toBe('abc123')
+    })
+
+    it('영문·숫자·특수문자(작은따옴표 제외)는 그대로 유지한다', () => {
       expect(sanitizePasswordInput('Abc123!@#')).toBe('Abc123!@#')
     })
   })

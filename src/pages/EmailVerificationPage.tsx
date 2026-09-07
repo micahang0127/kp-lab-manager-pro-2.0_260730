@@ -6,17 +6,11 @@ import type { ApiResponse } from '../api'
 // [TEMP] 26.07.27 백엔드 미연동 — 이메일 인증 API 연동 전까지 주석 처리. 연동 완료 시 주석 해제
 // import { loginWithEmailVerificationCode } from '../api/user'
 import type { EmailVerificationLoginData } from '../api/user'
-import { FormCheckbox, FormInput } from '../components/form'
+import { EmailCodeInput } from '../components/emailVerification'
 import { useAuthStore } from '../stores/authStore'
 import { useLoginFlowStore } from '../stores/loginFlowStore'
 import { EMAIL_CODE_LENGTH, isValidEmailCode } from '../utils/rules/validationRules'
 import { createTempAccessToken } from '../utils/tempAccessToken'
-
-// ─── 기기 신뢰 유효기간 ───────────────────────────────────────────────────────────
-// 체크박스 라벨과 백엔드로 전달하는 request data(trustDurationDays)가 항상 같은 값을 쓰도록
-// 하나의 상수로 관리한다.
-
-const TRUST_DEVICE_DURATION_DAYS = 30
 
 // ─── Component ─────────────────────────────────────────────────────────────────
 
@@ -33,9 +27,6 @@ export function EmailVerificationPage() {
 
   const [emailCode, setEmailCode] = useState('')
   const [timeLeft, setTimeLeft] = useState(0)
-  // 체크 시 백엔드가 TRUST_DEVICE_DURATION_DAYS 기간 동안 유효한 device-trust 쿠키를 발급해,
-  // 그 기간 내에는 이 브라우저에서 이메일 인증을 다시 요구하지 않도록 한다
-  const [trustDevice, setTrustDevice] = useState(false)
 
   // ─── 이메일 인증 타이머 ───────────────────────────────────────────────────────
 
@@ -55,18 +46,11 @@ export function EmailVerificationPage() {
   // ─── Mutation ──────────────────────────────────────────────────────────────────
 
   const emailCodeLoginMutation = useMutation({
-    mutationFn: async (_vars: {
-      code: string
-      email: string
-      rememberDevice: boolean
-      trustDurationDays: number
-    }) => {
+    mutationFn: async (_vars: { code: string; email: string }) => {
       // [TEMP] 26.07.27 백엔드 미연동 — 항상 성공 처리. 연동 완료 시 아래 주석 해제하고 스텁 제거
       // return await loginWithEmailVerificationCode({
       //   email: vars.email,
       //   code: vars.code,
-      //   rememberDevice: vars.rememberDevice,
-      //   trustDurationDays: vars.trustDurationDays,
       // })
       const stubResponse: ApiResponse<EmailVerificationLoginData> = {
         result: true,
@@ -93,8 +77,6 @@ export function EmailVerificationPage() {
     emailCodeLoginMutation.mutate({
       code: emailCode,
       email: pending.email,
-      rememberDevice: trustDevice,
-      trustDurationDays: TRUST_DEVICE_DURATION_DAYS,
     })
   }
 
@@ -142,17 +124,16 @@ export function EmailVerificationPage() {
           {pending.email}로 발송된 6자리 인증번호를 입력해주세요.
         </p>
 
-        <FormInput
-          id="email-code"
-          label="인증번호"
-          inputMode="numeric"
-          maxLength={EMAIL_CODE_LENGTH}
-          required
-          hideRequiredMark
-          value={emailCode}
-          onChange={(e) => setEmailCode(e.target.value.replace(/\D/g, ''))}
-          inputClassName="text-center font-mono tracking-widest"
-        />
+        <div className="flex flex-col items-center gap-2">
+          <p className="text-sm font-medium text-gray-700">인증번호</p>
+          <EmailCodeInput
+            length={EMAIL_CODE_LENGTH}
+            value={emailCode}
+            onChange={setEmailCode}
+            error={emailCodeErrors.length > 0}
+            ariaLabel="인증번호"
+          />
+        </div>
 
         {/* 이메일 인증 타이머 */}
         <div className="text-center text-sm text-gray-600">
@@ -162,14 +143,6 @@ export function EmailVerificationPage() {
             {String(timeLeft % 60).padStart(2, '0')}
           </span>
         </div>
-
-        {/* 이 브라우저를 신뢰 기기로 등록 */}
-        <FormCheckbox
-          id="trust-device"
-          label={`이 브라우저를 ${TRUST_DEVICE_DURATION_DAYS}일동안 신뢰`}
-          checked={trustDevice}
-          onChange={setTrustDevice}
-        />
 
         {/* 이메일 인증 제출 버튼 */}
         <button

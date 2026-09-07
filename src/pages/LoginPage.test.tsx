@@ -6,11 +6,13 @@ import { forwardRef, useImperativeHandle } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useAuthStore } from '../stores/authStore'
+import { useFingerprintStore } from '../stores/fingerprintStore'
 import { useLoginFlowStore } from '../stores/loginFlowStore'
 import { useSavedEmailStore } from '../stores/savedEmailStore'
 import { server } from '../test/mocks/server'
 import { render, screen } from '../test/test-utils'
 import { getCookie } from '../utils/cookie'
+import { HANGUL_INPUT_MESSAGE } from '../utils/rules/validationRules'
 import { LoginPage } from './LoginPage'
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
@@ -48,8 +50,10 @@ describe('LoginPage', () => {
   beforeEach(() => {
     sessionStorage.clear()
     document.cookie = 'savedEmail=; max-age=0; path=/'
+    document.cookie = 'fingerprintCode=; max-age=0; path=/'
     useAuthStore.setState({ isLoggedIn: false })
     useSavedEmailStore.setState({ savedEmail: null })
+    useFingerprintStore.setState({ fingerprintCode: null })
     useLoginFlowStore.setState({ pending: null })
     vi.mocked(useNavigate).mockReturnValue(mockNavigate)
     vi.clearAllMocks()
@@ -61,6 +65,19 @@ describe('LoginPage', () => {
           result: true,
           statusCode: 200,
           data: { isVerified: true },
+          message: [],
+        })
+      )
+    )
+    // 핑거프린트 발급 API 기본 성공 핸들러 — useFingerprint가 마운트 시 자동 호출하므로 등록.
+    // 발급 자체의 성공/실패/재사용 동작은 useFingerprint.test.ts에서 검증하므로 여기서는
+    // 조용히 통과시키기만 한다
+    server.use(
+      http.get('*/v1/user/fingerprint', () =>
+        HttpResponse.json({
+          result: true,
+          statusCode: 200,
+          data: { fingerprintCode: 'mock-fingerprint-code' },
           message: [],
         })
       )
@@ -79,7 +96,7 @@ describe('LoginPage', () => {
 
       // 이메일/비밀번호 입력 (HTML5 validation 통과를 위함)
       await userEvent.type(screen.getByLabelText(/이메일/), 'test@test.com')
-      await userEvent.type(screen.getByLabelText(/비밀번호/), 'password1')
+      await userEvent.type(screen.getByLabelText('비밀번호'), 'password1')
 
       // 처음에는 토큰 없이 제출 시도하여 에러 발생시킴
       const submitButton = screen.getByRole('button', { name: /^로그인$/ })
@@ -113,7 +130,7 @@ describe('LoginPage', () => {
     it('Turnstile 토큰 없이 로그인 시도하면 에러 메시지가 표시된다', async () => {
       render(<LoginPage />)
       const emailInput = screen.getByLabelText(/이메일/)
-      const passwordInput = screen.getByLabelText(/비밀번호/)
+      const passwordInput = screen.getByLabelText('비밀번호')
       const submitButton = screen.getByRole('button', { name: /^로그인$/ })
       await userEvent.type(emailInput, 'user@test.com')
       await userEvent.type(passwordInput, 'password123')
@@ -170,7 +187,7 @@ describe('LoginPage', () => {
       render(<LoginPage />)
 
       const emailInput = screen.getByLabelText(/이메일/) as HTMLInputElement
-      const passwordInput = screen.getByLabelText(/비밀번호/) as HTMLInputElement
+      const passwordInput = screen.getByLabelText('비밀번호') as HTMLInputElement
 
       await userEvent.type(emailInput, 'test@example.com')
       await userEvent.type(passwordInput, 'test123')
@@ -209,7 +226,7 @@ describe('LoginPage', () => {
 
     it('비밀번호 입력 시 한글/공백 등 허용되지 않는 문자는 즉시 제거된다', async () => {
       render(<LoginPage />)
-      const passwordInput = screen.getByLabelText(/비밀번호/) as HTMLInputElement
+      const passwordInput = screen.getByLabelText('비밀번호') as HTMLInputElement
 
       await userEvent.type(passwordInput, 'abc 한글123!@')
 
@@ -222,7 +239,7 @@ describe('LoginPage', () => {
 
       await userEvent.type(emailInput, 'test한글')
 
-      expect(await screen.findByText('한글은 입력불가합니다.')).toBeInTheDocument()
+      expect(await screen.findByText(HANGUL_INPUT_MESSAGE)).toBeInTheDocument()
     })
 
     it('한글 입력 시도 후 정상 문자를 입력하면 한글 오류 메시지가 사라진다', async () => {
@@ -230,11 +247,71 @@ describe('LoginPage', () => {
       const emailInput = screen.getByLabelText(/이메일/)
 
       await userEvent.type(emailInput, 'test한글')
-      expect(await screen.findByText('한글은 입력불가합니다.')).toBeInTheDocument()
+      expect(await screen.findByText(HANGUL_INPUT_MESSAGE)).toBeInTheDocument()
 
       await userEvent.type(emailInput, 'abc')
 
-      expect(screen.queryByText('한글은 입력불가합니다.')).not.toBeInTheDocument()
+      expect(screen.queryByText(HANGUL_INPUT_MESSAGE)).not.toBeInTheDocument()
+    })
+
+    it('이메일에 한글(IME) 조합이 시작된 것만으로는 안내를 표시하지 않는다 — 영문 입력 중 오탐 방지', () => {
+      render(<LoginPage />)
+      const emailInput = screen.getByLabelText(/이메일/) as HTMLInputElement
+
+      fireEvent.compositionStart(emailInput)
+      expect(screen.queryByText(HANGUL_INPUT_MESSAGE)).not.toBeInTheDocument()
+    })
+
+    it('이메일에 한글(IME) 조합 중 실제로 한글이 포함된 값이 오면 즉시 안내를 표시하고, 조합 중에는 값을 바꾸지 않는다', () => {
+      render(<LoginPage />)
+      const emailInput = screen.getByLabelText(/이메일/) as HTMLInputElement
+
+      fireEvent.compositionStart(emailInput)
+      fireEvent.change(emailInput, { target: { value: 'ㄱ' } })
+
+      expect(screen.getByText(HANGUL_INPUT_MESSAGE)).toBeInTheDocument()
+      expect(emailInput.value).toBe('')
+    })
+
+    it('이메일에 한글(IME) 조합 이벤트가 발생해도 조합 중인 값에 한글이 없으면(영문 조합 등) 값을 그대로 반영한다', () => {
+      render(<LoginPage />)
+      const emailInput = screen.getByLabelText(/이메일/) as HTMLInputElement
+
+      fireEvent.compositionStart(emailInput)
+      fireEvent.change(emailInput, { target: { value: 'a' } })
+
+      expect(screen.queryByText(HANGUL_INPUT_MESSAGE)).not.toBeInTheDocument()
+      expect(emailInput.value).toBe('a')
+    })
+
+    it('비밀번호에 한글(IME) 조합이 시작된 것만으로는 안내를 표시하지 않는다 — 영문 입력 중 오탐 방지', () => {
+      render(<LoginPage />)
+      const passwordInput = screen.getByLabelText('비밀번호') as HTMLInputElement
+
+      fireEvent.compositionStart(passwordInput)
+      expect(screen.queryByText(HANGUL_INPUT_MESSAGE)).not.toBeInTheDocument()
+    })
+
+    it('비밀번호에 한글(IME) 조합 중 실제로 한글이 포함된 값이 오면 즉시 안내를 표시하고, 조합 중에는 값을 바꾸지 않는다', () => {
+      render(<LoginPage />)
+      const passwordInput = screen.getByLabelText('비밀번호') as HTMLInputElement
+
+      fireEvent.compositionStart(passwordInput)
+      fireEvent.change(passwordInput, { target: { value: 'ㄱ' } })
+
+      expect(screen.getByText(HANGUL_INPUT_MESSAGE)).toBeInTheDocument()
+      expect(passwordInput.value).toBe('')
+    })
+
+    it('비밀번호에 한글(IME) 조합 이벤트가 발생해도 조합 중인 값에 한글이 없으면(영문 조합 등) 값을 그대로 반영한다', () => {
+      render(<LoginPage />)
+      const passwordInput = screen.getByLabelText('비밀번호') as HTMLInputElement
+
+      fireEvent.compositionStart(passwordInput)
+      fireEvent.change(passwordInput, { target: { value: 'a' } })
+
+      expect(screen.queryByText(HANGUL_INPUT_MESSAGE)).not.toBeInTheDocument()
+      expect(passwordInput.value).toBe('a')
     })
 
     it('이메일 형식이 아니면 입력란 아래에 오류 메시지가 표시된다', async () => {
@@ -257,7 +334,7 @@ describe('LoginPage', () => {
 
     it('비밀번호가 정규식(영문+숫자 조합, 8자 이상)에 맞지 않으면 입력란 아래에 오류 메시지가 표시된다', async () => {
       render(<LoginPage />)
-      const passwordInput = screen.getByLabelText(/비밀번호/)
+      const passwordInput = screen.getByLabelText('비밀번호')
 
       // 영문만 입력 (숫자 미포함)
       await userEvent.type(passwordInput, 'abcdefgh')
@@ -267,7 +344,7 @@ describe('LoginPage', () => {
 
     it('비밀번호가 정규식에 맞으면 오류 메시지가 표시되지 않는다', async () => {
       render(<LoginPage />)
-      const passwordInput = screen.getByLabelText(/비밀번호/)
+      const passwordInput = screen.getByLabelText('비밀번호')
 
       await userEvent.type(passwordInput, 'password1')
 
@@ -280,7 +357,7 @@ describe('LoginPage', () => {
 
       fireEvent.click(screen.getByText('turnstile-success'))
       await userEvent.type(screen.getByLabelText(/이메일/), 'invalid-email')
-      await userEvent.type(screen.getByLabelText(/비밀번호/), 'password123')
+      await userEvent.type(screen.getByLabelText('비밀번호'), 'password123')
       await userEvent.click(screen.getByRole('button', { name: /^로그인$/ }))
 
       expect(screen.getByText('이메일 형식에 맞지 않습니다.')).toBeInTheDocument()
@@ -295,7 +372,7 @@ describe('LoginPage', () => {
 
       fireEvent.click(screen.getByText('turnstile-success'))
       await userEvent.type(screen.getByLabelText(/이메일/), 'user@test.com')
-      await userEvent.type(screen.getByLabelText(/비밀번호/), 'pass1')
+      await userEvent.type(screen.getByLabelText('비밀번호'), 'pass1')
       await userEvent.click(screen.getByRole('button', { name: /^로그인$/ }))
 
       expect(screen.getByText('비밀번호 형식에 맞지 않습니다.')).toBeInTheDocument()
@@ -310,7 +387,7 @@ describe('LoginPage', () => {
 
       fireEvent.click(screen.getByText('turnstile-success'))
       await userEvent.type(screen.getByLabelText(/이메일/), 'user@test.com')
-      await userEvent.type(screen.getByLabelText(/비밀번호/), '12345678')
+      await userEvent.type(screen.getByLabelText('비밀번호'), '12345678')
       await userEvent.click(screen.getByRole('button', { name: /^로그인$/ }))
 
       expect(screen.getByText('비밀번호 형식에 맞지 않습니다.')).toBeInTheDocument()
@@ -338,7 +415,7 @@ describe('LoginPage', () => {
 
       fireEvent.click(screen.getByText('turnstile-success'))
       await userEvent.type(screen.getByLabelText(/이메일/), 'user@test.com')
-      await userEvent.type(screen.getByLabelText(/비밀번호/), 'wrongpass1')
+      await userEvent.type(screen.getByLabelText('비밀번호'), 'wrongpass1')
       await userEvent.click(screen.getByRole('button', { name: /^로그인$/ }))
 
       expect(
@@ -368,7 +445,7 @@ describe('LoginPage', () => {
 
       fireEvent.click(screen.getByText('turnstile-success'))
       await userEvent.type(screen.getByLabelText(/이메일/), 'user@test.com')
-      await userEvent.type(screen.getByLabelText(/비밀번호/), 'wrongpass1')
+      await userEvent.type(screen.getByLabelText('비밀번호'), 'wrongpass1')
 
       const submitButton = screen.getByRole('button', { name: /^로그인$/ })
       for (let i = 0; i < 5; i++) {
@@ -382,6 +459,45 @@ describe('LoginPage', () => {
 
       expect(alertSpy).toHaveBeenCalledWith('로그인이 일시적으로 제한되었습니다.')
       expect(sessionStorage.getItem('accessToken')).toBeNull()
+      expect(mockNavigate).not.toHaveBeenCalled()
+    })
+
+    it('네트워크 오류 시 자격증명 실패 문구 대신 일시적 오류 안내를 표시하고 실패 횟수는 증가시키지 않는다', async () => {
+      server.use(http.post('*/user/login', () => HttpResponse.error()))
+
+      render(<LoginPage />)
+
+      fireEvent.click(screen.getByText('turnstile-success'))
+      await userEvent.type(screen.getByLabelText(/이메일/), 'user@test.com')
+      await userEvent.type(screen.getByLabelText('비밀번호'), 'password123')
+      await userEvent.click(screen.getByRole('button', { name: /^로그인$/ }))
+
+      expect(
+        await screen.findByText('일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요.')
+      ).toBeInTheDocument()
+      expect(screen.queryByText(/실패 1\/5/)).not.toBeInTheDocument()
+      expect(mockNavigate).not.toHaveBeenCalled()
+    })
+
+    it('서버 오류(5xx) 시 서버 메시지를 안내하고 실패 횟수는 증가시키지 않는다', async () => {
+      server.use(
+        http.post('*/user/login', () =>
+          HttpResponse.json(
+            { result: false, statusCode: 500, data: null, message: ['서버 오류가 발생했습니다.'] },
+            { status: 500 }
+          )
+        )
+      )
+
+      render(<LoginPage />)
+
+      fireEvent.click(screen.getByText('turnstile-success'))
+      await userEvent.type(screen.getByLabelText(/이메일/), 'user@test.com')
+      await userEvent.type(screen.getByLabelText('비밀번호'), 'password123')
+      await userEvent.click(screen.getByRole('button', { name: /^로그인$/ }))
+
+      expect(await screen.findByText('서버 오류가 발생했습니다.')).toBeInTheDocument()
+      expect(screen.queryByText(/실패 1\/5/)).not.toBeInTheDocument()
       expect(mockNavigate).not.toHaveBeenCalled()
     })
 
@@ -401,7 +517,7 @@ describe('LoginPage', () => {
 
       fireEvent.click(screen.getByText('turnstile-success'))
       const emailInput = screen.getByLabelText(/이메일/)
-      const passwordInput = screen.getByLabelText(/비밀번호/)
+      const passwordInput = screen.getByLabelText('비밀번호')
       const submitButton = screen.getByRole('button', { name: /^로그인$/ })
 
       await userEvent.type(emailInput, 'user@test.com')
@@ -441,7 +557,7 @@ describe('LoginPage', () => {
 
       fireEvent.click(screen.getByText('turnstile-success'))
       const emailInput = screen.getByLabelText(/이메일/)
-      const passwordInput = screen.getByLabelText(/비밀번호/)
+      const passwordInput = screen.getByLabelText('비밀번호')
       const submitButton = screen.getByRole('button', { name: /^로그인$/ })
 
       await userEvent.type(emailInput, 'user@test.com')
@@ -482,7 +598,7 @@ describe('LoginPage', () => {
 
       fireEvent.click(screen.getByText('turnstile-success'))
       await userEvent.type(screen.getByLabelText(/이메일/), 'user@test.com')
-      await userEvent.type(screen.getByLabelText(/비밀번호/), 'password123')
+      await userEvent.type(screen.getByLabelText('비밀번호'), 'password123')
       await userEvent.click(screen.getByLabelText('아이디 저장'))
       await userEvent.click(screen.getByRole('button', { name: /^로그인$/ }))
 
@@ -507,7 +623,7 @@ describe('LoginPage', () => {
 
       fireEvent.click(screen.getByText('turnstile-success'))
       await userEvent.type(screen.getByLabelText(/이메일/), 'user@test.com')
-      await userEvent.type(screen.getByLabelText(/비밀번호/), 'password123')
+      await userEvent.type(screen.getByLabelText('비밀번호'), 'password123')
       await userEvent.click(screen.getByRole('button', { name: /^로그인$/ }))
 
       await waitFor(() => {
@@ -547,7 +663,7 @@ describe('LoginPage', () => {
 
       fireEvent.click(screen.getByText('turnstile-success'))
       await userEvent.type(screen.getByLabelText(/이메일/), 'user@test.com')
-      await userEvent.type(screen.getByLabelText(/비밀번호/), 'password123')
+      await userEvent.type(screen.getByLabelText('비밀번호'), 'password123')
       await userEvent.click(screen.getByRole('button', { name: /^로그인$/ }))
 
       await waitFor(() => {
@@ -566,6 +682,55 @@ describe('LoginPage', () => {
       await userEvent.click(screen.getByRole('button', { name: /^회원가입$/ }))
 
       expect(mockNavigate).toHaveBeenCalledWith({ to: '/register' })
+    })
+  })
+
+  // ─── 핑거프린트 발급 Tests ────────────────────────────────────────────────────
+  // 임시 버튼은 제거되고 useFingerprint 훅으로 대체됨 — 훅 자체의 동작(재사용/발급/실패)은
+  // useFingerprint.test.ts에서 검증하고, 여기서는 LoginPage 마운트 시 실제로 호출되어
+  // 쿠키에 저장되는지만 확인한다
+
+  describe('핑거프린트', () => {
+    it('마운트 시 쿠키에 fingerprintCode가 없으면 발급받아 쿠키에 저장한다', async () => {
+      server.use(
+        http.get('*/v1/user/fingerprint', () =>
+          HttpResponse.json({
+            result: true,
+            statusCode: 200,
+            data: { fingerprintCode: '904eT9hCwnwkSmjiDYeGnxmLdkMuHNQs' },
+            message: [],
+          })
+        )
+      )
+
+      render(<LoginPage />)
+
+      await waitFor(() => {
+        expect(getCookie('fingerprintCode')).toBe('904eT9hCwnwkSmjiDYeGnxmLdkMuHNQs')
+      })
+    })
+
+    it('쿠키에 이미 fingerprintCode가 있으면 발급 API를 호출하지 않고 그대로 재사용한다', async () => {
+      useFingerprintStore.getState().saveFingerprintCode('existing-fingerprint-code')
+      let callCount = 0
+      server.use(
+        http.get('*/v1/user/fingerprint', () => {
+          callCount += 1
+          return HttpResponse.json({
+            result: true,
+            statusCode: 200,
+            data: { fingerprintCode: 'new-fingerprint-code' },
+            message: [],
+          })
+        })
+      )
+
+      render(<LoginPage />)
+
+      await waitFor(() => {
+        expect(getCookie('fingerprintCode')).toBe('existing-fingerprint-code')
+      })
+      expect(callCount).toBe(0)
     })
   })
 })

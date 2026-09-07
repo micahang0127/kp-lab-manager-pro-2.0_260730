@@ -25,6 +25,11 @@ interface EmailCodeDigitInputProps {
  * 인증번호 확인이 실패한 상태(`error`)라면 값 유무와 관계없이 빨간색 테두리 + 옅은 빨간
  * 배경으로 표시된다 (Figma 디자인 기준). 포커스 이동은 상위 컴포넌트(EmailCodeInput)가
  * ref로 제어하므로 forwardRef로 input DOM 노드를 그대로 전달한다.
+ *
+ * `maxLength={1}`인 칸에 이미 값이 있는 상태로 포커스만 이동하면(클릭/탭), 선택 영역 없이
+ * 커서만 위치하므로 브라우저가 그 이상의 키 입력을 막아 지우고 다시 입력해야 하는 문제가
+ * 생긴다. 포커스 시 기존 값을 전체 선택해두면 다음 키 입력이 자연스럽게 덮어써지므로,
+ * 지우지 않고 바로 재입력할 수 있다.
  */
 export const EmailCodeDigitInput = forwardRef<HTMLInputElement, EmailCodeDigitInputProps>(
   function EmailCodeDigitInput(
@@ -41,6 +46,7 @@ export const EmailCodeDigitInput = forwardRef<HTMLInputElement, EmailCodeDigitIn
         disabled={disabled}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onFocus={(e) => e.target.select()}
         onPaste={(e) => {
           e.preventDefault()
           onPaste(e.clipboardData.getData('text'))

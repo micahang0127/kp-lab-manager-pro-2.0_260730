@@ -23,9 +23,11 @@ interface UseIdentityVerificationResult {
  *
  * @param onVerified 백엔드 확인까지 완료된(isVerified: true) 결과를 전달받는 콜백.
  *   hasExistingAccount로 기존 가입 여부를, 신규 사용자면 마스킹된 개인정보(maskedName 등)를 담고 있다.
+ *   두 번째 인자로 이번 인증 요청에 사용한 identityVerificationId를 함께 전달한다 — 회원가입
+ *   최종 제출(signUp) API가 verificationCode로 동일한 값을 요구하기 때문이다.
  */
 export function useIdentityVerification(
-  onVerified?: (result: VerifyIdentityResult) => void
+  onVerified?: (result: VerifyIdentityResult, identityVerificationId: string) => void
 ): UseIdentityVerificationResult {
   const [status, setStatus] = useState<IdentityVerificationStatus>('idle')
   const [error, setError] = useState<string | null>(null)
@@ -63,7 +65,7 @@ export function useIdentityVerification(
 
       setVerifyResult(res.data)
       setStatus('success')
-      onVerified?.(res.data)
+      onVerified?.(res.data, identityVerificationId)
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : '본인인증 확인 중 오류가 발생했습니다.'

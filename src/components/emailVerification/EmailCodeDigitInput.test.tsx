@@ -96,6 +96,28 @@ describe('EmailCodeDigitInput', () => {
     expect(screen.getByLabelText('인증번호 1번째 자리')).toHaveClass('border-[#c9c9c4]')
   })
 
+  it('값이 있는 상태로 포커스를 받으면 기존 값이 전체 선택된다 (지우지 않고 바로 재입력 가능하도록)', async () => {
+    render(
+      <EmailCodeDigitInput
+        value="1"
+        onChange={vi.fn()}
+        onKeyDown={vi.fn()}
+        onPaste={vi.fn()}
+        ariaLabel="인증번호 1번째 자리"
+      />
+    )
+
+    const input = screen.getByLabelText('인증번호 1번째 자리') as HTMLInputElement
+    await userEvent.click(input)
+
+    // maxLength=1인 칸에 값이 이미 있으면, 선택 영역 없이 커서만 있는 상태에서는 브라우저가
+    // 추가 입력을 막는다(지우고 다시 입력해야 하는 문제) — 전체 선택되어 있어야 다음
+    // 키 입력이 바로 덮어써진다. (userEvent의 타이핑 시뮬레이션은 이 네이티브 selection
+    // 기반 덮어쓰기를 재현하지 못해, 실제 덮어쓰기 자체는 여기서 검증하지 않고 선택 영역만 검증한다)
+    expect(input.selectionStart).toBe(0)
+    expect(input.selectionEnd).toBe(1)
+  })
+
   it('입력 시 onChange에 입력값을 그대로 전달한다', async () => {
     const handleChange = vi.fn()
     render(

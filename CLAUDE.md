@@ -103,7 +103,11 @@
 | 클라이언트 전역 상태       | `zustand`               | `src/stores/{name}Store.ts`              |
 | 로컬 UI 상태               | `useState`              | 컴포넌트 내부                            |
 
-**서버 응답 데이터를 Zustand에 복제 저장하지 말 것** — 캐싱은 React Query가 담당.
+**React Query가 캐싱하는 서버 상태를 목적 없이 Zustand에 복제 저장하지 말 것** — 캐싱·재검증은 React Query가 담당한다.
+단, 멀티스텝 플로우(회원가입·로그인 등)에서 이전 단계 API 응답을 다음 단계 화면까지 전달해야 하는 **일회성
+전달값**은 예외로 Zustand에 둘 수 있다(예: `registerFlowStore`의 `identityVerifyResult`,
+`businessRegistrationReview`). 이 경우도 새로고침 시 초기화되도록 두어(persist 금지) 오래된 사본이 남지
+않게 한다.
 
 ### API 클라이언트 (`src/api/index.ts`)
 
@@ -238,9 +242,10 @@ update: 로그인 폼 유효성 검증 강화
 2. `npm`, `yarn`, `npx` 명령어 사용
 3. `any` 타입 사용
 4. 팀 합의 없는 `@ts-ignore` / `@ts-expect-error`
-5. 서버 응답 데이터를 Zustand 스토어에 복제 저장
+5. React Query가 캐싱하는 서버 상태를 목적 없이 Zustand 스토어에 복제 저장 (멀티스텝 플로우의 일회성 전달값은 예외 — `registerFlowStore` 참고)
 6. `[TEMP]` 마킹 없이 임시 stub 코드 작성
-7. `localStorage` 사용 (이 프로젝트는 sessionStorage 정책)
+7. 브라우저 저장소(localStorage/sessionStorage/쿠키) 선택은 기능 요구사항에 맞춰 구현 시점에
+   판단하고, 그 판단 근거를 코드 주석으로 남길 것 (예: src/utils/cookie.ts 상단 주석 참고)
 8. 테스트 생략 (새 로직은 반드시 테스트 추가)
 
 ---

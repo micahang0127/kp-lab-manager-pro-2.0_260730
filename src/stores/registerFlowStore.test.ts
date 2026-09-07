@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import type { VerifyIdentityResult } from '../api/auth'
+import type { BusinessRegistrationReviewData } from '../api/file'
+import type { InvitedOrg } from '../api/user'
 import { useRegisterFlowStore } from './registerFlowStore'
 
 const IDENTITY_VERIFY_RESULT: VerifyIdentityResult = {
@@ -17,10 +19,14 @@ describe('registerFlowStore', () => {
     useRegisterFlowStore.setState({
       registerMethod: null,
       identityVerifyResult: null,
+      identityVerificationCode: null,
       termsAgreement: null,
       registerEmail: null,
+      invitedOrgs: null,
       registerPassword: null,
       businessRegistrationFile: null,
+      businessRegistrationReview: null,
+      businessRegistrationS3Key: null,
     })
   })
 
@@ -67,6 +73,26 @@ describe('registerFlowStore', () => {
     expect(useRegisterFlowStore.getState().identityVerifyResult).toBeNull()
   })
 
+  it('초기 상태는 identityVerificationCode가 null이다', () => {
+    expect(useRegisterFlowStore.getState().identityVerificationCode).toBeNull()
+  })
+
+  it('setIdentityVerificationCode()로 본인인증 키를 저장한다', () => {
+    useRegisterFlowStore.getState().setIdentityVerificationCode('identity-verification-abc123')
+
+    expect(useRegisterFlowStore.getState().identityVerificationCode).toBe(
+      'identity-verification-abc123'
+    )
+  })
+
+  it('clearIdentityVerificationCode()로 상태를 초기화한다', () => {
+    useRegisterFlowStore.getState().setIdentityVerificationCode('identity-verification-abc123')
+
+    useRegisterFlowStore.getState().clearIdentityVerificationCode()
+
+    expect(useRegisterFlowStore.getState().identityVerificationCode).toBeNull()
+  })
+
   it('초기 상태는 termsAgreement가 null이다', () => {
     expect(useRegisterFlowStore.getState().termsAgreement).toBeNull()
   })
@@ -101,6 +127,40 @@ describe('registerFlowStore', () => {
     useRegisterFlowStore.getState().clearRegisterEmail()
 
     expect(useRegisterFlowStore.getState().registerEmail).toBeNull()
+  })
+
+  const INVITED_ORGS: InvitedOrg[] = [
+    {
+      invitedIdx: '12',
+      orgIdx: '3',
+      orgName: '테스트회사',
+      orgGrade: 'MEMBER',
+      invitedAt: '2026-09-04T01:23:45.000Z',
+    },
+  ]
+
+  it('초기 상태는 invitedOrgs가 null이다', () => {
+    expect(useRegisterFlowStore.getState().invitedOrgs).toBeNull()
+  })
+
+  it('setInvitedOrgs()로 초대 조직 목록을 저장한다', () => {
+    useRegisterFlowStore.getState().setInvitedOrgs(INVITED_ORGS)
+
+    expect(useRegisterFlowStore.getState().invitedOrgs).toEqual(INVITED_ORGS)
+  })
+
+  it('setInvitedOrgs()로 빈 배열(초대 없음)도 저장할 수 있다', () => {
+    useRegisterFlowStore.getState().setInvitedOrgs([])
+
+    expect(useRegisterFlowStore.getState().invitedOrgs).toEqual([])
+  })
+
+  it('clearInvitedOrgs()로 상태를 초기화한다', () => {
+    useRegisterFlowStore.getState().setInvitedOrgs(INVITED_ORGS)
+
+    useRegisterFlowStore.getState().clearInvitedOrgs()
+
+    expect(useRegisterFlowStore.getState().invitedOrgs).toBeNull()
   })
 
   it('초기 상태는 registerPassword가 null이다', () => {
@@ -140,5 +200,60 @@ describe('registerFlowStore', () => {
     useRegisterFlowStore.getState().clearBusinessRegistrationFile()
 
     expect(useRegisterFlowStore.getState().businessRegistrationFile).toBeNull()
+  })
+
+  const BUSINESS_REGISTRATION_REVIEW: BusinessRegistrationReviewData = {
+    registrationNumber: '123-45-67890',
+    corporateName: '코리아석유',
+    ceoName: '홍길동',
+    corporateRegistrationNumber: '110111-1234567',
+    businessAddress: '서울시 ...',
+    businessType: '도매',
+    businessItem: '석유제품',
+    issueDate: '2020-01-01',
+  }
+
+  it('초기 상태는 businessRegistrationReview가 null이다', () => {
+    expect(useRegisterFlowStore.getState().businessRegistrationReview).toBeNull()
+  })
+
+  it('setBusinessRegistrationReview()로 사업자등록증 분석 결과를 저장한다', () => {
+    useRegisterFlowStore.getState().setBusinessRegistrationReview(BUSINESS_REGISTRATION_REVIEW)
+
+    expect(useRegisterFlowStore.getState().businessRegistrationReview).toEqual(
+      BUSINESS_REGISTRATION_REVIEW
+    )
+  })
+
+  it('clearBusinessRegistrationReview()로 상태를 초기화한다', () => {
+    useRegisterFlowStore.getState().setBusinessRegistrationReview(BUSINESS_REGISTRATION_REVIEW)
+
+    useRegisterFlowStore.getState().clearBusinessRegistrationReview()
+
+    expect(useRegisterFlowStore.getState().businessRegistrationReview).toBeNull()
+  })
+
+  it('초기 상태는 businessRegistrationS3Key가 null이다', () => {
+    expect(useRegisterFlowStore.getState().businessRegistrationS3Key).toBeNull()
+  })
+
+  it('setBusinessRegistrationS3Key()로 S3 키를 저장한다', () => {
+    useRegisterFlowStore
+      .getState()
+      .setBusinessRegistrationS3Key('PRODUCTION/BusinessRegistration/260901/xxxxxxxx.pdf')
+
+    expect(useRegisterFlowStore.getState().businessRegistrationS3Key).toBe(
+      'PRODUCTION/BusinessRegistration/260901/xxxxxxxx.pdf'
+    )
+  })
+
+  it('clearBusinessRegistrationS3Key()로 상태를 초기화한다', () => {
+    useRegisterFlowStore
+      .getState()
+      .setBusinessRegistrationS3Key('PRODUCTION/BusinessRegistration/260901/xxxxxxxx.pdf')
+
+    useRegisterFlowStore.getState().clearBusinessRegistrationS3Key()
+
+    expect(useRegisterFlowStore.getState().businessRegistrationS3Key).toBeNull()
   })
 })

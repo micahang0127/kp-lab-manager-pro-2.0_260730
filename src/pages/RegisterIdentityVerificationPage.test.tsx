@@ -21,18 +21,23 @@ vi.mock('../components/identityVerification', () => ({
     <>
       <button
         type="button"
-        onClick={() => onVerified?.({ isVerified: true, hasExistingAccount: false })}
+        onClick={() =>
+          onVerified?.({ isVerified: true, hasExistingAccount: false }, 'iv-no-account-id')
+        }
       >
         {label}
       </button>
       <button
         type="button"
         onClick={() =>
-          onVerified?.({
-            isVerified: true,
-            hasExistingAccount: true,
-            existingEmail: 'fu******@gmail.com',
-          })
+          onVerified?.(
+            {
+              isVerified: true,
+              hasExistingAccount: true,
+              existingEmail: 'fu******@gmail.com',
+            },
+            'iv-existing-account-id'
+          )
         }
       >
         {`${label}(가입된 계정 있음)`}
@@ -45,7 +50,7 @@ describe('RegisterIdentityVerificationPage', () => {
   beforeEach(() => {
     vi.mocked(useNavigate).mockReturnValue(mockNavigate)
     vi.clearAllMocks()
-    useRegisterFlowStore.setState({ identityVerifyResult: null })
+    useRegisterFlowStore.setState({ identityVerifyResult: null, identityVerificationCode: null })
   })
 
   it('페이지 제목과 안내 문구를 렌더링한다', () => {
@@ -76,6 +81,7 @@ describe('RegisterIdentityVerificationPage', () => {
       isVerified: true,
       hasExistingAccount: false,
     })
+    expect(useRegisterFlowStore.getState().identityVerificationCode).toBe('iv-no-account-id')
     expect(mockNavigate).toHaveBeenCalledWith({ to: '/register-account-check' })
   })
 
@@ -89,6 +95,7 @@ describe('RegisterIdentityVerificationPage', () => {
       hasExistingAccount: true,
       existingEmail: 'fu******@gmail.com',
     })
+    expect(useRegisterFlowStore.getState().identityVerificationCode).toBe('iv-existing-account-id')
     expect(mockNavigate).toHaveBeenCalledWith({ to: '/register-account-exists' })
   })
 

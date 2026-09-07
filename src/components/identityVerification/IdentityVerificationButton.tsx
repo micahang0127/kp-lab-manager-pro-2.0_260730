@@ -7,8 +7,9 @@ interface IdentityVerificationButtonProps {
   /** 버튼 및 안내 문구에 표시할 명칭 (예: '핸드폰인증', '본인인증') */
   label?: string
   /** 인증 성공(isVerified: true) 시 확인 결과를 전달받는 콜백.
-   *  hasExistingAccount로 기존 가입 여부를, 신규 사용자면 마스킹된 개인정보를 담고 있다 */
-  onVerified?: (result: VerifyIdentityResult) => void
+   *  hasExistingAccount로 기존 가입 여부를, 신규 사용자면 마스킹된 개인정보를 담고 있다.
+   *  두 번째 인자로 이번 인증에 사용한 identityVerificationId를 함께 전달한다 */
+  onVerified?: (result: VerifyIdentityResult, identityVerificationId: string) => void
   /** 버튼에 적용할 클래스명 — 지정하지 않으면 기본 스타일을 사용한다 (화면별 디자인에 맞춰 오버라이드) */
   className?: string
 }

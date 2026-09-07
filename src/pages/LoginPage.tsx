@@ -4,24 +4,25 @@ import { useMutation } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { useEffect, useRef, useState } from 'react'
 
+import { ApiError } from '../api'
 import { login, verifyTurnstile } from '../api/user'
 import { FormCheckbox, FormInput } from '../components/form'
+import { PasswordField } from '../components/password'
 import { useAuthStore } from '../stores/authStore'
 import { useLoginFlowStore } from '../stores/loginFlowStore'
 import { useSavedEmailStore } from '../stores/savedEmailStore'
 import {
-  containsHangul,
   EMAIL_MAX_LENGTH,
+  HANGUL_INPUT_MESSAGE,
   isValidEmail,
   isValidPassword,
-  removeHangul,
-  sanitizePasswordInput,
 } from '../utils/rules/validationRules'
+import { useFingerprint } from '../utils/useFingerprint'
+import { useHangulGuardedInput } from '../utils/useHangulGuardedInput'
 
 // ─── Validation ────────────────────────────────────────────────────────────────
 // 이메일/비밀번호 형식 오류는 alert가 아니라 입력란 하단 인라인 메시지로만 안내한다.
 
-const EMAIL_HANGUL_MESSAGE = '한글은 입력불가합니다.'
 const EMAIL_FORMAT_MESSAGE = '이메일 형식에 맞지 않습니다.'
 const PASSWORD_FORMAT_MESSAGE = '비밀번호 형식에 맞지 않습니다.'
 
@@ -68,12 +69,23 @@ export function LoginPage() {
   // 아이디 저장 체크박스 상태
   const [rememberId, setRememberId] = useState(() => !!useSavedEmailStore.getState().savedEmail)
 
-  // 이메일 입력 중 한글(한글 키보드) 입력을 시도했는지 여부 — removeHangul로 즉시 제거되므로
-  // form.email 값만으로는 판별 불가하여 별도 상태로 추적한다
-  const [emailHangulAttempted, setEmailHangulAttempted] = useState(false)
+  // 이메일 입력 — 한글(IME) 조합 중에는 값을 건드리지 않다가 조합이 끝난 시점에만 한글을
+  // 제거해 반영한다(그렇지 않으면 조합이 깨지면서 엉뚱한 영문자가 입력되는 문제가 있음)
+  const {
+    hasHangulInput: emailHangulAttempted,
+    handleChange: handleEmailChange,
+    handleCompositionStart: handleEmailCompositionStart,
+    handleCompositionEnd: handleEmailCompositionEnd,
+  } = useHangulGuardedInput({
+    onChange: (value) => setForm((f) => ({ ...f, email: value })),
+  })
 
-  // 로그인 실패 횟수 (성공 시에만 0으로 리셋)
+  // 로그인 실패 횟수 (성공 시에만 0으로 리셋) — 자격증명 불일치(401)일 때만 증가한다
   const [loginFailCount, setLoginFailCount] = useState(0)
+
+  // 자격증명 문제가 아닌 로그인 오류(네트워크 단절·타임아웃·서버 오류 등) 안내 메시지.
+  // 이 경우는 사용자가 이메일/비밀번호를 잘못 입력한 게 아니므로 실패 카운트에는 반영하지 않는다.
+  const [loginErrorMessage, setLoginErrorMessage] = useState<string | null>(null)
 
   // 이메일 입력란 자동 포커스용
   const emailInputRef = useRef<HTMLInputElement>(null)
@@ -83,6 +95,12 @@ export function LoginPage() {
   useEffect(() => {
     emailInputRef.current?.focus()
   }, [])
+
+  // 이 브라우저의 fingerprintCode를 확보해둔다 — 쿠키에 이미 있으면 재사용하고, 없으면(이
+  // 브라우저에서의 최초 로그인 시도 등) 여기서 발급받아 쿠키에 저장한다. 신규 기기+신규 이메일
+  // 조합 판단에 사용할 예정이며, 로그인 요청에 실어 보내는 구체적인 연동은 백엔드 요청 스펙
+  // 확정 후 별도로 진행한다.
+  useFingerprint()
 
   // ─── Mutations ─────────────────────────────────────────────────────────────────
 
@@ -116,8 +134,7 @@ export function LoginPage() {
         setLoggedIn(true)
         void navigate({ to: '/main' })
       } else if (res.data?.type === 'O') {
-        // 신규 기기(브라우저)로 판단됨 — 이메일 인증 단계로 이동. 신뢰 판단은 백엔드가
-        // device-trust 쿠키로 하므로 프론트는 별도 식별값을 계산해 보내지 않는다.
+        // 신규 기기(브라우저) + 신규 이메일 조합으로 판단됨 — 이메일 2차 인증 단계로 이동
         setPendingVerification({
           email: form.email,
           expiresAt: Date.now() + EMAIL_VERIFICATION_DURATION_MS,
@@ -125,14 +142,27 @@ export function LoginPage() {
         void navigate({ to: '/login/verify' })
       }
     },
-    onError: () => {
-      setLoginFailCount((prev) => {
-        const next = Math.min(prev + 1, LOGIN_FAIL_LIMIT)
-        if (next >= LOGIN_FAIL_LIMIT) {
-          alert(LOGIN_LOCKED_MESSAGE)
-        }
-        return next
-      })
+    onError: (err) => {
+      // 401(자격증명 불일치)만 실패 카운트에 반영한다. 네트워크 단절·타임아웃·서버 오류(5xx) 등
+      // 다른 원인까지 "이메일/비밀번호 확인" 문구로 안내하면 사용자가 잘못된 원인으로 오인하고,
+      // 반복되는 일시적 오류만으로도 로컬 잠금(LOGIN_FAIL_LIMIT)에 도달할 수 있기 때문이다.
+      if (err instanceof ApiError && err.statusCode === 401) {
+        setLoginErrorMessage(null)
+        setLoginFailCount((prev) => {
+          const next = Math.min(prev + 1, LOGIN_FAIL_LIMIT)
+          if (next >= LOGIN_FAIL_LIMIT) {
+            alert(LOGIN_LOCKED_MESSAGE)
+          }
+          return next
+        })
+        return
+      }
+
+      setLoginErrorMessage(
+        err instanceof Error
+          ? err.message
+          : '로그인 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'
+      )
     },
   })
 
@@ -141,6 +171,7 @@ export function LoginPage() {
   const handleLoginSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setTurnstileError(null)
+    setLoginErrorMessage(null)
 
     // 이메일/비밀번호 형식 오류는 입력란 하단 인라인 메시지로 이미 실시간 안내되므로 별도 alert
     // 없이 제출만 막는다.
@@ -172,7 +203,7 @@ export function LoginPage() {
 
   const isEmailFormatInvalid = form.email.length > 0 && !isValidEmail(form.email)
   const emailMessage = emailHangulAttempted
-    ? EMAIL_HANGUL_MESSAGE
+    ? HANGUL_INPUT_MESSAGE
     : isEmailFormatInvalid
       ? EMAIL_FORMAT_MESSAGE
       : undefined
@@ -199,24 +230,18 @@ export function LoginPage() {
           placeholder="이메일을 입력해 주세요"
           maxLength={EMAIL_MAX_LENGTH}
           value={form.email}
-          onChange={(e) => {
-            const rawValue = e.target.value
-            setEmailHangulAttempted(containsHangul(rawValue))
-            setForm((f) => ({ ...f, email: removeHangul(rawValue) }))
-          }}
+          onChange={handleEmailChange}
+          onCompositionStart={handleEmailCompositionStart}
+          onCompositionEnd={handleEmailCompositionEnd}
           message={emailMessage}
         />
-        <FormInput
+        <PasswordField
           id="password"
           label="비밀번호"
-          type="password"
           required
-          placeholder="비밀번호를 입력해 주세요"
           value={form.password}
-          onChange={(e) =>
-            setForm((f) => ({ ...f, password: sanitizePasswordInput(e.target.value) }))
-          }
-          message={passwordMessage}
+          onChange={(value) => setForm((f) => ({ ...f, password: value }))}
+          error={passwordMessage}
         />
 
         {/* 아이디 저장 */}
@@ -254,6 +279,13 @@ export function LoginPage() {
           </div>
         )}
 
+        {/* 자격증명 불일치가 아닌 로그인 오류(네트워크·서버 오류 등) */}
+        {loginErrorMessage && (
+          <div className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-600">
+            {loginErrorMessage}
+          </div>
+        )}
+
         <button
           type="submit"
           disabled={loginMutation.isPending || verifyTurnstileMutation.isPending}
@@ -261,6 +293,7 @@ export function LoginPage() {
         >
           {loginMutation.isPending ? '로그인 중...' : '로그인'}
         </button>
+
         {/* 아이디/비밀번호 찾기 · 회원가입 */}
         <div className="flex gap-2">
           <button

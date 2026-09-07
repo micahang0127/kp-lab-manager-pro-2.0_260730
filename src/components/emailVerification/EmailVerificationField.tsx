@@ -1,7 +1,10 @@
-import { useState } from 'react'
-
 import checkCircleIcon from '../../assets/icons/register/check-circle.svg'
-import { containsHangul, EMAIL_CODE_LENGTH, removeHangul } from '../../utils/rules/validationRules'
+import {
+  EMAIL_CODE_LENGTH,
+  EMAIL_RULE_MESSAGE,
+  HANGUL_INPUT_MESSAGE,
+} from '../../utils/rules/validationRules'
+import { useHangulGuardedInput } from '../../utils/useHangulGuardedInput'
 import { EmailCodeInput } from './EmailCodeInput'
 import type { UseEmailVerificationResult } from './useEmailVerification'
 
@@ -17,7 +20,7 @@ function formatTimeLeft(seconds: number): string {
 interface EmailVerificationFieldProps {
   /** 이메일 입력 input의 id (label htmlFor와 연결) */
   emailId: string
-  /** 이메일 입력칸 라벨 (기본값 '그룹 이메일 *') */
+  /** 이메일 입력칸 라벨 (기본값 '이메일 *') */
   emailLabel?: string
   /** 이메일 입력칸 placeholder (기본값 '회사 이메일을 입력해 주세요') */
   emailPlaceholder?: string
@@ -31,25 +34,30 @@ interface EmailVerificationFieldProps {
   verification: UseEmailVerificationResult
   /** 인증번호 최종 확인(호출 측 verify mutation) 실패 시 에러 메시지 */
   codeError?: string | null
+  /** 인증번호 입력칸을 강제로 비활성화할지 여부(기본 false). 호출 측이 자체적으로 판단한 한도
+   *  초과(예: 인증 실패 5회 초과) 등을 반영할 때 사용하며, 이 컴포넌트는 "한도"라는 개념 자체는
+   *  몰라도 되도록 boolean만 받는다 */
+  codeDisabled?: boolean
 }
 
 // ─── Component ─────────────────────────────────────────────────────────────────
 
 /**
  * 이메일 입력 → 인증번호 전송 → 인증번호 입력(+ 남은 시간/재전송)까지의 UI를 묶은 공통 필드.
- * 회원가입 이메일 인증 등 "그룹 이메일로 인증번호를 받아 확인"하는 화면에서 재사용한다.
+ * 회원가입 이메일 인증 등 "이메일로 인증번호를 받아 확인"하는 화면에서 재사용한다.
  * 상태/발송 로직은 `useEmailVerification` 훅이 담당하고, 이 컴포넌트는 그 결과를 그대로
  * 렌더링만 한다 — 인증번호 최종 검증(확인 버튼 클릭 시 동작)은 호출 측이 별도로 구성한다.
  */
 export function EmailVerificationField({
   emailId,
-  emailLabel = '그룹 이메일 *',
+  emailLabel = '이메일 *',
   emailPlaceholder = '회사 이메일을 입력해 주세요',
   codeLabel = '인증번호 *',
   codeAriaLabel = '인증번호',
   codeLength = EMAIL_CODE_LENGTH,
   verification,
   codeError,
+  codeDisabled = false,
 }: EmailVerificationFieldProps) {
   const {
     email,
@@ -63,21 +71,26 @@ export function EmailVerificationField({
     sendCode,
     isSending,
     sendCodeError,
+    isSendLimitExceeded,
   } = verification
 
-  // 이메일은 한글을 허용하지 않아 입력 즉시 제거한다 — 직전 입력에 한글이 섞여 있었는지를
-  // 별도로 기억해뒀다가 안내 문구로 보여준다 (제거된 값 자체에는 한글 포함 여부가 남지 않으므로)
-  const [hasHangulInput, setHasHangulInput] = useState(false)
+  // 이메일은 한글을 허용하지 않는다. 조합(IME) 중에는 값을 건드리지 않다가 조합이 끝난
+  // 시점에만 한글을 제거해 반영한다(그렇지 않으면 조합이 깨지면서 엉뚱한 영문자가 입력되는
+  // 문제가 있음)
+  const {
+    hasHangulInput,
+    handleChange: handleEmailChange,
+    handleCompositionStart: handleEmailCompositionStart,
+    handleCompositionEnd: handleEmailCompositionEnd,
+  } = useHangulGuardedInput({ onChange: setEmail })
 
-  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const rawValue = e.target.value
-    setHasHangulInput(containsHangul(rawValue))
-    setEmail(removeHangul(rawValue))
-  }
+  // 한글은 아니지만 형식 자체가 이메일이 아닌 경우(예: '@' 누락) — 아직 입력 중일 수 있는
+  // 빈 값에는 표시하지 않는다
+  const isEmailFormatInvalid = email.length > 0 && !hasHangulInput && !isEmailValid
 
-  // 입력값 자체가 잘못된 경우(한글 입력 등) + 서버가 이메일 자체를 거부한 경우(발송 실패)를
+  // 입력값 자체가 잘못된 경우(한글 입력, 형식 오류) + 서버가 이메일 자체를 거부한 경우(발송 실패)를
   // 묶어 "이메일 입력 오류" 상태로 취급 — 입력칸 테두리를 빨간색으로 강조한다
-  const hasEmailError = hasHangulInput || Boolean(sendCodeError)
+  const hasEmailError = hasHangulInput || isEmailFormatInvalid || Boolean(sendCodeError)
 
   return (
     <>
@@ -97,6 +110,8 @@ export function EmailVerificationField({
               required
               value={email}
               onChange={handleEmailChange}
+              onCompositionStart={handleEmailCompositionStart}
+              onCompositionEnd={handleEmailCompositionEnd}
               placeholder={emailPlaceholder}
               className="flex-1 text-xs text-black outline-none"
             />
@@ -106,14 +121,17 @@ export function EmailVerificationField({
           </div>
           <button
             type="button"
-            disabled={!isEmailValid || isCodeSent || isSending}
+            disabled={!isEmailValid || isCodeSent || isSending || isSendLimitExceeded}
             onClick={sendCode}
             className="flex h-10 w-[100px] shrink-0 items-center justify-center rounded border border-[#c9c9c4] bg-white px-2 text-center text-xs text-[#2b2b29] disabled:opacity-30"
           >
             {isSending ? '전송 중...' : '인증번호 전송'}
           </button>
         </div>
-        {hasHangulInput && <p className="text-[10px] text-red-600">한글 입력불가</p>}
+        {hasHangulInput && <p className="text-[10px] text-red-600">{HANGUL_INPUT_MESSAGE}</p>}
+        {!hasHangulInput && isEmailFormatInvalid && (
+          <p className="text-[10px] text-red-600">{EMAIL_RULE_MESSAGE}</p>
+        )}
         {sendCodeError && <p className="text-[10px] text-red-600">{sendCodeError}</p>}
       </div>
 
@@ -124,19 +142,21 @@ export function EmailVerificationField({
             length={codeLength}
             value={emailCode}
             onChange={setEmailCode}
-            disabled={!isCodeSent || isCodeExpired}
+            disabled={!isCodeSent || isCodeExpired || codeDisabled}
             error={Boolean(codeError)}
             ariaLabel={codeAriaLabel}
           />
           <div className="flex w-full items-center justify-between">
             <p className="text-xs font-medium text-[#1a1a17] opacity-50">
-              {isCodeSent
-                ? `남은 시간 ${formatTimeLeft(timeLeft)}`
-                : '이메일 인증번호를 전송해 주세요'}
+              {codeDisabled
+                ? ''
+                : isCodeSent
+                  ? `남은 시간 ${formatTimeLeft(timeLeft)}`
+                  : '이메일 인증번호를 전송해 주세요'}
             </p>
             <button
               type="button"
-              disabled={!isCodeSent || isSending}
+              disabled={!isCodeSent || isSending || isSendLimitExceeded}
               onClick={sendCode}
               className="text-xs font-medium text-[#1a1a17] opacity-50 disabled:opacity-30"
             >
@@ -144,7 +164,9 @@ export function EmailVerificationField({
             </button>
           </div>
         </div>
-        {isCodeExpired && (
+        {/* 인증 실패 횟수 초과로 잠긴 상태(codeDisabled)에서는 잠금 안내(codeError)만 보여주고,
+            "인증 시간이 만료되었습니다" 안내는 모순되어 보이므로 함께 띄우지 않는다 */}
+        {isCodeExpired && !codeDisabled && (
           <p className="text-[10px] text-red-600">인증 시간이 만료되었습니다. 재전송해 주세요.</p>
         )}
         {codeError && (

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useRegisterFlowStore } from '../stores/registerFlowStore'
 import { render, screen } from '../test/test-utils'
+import { PASSWORD_RULE_MESSAGE } from '../utils/rules/validationRules'
 import { RegisterPasswordPage } from './RegisterPasswordPage'
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
@@ -40,14 +41,18 @@ describe('RegisterPasswordPage', () => {
     expect(screen.getByRole('button', { name: '다음' })).toBeDisabled()
   })
 
+  it('입력 전에도 신규 비밀번호 형식 규칙 안내 문구를 항상 표시한다', () => {
+    render(<RegisterPasswordPage />)
+
+    expect(screen.getByText(PASSWORD_RULE_MESSAGE)).toBeInTheDocument()
+  })
+
   it('신규 비밀번호가 형식에 맞지 않으면 오류 문구를 표시한다', async () => {
     render(<RegisterPasswordPage />)
 
     await userEvent.type(screen.getByLabelText('신규 비밀번호 *'), 'abc')
 
-    expect(
-      screen.getByText('비밀번호는 영문과 숫자를 포함하여 8자리 이상 입력해주세요.')
-    ).toBeInTheDocument()
+    expect(screen.getByText(PASSWORD_RULE_MESSAGE)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '다음' })).toBeDisabled()
   })
 
@@ -65,6 +70,14 @@ describe('RegisterPasswordPage', () => {
     render(<RegisterPasswordPage />)
 
     await userEvent.type(screen.getByLabelText('신규 비밀번호 *'), 'ab한글cd1234')
+
+    expect(screen.getByLabelText('신규 비밀번호 *')).toHaveValue('abcd1234')
+  })
+
+  it("작은따옴표(')는 입력 즉시 제거된다", async () => {
+    render(<RegisterPasswordPage />)
+
+    await userEvent.type(screen.getByLabelText('신규 비밀번호 *'), "ab'cd1234")
 
     expect(screen.getByLabelText('신규 비밀번호 *')).toHaveValue('abcd1234')
   })
@@ -106,6 +119,16 @@ describe('RegisterPasswordPage', () => {
 
     expect(useRegisterFlowStore.getState().registerPassword).toBe(VALID_PASSWORD)
     expect(mockNavigate).toHaveBeenCalledWith({ to: '/register-organization' })
+  })
+
+  it('"이전" 버튼으로 되돌아와 store에 이미 저장된 비밀번호가 남아있으면 입력값이 복원된다', () => {
+    useRegisterFlowStore.setState({ registerPassword: VALID_PASSWORD })
+
+    render(<RegisterPasswordPage />)
+
+    expect(screen.getByLabelText('신규 비밀번호 *')).toHaveValue(VALID_PASSWORD)
+    expect(screen.getByLabelText('비밀번호 확인 *')).toHaveValue(VALID_PASSWORD)
+    expect(screen.getByRole('button', { name: '다음' })).not.toBeDisabled()
   })
 
   it('"← 이전" 버튼을 클릭하면 5단계(이메일 인증)로 이동한다', async () => {

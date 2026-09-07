@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { useAuthStore } from '../stores/authStore'
 import { useLoginFlowStore } from '../stores/loginFlowStore'
-import { render, screen } from '../test/test-utils'
+import { fireEvent, render, screen } from '../test/test-utils'
 import { isAuthValid } from '../utils/requireAuth'
 import { EmailVerificationPage } from './EmailVerificationPage'
 
@@ -18,6 +18,14 @@ vi.mock('@tanstack/react-router', () => ({
 }))
 
 const PENDING_EMAIL = 'user@test.com'
+
+/** 박스형 인증번호 입력칸(1~6번째 자리)에 한 자리씩 입력한다 */
+async function typeEmailCode(code: string) {
+  const user = userEvent.setup()
+  for (let i = 0; i < code.length; i += 1) {
+    await user.type(screen.getByLabelText(`인증번호 ${i + 1}번째 자리`), code[i])
+  }
+}
 
 /** 이메일 인증 대기 상태를 store에 채워넣는다 (LoginPage에서 type: 'O' 응답을 받은 이후 상태) */
 function setPending(overrides: Partial<{ email: string; expiresAt: number }> = {}) {
@@ -56,51 +64,64 @@ describe('EmailVerificationPage', () => {
   // ─── 인증번호 입력 UI ─────────────────────────────────────────────────────────
 
   describe('인증번호 입력 UI', () => {
-    it('안내 문구, 인증번호 입력란, 남은 시간이 렌더링된다', () => {
+    it('안내 문구, 인증번호 입력칸 6개, 남은 시간이 렌더링된다', () => {
       setPending()
       render(<EmailVerificationPage />)
 
       expect(
         screen.getByText(`${PENDING_EMAIL}로 발송된 6자리 인증번호를 입력해주세요.`)
       ).toBeInTheDocument()
-      expect(screen.getByLabelText(/인증번호/)).toBeInTheDocument()
+      expect(screen.getAllByLabelText(/인증번호 \d번째 자리/)).toHaveLength(6)
       expect(screen.getByText(/남은 시간/)).toBeInTheDocument()
     })
 
-    it('"이 브라우저를 30일동안 신뢰" 체크박스를 토글할 수 있다', async () => {
+    it('붙여넣은 값 중 숫자만 인증번호로 인식한다 (필터링 자체는 EmailCodeInput이 담당)', async () => {
       setPending()
       render(<EmailVerificationPage />)
 
-      const checkbox = screen.getByLabelText('이 브라우저를 30일동안 신뢰')
-      expect(checkbox).not.toBeChecked()
+      screen.getByLabelText('인증번호 1번째 자리').focus()
+      await userEvent.paste('ab123456cd')
 
-      await userEvent.click(checkbox)
-
-      expect(checkbox).toBeChecked()
-    })
-
-    it('인증번호 입력 중에는 숫자만 입력된다', async () => {
-      setPending()
-      render(<EmailVerificationPage />)
-
-      const emailCodeInput = screen.getByLabelText(/인증번호/) as HTMLInputElement
-      await userEvent.type(emailCodeInput, 'abc123def')
-
-      expect(emailCodeInput.value).toBe('123')
+      const boxes = screen.getAllByLabelText(/인증번호 \d번째 자리/) as HTMLInputElement[]
+      expect(boxes.map((box) => box.value).join('')).toBe('123456')
     })
 
     it('인증번호 6자리 미만이면 제출 버튼이 disabled다', async () => {
       setPending()
       render(<EmailVerificationPage />)
 
-      const emailCodeInput = screen.getByLabelText(/인증번호/)
       const submitButton = screen.getByRole('button', { name: /이메일 인증/ })
 
-      await userEvent.type(emailCodeInput, '12345')
+      await typeEmailCode('12345')
       expect(submitButton).toBeDisabled()
 
-      await userEvent.type(emailCodeInput, '6')
+      await userEvent.type(screen.getByLabelText('인증번호 6번째 자리'), '6')
       expect(submitButton).not.toBeDisabled()
+    })
+
+    it('값이 채워진 칸에 다시 포커스하면 기존 값이 전체 선택되어, 지우지 않고 바로 재입력할 수 있다', async () => {
+      setPending()
+      render(<EmailVerificationPage />)
+
+      await typeEmailCode('123456')
+
+      const box1 = screen.getByLabelText('인증번호 1번째 자리') as HTMLInputElement
+      await userEvent.click(box1)
+
+      // 값이 이미 있는 maxLength=1 칸에 커서만 있고 선택 영역이 없으면, 브라우저가 추가
+      // 입력 자체를 막아서 지우고 다시 입력해야 하는 문제가 있었다(EmailCodeDigitInput.tsx
+      // 참고). 포커스 시 기존 값을 전체 선택해두면 실제 브라우저에서는 다음 입력이 선택
+      // 영역을 그대로 덮어쓴다 — 여기서는 그 전제 조건(전체 선택)까지 검증한다.
+      expect(box1.selectionStart).toBe(0)
+      expect(box1.selectionEnd).toBe(1)
+
+      // userEvent의 키보드 시뮬레이션은 네이티브 selection 기반 덮어쓰기 자체를 재현하지
+      // 못하므로(jsdom 한계), 실제 브라우저가 선택 영역을 덮어쓴 뒤 보낼 input 이벤트를
+      // 직접 발생시켜 상위(emailCode 상태)가 올바르게 갱신되는지 검증한다.
+      fireEvent.change(box1, { target: { value: '9' } })
+
+      expect(box1.value).toBe('9')
+      expect(screen.getByLabelText('인증번호 2번째 자리')).toHaveFocus()
     })
   })
 
@@ -111,7 +132,7 @@ describe('EmailVerificationPage', () => {
       setPending({ expiresAt: Date.now() - 1000 })
       render(<EmailVerificationPage />)
 
-      await userEvent.type(screen.getByLabelText(/인증번호/), '123456')
+      await typeEmailCode('123456')
 
       await waitFor(() => {
         expect(screen.getByText(/인증 시간이 만료되었습니다/)).toBeInTheDocument()
@@ -128,7 +149,7 @@ describe('EmailVerificationPage', () => {
     setPending()
     render(<EmailVerificationPage />)
 
-    await userEvent.type(screen.getByLabelText(/인증번호/), '123456')
+    await typeEmailCode('123456')
     await userEvent.click(screen.getByRole('button', { name: /이메일 인증/ }))
 
     await waitFor(() => {
@@ -175,36 +196,10 @@ describe('EmailVerificationPage', () => {
   //     setPending()
   //     render(<EmailVerificationPage />)
   //
-  //     await userEvent.type(screen.getByLabelText(/인증번호/), '000000')
+  //     await typeEmailCode('000000')
   //     await userEvent.click(screen.getByRole('button', { name: /이메일 인증/ }))
   //
   //     expect(await screen.findByText(/잘못된 인증번호입니다./)).toBeInTheDocument()
-  //   })
-  //
-  //   it('신뢰 체크박스를 선택하고 제출하면 rememberDevice와 trustDurationDays가 요청 body에 포함된다', async () => {
-  //     let capturedBody: Record<string, unknown> | null = null
-  //     server.use(
-  //       http.post('*/user/email-verification-login', async ({ request }) => {
-  //         capturedBody = (await request.json()) as Record<string, unknown>
-  //         return HttpResponse.json({
-  //           result: true,
-  //           statusCode: 200,
-  //           data: { token: 'tok' },
-  //           message: [],
-  //         })
-  //       })
-  //     )
-  //
-  //     setPending()
-  //     render(<EmailVerificationPage />)
-  //
-  //     await userEvent.click(screen.getByLabelText('이 브라우저를 30일동안 신뢰'))
-  //     await userEvent.type(screen.getByLabelText(/인증번호/), '123456')
-  //     await userEvent.click(screen.getByRole('button', { name: /이메일 인증/ }))
-  //
-  //     await waitFor(() => {
-  //       expect(capturedBody).toMatchObject({ rememberDevice: true, trustDurationDays: 30 })
-  //     })
   //   })
   //
   //   it('이메일 인증 중에는 제출 버튼이 disabled다', async () => {
@@ -228,7 +223,7 @@ describe('EmailVerificationPage', () => {
   //     setPending()
   //     render(<EmailVerificationPage />)
   //
-  //     await userEvent.type(screen.getByLabelText(/인증번호/), '123456')
+  //     await typeEmailCode('123456')
   //     const submitButton = screen.getByRole('button', { name: /이메일 인증/ })
   //     await userEvent.click(submitButton)
   //

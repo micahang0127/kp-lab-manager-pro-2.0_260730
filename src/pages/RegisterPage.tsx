@@ -17,9 +17,11 @@ import { useRegisterFlowStore } from '../stores/registerFlowStore'
  */
 export function RegisterPage() {
   const navigate = useNavigate()
+  const registerMethodInStore = useRegisterFlowStore((s) => s.registerMethod)
   const setRegisterMethodInStore = useRegisterFlowStore((s) => s.setRegisterMethod)
 
-  const [registerMethod, setRegisterMethod] = useState<RegisterMethod | null>(null)
+  // '이전' 버튼으로 되돌아온 경우, store에 이미 선택된 방법이 있으면 화면에도 그대로 복원한다
+  const [registerMethod, setRegisterMethod] = useState<RegisterMethod | null>(registerMethodInStore)
 
   const handleSelect = (method: RegisterMethod) => {
     setRegisterMethod(method)

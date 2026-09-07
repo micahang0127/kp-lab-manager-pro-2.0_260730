@@ -11,6 +11,13 @@ export interface PagedData {
 }
 
 /**
+ * 에러 메시지 형태 — 백엔드가 검증 단계에 따라 다르게 내려준다.
+ * - 문자열 배열: 서비스 로직이 직접 던진 에러 (예: 발송 횟수 초과, 필수값 조합 검증)
+ * - `{ 필드명: [메시지] }` 객체: ValidationPipe(DTO) 검증 실패 — 필드별 메시지 목록
+ */
+export type ApiErrorMessage = string[] | Record<string, string[]>
+
+/**
  * 모든 API 응답이 공통으로 따르는 표준 응답 형태 (백엔드 CommonResponsePayload와 동일)
  */
 export interface ApiResponse<T> {
@@ -18,8 +25,8 @@ export interface ApiResponse<T> {
   result: boolean
   /** 성공 시 응답 데이터, 실패 시 null */
   data: T | null
-  /** 에러 메시지 목록. 성공 시 빈 배열 */
-  message: string[]
+  /** 에러 메시지. 성공 시 null이며, 실패 시 ApiErrorMessage 형태(문자열 배열 또는 필드별 객체) */
+  message: ApiErrorMessage | null
   /** HTTP 상태 코드 */
   statusCode: number
 }
@@ -27,6 +34,8 @@ export interface ApiResponse<T> {
 export interface RequestOptions {
   extraHeaders?: Record<string, string> // 커스텀 헤더
   skipAuth?: boolean // true면 Authorization 헤더 미포함
+  /** 이 요청에만 적용할 타임아웃(ms). 생략 시 기본 REQUEST_TIMEOUT(10초) 사용 */
+  timeoutMs?: number
 }
 
 // ─── Error Types ──────────────────────────────────────────────────────────────
@@ -51,6 +60,19 @@ if (import.meta.env.PROD && BASE_URL && BASE_URL.startsWith('http://')) {
 
 const getToken = () => sessionStorage.getItem('accessToken')?.trim()
 
+// ─── Error message 추출 ─────────────────────────────────────────────────────────
+
+/**
+ * 에러 응답의 message에서 사용자에게 보여줄 첫 번째 메시지를 꺼낸다.
+ * 문자열 배열이면 첫 원소를, `{ 필드명: [메시지] }` 객체(DTO 검증 실패)면 첫 번째 필드의
+ * 첫 메시지를 반환한다. null이거나 빈 값이면 undefined를 반환해 호출 측이 기본 문구로 대체하게 한다.
+ */
+function extractErrorMessage(message: ApiErrorMessage | null): string | undefined {
+  if (!message) return undefined
+  if (Array.isArray(message)) return message[0]
+  return Object.values(message)[0]?.[0]
+}
+
 // ─── Base request ─────────────────────────────────────────────────────────────
 
 async function request<T>(
@@ -67,18 +89,12 @@ async function request<T>(
   }
 
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT)
+  const timeoutId = setTimeout(() => controller.abort(), options?.timeoutMs ?? REQUEST_TIMEOUT)
 
   try {
-    // [팀 합의 필요] credentials: 'include' — 신규 기기 로그인 판별용 device-trust 쿠키(백엔드가
-    // 이메일 인증 성공 시 발급)를 브라우저가 요청에 실어 보내도록 하기 위해 추가함. API 서버가
-    // 프론트와 동일 origin이면 없어도 동작에 차이가 없으나, 별도 서브도메인(cross-origin)이면
-    // 이 옵션이 없으면 쿠키가 전송되지 않는다. VITE_API_BASE_URL이 로컬에 비어있어 실제 배포
-    // 환경이 동일 origin인지 이 리포에서 확인 불가 — PR 리뷰에서 백엔드/인프라 확인 필요.
     const res = await fetch(`${BASE_URL}${endpoint}`, {
       method,
       headers,
-      credentials: 'include',
       signal: controller.signal,
       ...(body !== undefined && { body: JSON.stringify(body) }),
     })
@@ -86,7 +102,7 @@ async function request<T>(
 
     // 401 Unauthorized: 응답 메시지 사용, 만료된 경우만 자동 로그아웃
     if (res.status === 401) {
-      const errorMessage = json.message?.[0] || '인증이 필요합니다.'
+      const errorMessage = extractErrorMessage(json.message) || '인증이 필요합니다.'
 
       // 토큰 만료로 인한 401인 경우에만 자동 로그아웃
       // (api 요청 중 토큰이 만료된 경우 = Silent Refresh 필요)
@@ -106,7 +122,7 @@ async function request<T>(
     }
 
     // 에러 발생 시 에러 객체를 던짐
-    const errorMessage = json.message?.[0] || '알 수 없는 오류가 발생했습니다.'
+    const errorMessage = extractErrorMessage(json.message) || '알 수 없는 오류가 발생했습니다.'
     throw new ApiError(errorMessage, json.statusCode)
   } catch (err) {
     // ApiError는 백엔드가 사용자에게 보여줄 목적으로 준 메시지이므로 그대로 전달한다.
@@ -118,7 +134,9 @@ async function request<T>(
     // 원본 에러라서 사용자가 이해할 수 없다 — 콘솔에만 남기고 공통 문구로 대체한다.
     console.error('[API] 요청 처리 중 오류:', err)
 
-    if (err instanceof DOMException && err.name === 'AbortError') {
+    // DOMException instanceof 체크는 jsdom 등 실행 환경에 따라 실제 fetch가 던지는 DOMException과
+    // 다른 realm의 클래스를 참조해 매칭에 실패할 수 있어, 더 안전한 name 기반 판별을 사용한다
+    if (err instanceof Error && err.name === 'AbortError') {
       throw new Error('요청 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.')
     }
 
@@ -131,7 +149,8 @@ async function request<T>(
 // ─── API client ───────────────────────────────────────────────────────────────
 
 export const api = {
-  get: <T = PagedData>(endpoint: string) => request<T>('GET', endpoint),
+  get: <T = PagedData>(endpoint: string, options?: RequestOptions) =>
+    request<T>('GET', endpoint, undefined, options),
   post: <T = boolean>(endpoint: string, body?: unknown, options?: RequestOptions) =>
     request<T>('POST', endpoint, body, options),
   patch: (endpoint: string, body?: unknown) => request<boolean>('PATCH', endpoint, body),

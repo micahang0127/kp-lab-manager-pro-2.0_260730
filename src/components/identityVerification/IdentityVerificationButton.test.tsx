@@ -95,8 +95,11 @@ describe('IdentityVerificationButton', () => {
     await userEvent.click(screen.getByRole('button', { name: /핸드폰인증/ }))
 
     expect(await screen.findByText(/핸드폰인증이 완료되었습니다./)).toBeInTheDocument()
+    // 두 번째 인자는 훅 내부에서 매번 새로 생성하는 identityVerificationId(crypto.randomUUID
+    // 기반)이므로 값 자체가 아니라 형식만 검증한다
     expect(onVerified).toHaveBeenCalledWith(
-      expect.objectContaining({ isVerified: true, hasExistingAccount: false, maskedName: '홍길*' })
+      expect.objectContaining({ isVerified: true, hasExistingAccount: false, maskedName: '홍길*' }),
+      expect.stringMatching(/^identity-verification-/)
     )
   })
 
