@@ -5,69 +5,63 @@ import { useNavigate } from '@tanstack/react-router'
 import { useEffect, useRef, useState } from 'react'
 
 import { ApiError } from '../api'
-import { login, verifyTurnstile } from '../api/user'
+import { login, verifyTurnstile } from '../api/auth'
+import { AuthCardLayout, AuthFormActions } from '../components/auth'
+import { ErrorToast } from '../components/error/ErrorToast'
+import { ServerErrorBanner } from '../components/error/ServerErrorBanner'
 import { FormCheckbox, FormInput } from '../components/form'
 import { PasswordField } from '../components/password'
 import { useAuthStore } from '../stores/authStore'
+import { useFindAccountFlowStore } from '../stores/findAccountFlowStore'
 import { useLoginFlowStore } from '../stores/loginFlowStore'
+import { useRegisterFlowStore } from '../stores/registerFlowStore'
 import { useSavedEmailStore } from '../stores/savedEmailStore'
+import { getLoginDevice } from '../utils/device'
 import {
   EMAIL_MAX_LENGTH,
+  EMAIL_RULE_MESSAGE,
   HANGUL_INPUT_MESSAGE,
   isValidEmail,
-  isValidPassword,
 } from '../utils/rules/validationRules'
 import { useFingerprint } from '../utils/useFingerprint'
 import { useHangulGuardedInput } from '../utils/useHangulGuardedInput'
 
-// ─── Validation ────────────────────────────────────────────────────────────────
-// 이메일/비밀번호 형식 오류는 alert가 아니라 입력란 하단 인라인 메시지로만 안내한다.
-
-const EMAIL_FORMAT_MESSAGE = '이메일 형식에 맞지 않습니다.'
-const PASSWORD_FORMAT_MESSAGE = '비밀번호 형식에 맞지 않습니다.'
-
-// ─── 로그인 실패 카운트 ───────────────────────────────────────────────────────────
-// 서버가 이메일/비밀번호 불일치로 로그인을 거부할 때마다(Turnstile 오류 제외) 카운트를 올리고,
-// 로그인 성공 시에만 0으로 리셋한다. 즉 이메일을 바꾸거나 페이지를 새로고침해도(컴포넌트 state가
-// 초기화되므로) 카운트는 유지되지 않지만, 같은 세션에서 계속 실패하는 한 5회까지 계속 누적된다.
-// ⚠️ 프런트엔드 단독 카운트이므로 새로고침·시크릿창 등으로 쉽게 우회 가능한 UX 안내용일 뿐이며,
-// 실질적인 브루트포스 방어(계정/IP 단위 잠금)는 반드시 백엔드에서 처리해야 한다.
-const LOGIN_FAIL_LIMIT = 5
-const LOGIN_LOCKED_MESSAGE = '로그인이 일시적으로 제한되었습니다.'
-
-/** 로그인 실패 횟수에 따른 안내 문구를 생성한다 (비밀번호 입력란 하단에 실시간으로 표시) */
-function getLoginFailMessage(count: number): string {
-  return `이메일 또는 비밀번호를 확인해 주세요. (실패 ${count}/${LOGIN_FAIL_LIMIT})`
-}
-
-// ─── 이메일 인증 유효 시간 ────────────────────────────────────────────────────────
-
-const EMAIL_VERIFICATION_DURATION_MS = 5 * 60 * 1000
-
 // ─── Component ─────────────────────────────────────────────────────────────────
 
+/**
+ * 로그인 페이지 (Figma node-id=286:1751 기준).
+ * 봇 차단(Turnstile) → 자격증명 로그인 → 신규 브라우저면 2차 인증(/login-verify)으로 이동,
+ * 신뢰된 브라우저면 바로 로그인 완료까지 처리한다.
+ */
 export function LoginPage() {
   const navigate = useNavigate()
-  const setLoggedIn = useAuthStore((s) => s.setLoggedIn)
-  const setPendingVerification = useLoginFlowStore((s) => s.setPending)
   const saveEmail = useSavedEmailStore((s) => s.saveEmail)
   const clearSavedEmail = useSavedEmailStore((s) => s.clearSavedEmail)
+  const authLogin = useAuthStore((s) => s.login)
+  const setPending = useLoginFlowStore((s) => s.setPending)
+  const clearVerifiedIdentity = useFindAccountFlowStore((s) => s.clearVerifiedIdentity)
+  const resetRegisterFlow = useRegisterFlowStore((s) => s.resetRegisterFlow)
+
+  // 브라우저 식별 코드 — 쿠키에 이미 있으면 재사용하고, 없으면 마운트 시 자동 발급받는다.
+  // 발급 전/실패 시 null이며, 이 경우 로그인 제출을 막는다(아래 handleSubmit 참고).
+  const fingerprintCode = useFingerprint()
+
+  // 자격증명 폼 상태 (아이디 저장 기능으로 저장된 이메일이 있으면 초기값으로 채움).
+  // lazy initializer: 마운트 시 1회만 쿠키(스토어 경유)를 읽기 위함
+  const [email, setEmail] = useState(() => useSavedEmailStore.getState().savedEmail ?? '')
+  const [password, setPassword] = useState('')
+
+  // 아이디 저장 체크박스 상태
+  const [rememberEmail, setRememberEmail] = useState(
+    () => !!useSavedEmailStore.getState().savedEmail
+  )
 
   // Turnstile 검증 상태 — 서버(verifyTurnstile)가 위젯 토큰을 실제로 검증 완료했는지 여부
-  // (로그인 제출 허용 기준)
+  // (로그인 제출 허용 기준). turnstileError는 로그인 API 호출 전 단계(로봇 인증 미완료,
+  // 브라우저 확인 중)에서 제출을 막을 때의 안내 문구도 함께 담는다.
   const [turnstileVerified, setTurnstileVerified] = useState(false)
   const [turnstileError, setTurnstileError] = useState<string | null>(null)
   const turnstileRef = useRef<TurnstileInstance | null>(null)
-
-  // 자격증명 폼 상태 (아이디 저장 기능으로 저장된 이메일이 있으면 초기값으로 채움)
-  // lazy initializer: 마운트 시 1회만 sessionStorage(스토어 경유)를 읽기 위함
-  const [form, setForm] = useState(() => ({
-    email: useSavedEmailStore.getState().savedEmail ?? '',
-    password: '',
-  }))
-
-  // 아이디 저장 체크박스 상태
-  const [rememberId, setRememberId] = useState(() => !!useSavedEmailStore.getState().savedEmail)
 
   // 이메일 입력 — 한글(IME) 조합 중에는 값을 건드리지 않다가 조합이 끝난 시점에만 한글을
   // 제거해 반영한다(그렇지 않으면 조합이 깨지면서 엉뚱한 영문자가 입력되는 문제가 있음)
@@ -76,36 +70,42 @@ export function LoginPage() {
     handleChange: handleEmailChange,
     handleCompositionStart: handleEmailCompositionStart,
     handleCompositionEnd: handleEmailCompositionEnd,
-  } = useHangulGuardedInput({
-    onChange: (value) => setForm((f) => ({ ...f, email: value })),
-  })
+  } = useHangulGuardedInput({ onChange: setEmail })
 
-  // 로그인 실패 횟수 (성공 시에만 0으로 리셋) — 자격증명 불일치(401)일 때만 증가한다
-  const [loginFailCount, setLoginFailCount] = useState(0)
-
-  // 자격증명 문제가 아닌 로그인 오류(네트워크 단절·타임아웃·서버 오류 등) 안내 메시지.
-  // 이 경우는 사용자가 이메일/비밀번호를 잘못 입력한 게 아니므로 실패 카운트에는 반영하지 않는다.
-  const [loginErrorMessage, setLoginErrorMessage] = useState<string | null>(null)
-
-  // 이메일 입력란 자동 포커스용
+  // 이메일 입력란 자동 포커스
   const emailInputRef = useRef<HTMLInputElement>(null)
-
-  // ─── 이메일 자동 포커스 ────────────────────────────────────────────────────────
-
   useEffect(() => {
     emailInputRef.current?.focus()
   }, [])
 
-  // 이 브라우저의 fingerprintCode를 확보해둔다 — 쿠키에 이미 있으면 재사용하고, 없으면(이
-  // 브라우저에서의 최초 로그인 시도 등) 여기서 발급받아 쿠키에 저장한다. 신규 기기+신규 이메일
-  // 조합 판단에 사용할 예정이며, 로그인 요청에 실어 보내는 구체적인 연동은 백엔드 요청 스펙
-  // 확정 후 별도로 진행한다.
-  useFingerprint()
+  // "아이디 저장" 체크 시에만 현재 이메일을 쿠키에 반영하고, 체크 해제 시 즉시 제거한다.
+  // savedEmail을 구독하지 않는 이유는, 이 effect 자체가 store를 갱신하는 쪽이라 구독하면
+  // 순환이 생기기 때문 — rememberEmail/email 변화만으로 충분하다.
+  useEffect(() => {
+    if (rememberEmail && email) {
+      saveEmail(email)
+    } else if (!rememberEmail) {
+      clearSavedEmail()
+    }
+  }, [rememberEmail, email, saveEmail, clearSavedEmail])
+
+  const isEmailFormatInvalid = email.length > 0 && !emailHangulAttempted && !isValidEmail(email)
+  const emailMessage = emailHangulAttempted
+    ? HANGUL_INPUT_MESSAGE
+    : isEmailFormatInvalid
+      ? EMAIL_RULE_MESSAGE
+      : undefined
 
   // ─── Mutations ─────────────────────────────────────────────────────────────────
 
   // Turnstile 위젯이 토큰을 발급하는 즉시(onSuccess) 호출 — 토큰은 일회용·300초 만료이므로
   // 로그인 폼 제출을 기다리지 않고 최대한 빨리 서버 검증을 받아 실패를 미리 감지한다.
+  //
+  // 주의: 실패했다고 여기서 turnstileRef.current?.reset()을 자동 호출하면 안 된다 — 위젯은
+  // reset() 직후 사용자 개입 없이 스스로 새 토큰을 발급하고(appearance: interaction-only),
+  // 그 토큰이 다시 onSuccess → 이 mutation을 트리거한다. 서버 검증이 계속 실패하는 상황(예:
+  // 서버 장애)이면 reset→발급→실패→reset…이 무한 루프로 이어진다. 실패 시에는 에러만 보여주고,
+  // 재시도는 아래 배너의 "다시 시도" 버튼으로 사용자가 직접 트리거하게 한다.
   const verifyTurnstileMutation = useMutation({
     mutationFn: (token: string) => verifyTurnstile({ token }),
     onSuccess: (res) => {
@@ -115,207 +115,204 @@ export function LoginPage() {
         return
       }
       setTurnstileVerified(false)
-      setTurnstileError('로봇 인증에 실패했습니다. 새로고침 후 다시 시도해주세요.')
-      turnstileRef.current?.reset()
+      setTurnstileError('로봇 인증에 실패했습니다. 다시 시도해주세요.')
     },
     onError: () => {
       setTurnstileVerified(false)
-      setTurnstileError('로봇 인증 확인 중 오류가 발생했습니다. 새로고침 후 다시 시도해주세요.')
-      turnstileRef.current?.reset()
+      setTurnstileError('로봇 인증 확인 중 오류가 발생했습니다. 다시 시도해주세요.')
     },
   })
 
   const loginMutation = useMutation({
-    mutationFn: (vars: { email: string; password: string }) => login(vars),
-    onSuccess: (res) => {
-      setLoginFailCount(0)
-      if (res.data?.type === 'T' && res.data.token) {
-        sessionStorage.setItem('accessToken', res.data.token)
-        setLoggedIn(true)
-        void navigate({ to: '/main' })
-      } else if (res.data?.type === 'O') {
-        // 신규 기기(브라우저) + 신규 이메일 조합으로 판단됨 — 이메일 2차 인증 단계로 이동
-        setPendingVerification({
-          email: form.email,
-          expiresAt: Date.now() + EMAIL_VERIFICATION_DURATION_MS,
+    mutationFn: (vars: {
+      email: string
+      password: string
+      fingerprintCode: string
+      device: ReturnType<typeof getLoginDevice>
+    }) => login(vars),
+    onSuccess: (res, vars) => {
+      if (!res.data) return
+
+      if (res.data.isNewDevice) {
+        setPending({
+          email: vars.email,
+          password: vars.password,
+          fingerprintCode: vars.fingerprintCode,
+          device: vars.device,
         })
-        void navigate({ to: '/login/verify' })
-      }
-    },
-    onError: (err) => {
-      // 401(자격증명 불일치)만 실패 카운트에 반영한다. 네트워크 단절·타임아웃·서버 오류(5xx) 등
-      // 다른 원인까지 "이메일/비밀번호 확인" 문구로 안내하면 사용자가 잘못된 원인으로 오인하고,
-      // 반복되는 일시적 오류만으로도 로컬 잠금(LOGIN_FAIL_LIMIT)에 도달할 수 있기 때문이다.
-      if (err instanceof ApiError && err.statusCode === 401) {
-        setLoginErrorMessage(null)
-        setLoginFailCount((prev) => {
-          const next = Math.min(prev + 1, LOGIN_FAIL_LIMIT)
-          if (next >= LOGIN_FAIL_LIMIT) {
-            alert(LOGIN_LOCKED_MESSAGE)
-          }
-          return next
-        })
+        void navigate({ to: '/login-verify' })
         return
       }
 
-      setLoginErrorMessage(
-        err instanceof Error
-          ? err.message
-          : '로그인 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'
-      )
+      const { accessToken, userIdx, userName, orgIdx, orgName, userGrade } = res.data
+      // isNewDevice: false인데 토큰이 없는 비정상 응답 방어
+      if (!accessToken) return
+
+      authLogin(accessToken, {
+        userIdx: userIdx ?? '',
+        userName: userName ?? '',
+        orgIdx: orgIdx ?? '',
+        orgName: orgName ?? '',
+        userGrade: userGrade ?? 0,
+      })
+      void navigate({ to: '/main' })
     },
   })
 
   // ─── Event Handlers ───────────────────────────────────────────────────────────
 
-  const handleLoginSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault()
-    setTurnstileError(null)
-    setLoginErrorMessage(null)
+  const canSubmit = isValidEmail(email) && password.length > 0 && !loginMutation.isPending
 
-    // 이메일/비밀번호 형식 오류는 입력란 하단 인라인 메시지로 이미 실시간 안내되므로 별도 alert
-    // 없이 제출만 막는다.
-    if (!isValidEmail(form.email)) {
-      return
-    }
-    if (!isValidPassword(form.password)) {
-      return
-    }
+  // 아이디·비밀번호 찾기 / 회원가입은 이 버튼을 누른 시점부터 "새로 시작하는" 플로우다.
+  // 두 플로우 store는 persist하지 않지만 새로고침 없이 화면만 오가면 값이 그대로 남아,
+  // 초기화하지 않으면 이전에 마쳤던 본인인증 결과가 재사용되면서 본인인증 단계를 건너뛴다
+  // (예: 찾기 → 본인인증 → 결과 → 로그인 → 다시 찾기 시 이전 결과 화면이 그대로 보임).
+  // 진입 지점에서 한 번만 비우면 되므로 각 화면의 이탈 버튼에서는 따로 비우지 않는다.
+  const handleGoFindAccount = () => {
+    clearVerifiedIdentity()
+    void navigate({ to: '/find-account' })
+  }
+
+  const handleGoRegister = () => {
+    resetRegisterFlow()
+    void navigate({ to: '/register' })
+  }
+
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    if (!canSubmit) return
+
     if (!turnstileVerified) {
       setTurnstileError('로봇 인증을 완료해주세요.')
       return
     }
-
-    if (rememberId) {
-      saveEmail(form.email)
-    } else {
-      clearSavedEmail()
+    if (!fingerprintCode) {
+      setTurnstileError('브라우저 확인 중입니다. 잠시 후 다시 시도해주세요.')
+      return
     }
 
-    loginMutation.mutate(form)
+    loginMutation.mutate({ email, password, fingerprintCode, device: getLoginDevice() })
   }
 
   // ─── Render ───────────────────────────────────────────────────────────────────
-  // 이메일/비밀번호 형식 오류는 입력란 하단에 실시간으로 안내한다. 로그인 실패(이메일/비밀번호
-  // 불일치 등 서버 응답 기반 에러)도 비밀번호 입력란 하단에 실패 횟수와 함께 안내하며, 5회에
-  // 도달하면 alert로 한 번 더 안내한다(위 loginMutation.onError 참고). 형식 오류가 있을 때는
-  // 형식 오류 메시지를 우선 표시한다.
 
-  const isEmailFormatInvalid = form.email.length > 0 && !isValidEmail(form.email)
-  const emailMessage = emailHangulAttempted
-    ? HANGUL_INPUT_MESSAGE
-    : isEmailFormatInvalid
-      ? EMAIL_FORMAT_MESSAGE
-      : undefined
-
-  const isPasswordFormatInvalid = form.password.length > 0 && !isValidPassword(form.password)
-  const passwordMessage = isPasswordFormatInvalid
-    ? PASSWORD_FORMAT_MESSAGE
-    : loginFailCount > 0
-      ? getLoginFailMessage(loginFailCount)
-      : undefined
+  const serverErrorMessage =
+    loginMutation.error instanceof Error ? loginMutation.error.message : null
+  const isLockedOrInvalidCredentials =
+    loginMutation.error instanceof ApiError && loginMutation.error.statusCode === 401
 
   return (
-    <section className="mx-auto w-full max-w-sm">
-      <h1 className="mb-6 text-2xl font-bold text-gray-900">로그인</h1>
+    <AuthCardLayout title="로그인" align="center" onSubmit={handleSubmit}>
+      {/* [TEMP] 26.09.07 로고 자산 미확정 — Figma 원본도 벡터 없는 빈 placeholder다.
+          자산 확정 시 이미지로 교체할 것 */}
+      <div aria-hidden className="size-20 bg-[#e0e0e0]" />
 
-      {/* noValidate: 브라우저 기본 검증(영문 툴팁 등) 대신 alert()로 안내하는 커스텀 검증만 사용 */}
-      <form className="space-y-4" onSubmit={handleLoginSubmit} noValidate>
+      <div className="flex w-full flex-col items-start gap-5">
         <FormInput
           ref={emailInputRef}
-          id="email"
-          label="이메일"
+          id="login-email"
+          label="이메일 *"
           type="email"
           required
-          placeholder="이메일을 입력해 주세요"
+          hideRequiredMark
           maxLength={EMAIL_MAX_LENGTH}
-          value={form.email}
+          placeholder="이메일을 입력해 주세요"
+          value={email}
           onChange={handleEmailChange}
           onCompositionStart={handleEmailCompositionStart}
           onCompositionEnd={handleEmailCompositionEnd}
           message={emailMessage}
         />
-        <PasswordField
-          id="password"
-          label="비밀번호"
-          required
-          value={form.password}
-          onChange={(value) => setForm((f) => ({ ...f, password: value }))}
-          error={passwordMessage}
-        />
-
-        {/* 아이디 저장 */}
-        <FormCheckbox
-          id="remember-id"
-          label="아이디 저장"
-          checked={rememberId}
-          onChange={setRememberId}
-        />
-
-        {/* Turnstile 컴포넌트 */}
-        <div>
-          <Turnstile
-            ref={turnstileRef}
-            siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY ?? ''}
-            onSuccess={(token: string) => {
-              setTurnstileError(null)
-              verifyTurnstileMutation.mutate(token)
-            }}
-            onError={() => {
-              setTurnstileVerified(false)
-              setTurnstileError('로봇 인증에 실패했습니다. 새로고침 후 다시 시도해주세요.')
-            }}
-            onExpire={() => {
-              setTurnstileVerified(false)
-              setTurnstileError('로봇 인증이 만료되었습니다. 새로고침 후 다시 시도해주세요.')
-            }}
-            options={{ theme: 'light', appearance: 'interaction-only' }}
+        <div className="flex w-full flex-col items-start gap-3">
+          <PasswordField
+            id="login-password"
+            label="비밀번호 *"
+            value={password}
+            onChange={setPassword}
           />
+          <div className="flex w-full items-center justify-between">
+            <FormCheckbox
+              id="login-remember-email"
+              label="아이디 저장"
+              checked={rememberEmail}
+              onChange={setRememberEmail}
+            />
+            <button
+              type="button"
+              onClick={handleGoFindAccount}
+              className="text-xs font-medium text-[#1a1a17] opacity-50"
+            >
+              아이디 · 비밀번호 찾기
+            </button>
+          </div>
         </div>
-        {/* Turnstile 에러 */}
-        {turnstileError && (
-          <div className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-600">
-            {turnstileError}
-          </div>
-        )}
+      </div>
 
-        {/* 자격증명 불일치가 아닌 로그인 오류(네트워크·서버 오류 등) */}
-        {loginErrorMessage && (
-          <div className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-600">
-            {loginErrorMessage}
-          </div>
-        )}
+      {serverErrorMessage && (
+        <ErrorToast message={serverErrorMessage}>
+          {isLockedOrInvalidCredentials && (
+            <button
+              type="button"
+              onClick={handleGoFindAccount}
+              className="text-left text-[10px] underline"
+            >
+              비밀번호 찾기
+            </button>
+          )}
+        </ErrorToast>
+      )}
 
-        <button
-          type="submit"
-          disabled={loginMutation.isPending || verifyTurnstileMutation.isPending}
-          className="w-full rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
-        >
-          {loginMutation.isPending ? '로그인 중...' : '로그인'}
-        </button>
+      <AuthFormActions
+        primaryLabel={loginMutation.isPending ? '로그인 중...' : '로그인'}
+        primaryDisabled={!canSubmit}
+        beforePrimary={
+          <>
+            <Turnstile
+              ref={turnstileRef}
+              siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY ?? ''}
+              onSuccess={(token: string) => {
+                setTurnstileError(null)
+                verifyTurnstileMutation.mutate(token)
+              }}
+              onError={() => {
+                setTurnstileVerified(false)
+                setTurnstileError('로봇 인증에 실패했습니다. 새로고침 후 다시 시도해주세요.')
+              }}
+              onExpire={() => {
+                setTurnstileVerified(false)
+                setTurnstileError('로봇 인증이 만료되었습니다. 새로고침 후 다시 시도해주세요.')
+              }}
+              options={{ theme: 'light', appearance: 'interaction-only' }}
+            />
 
-        {/* 아이디/비밀번호 찾기 · 회원가입 */}
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              void navigate({ to: '/find-account' })
-            }}
-            className="flex-1 rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
-            아이디/비밀번호 찾기
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              void navigate({ to: '/register' })
-            }}
-            className="flex-1 rounded border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
+            {/* 로봇 인증 관련 안내는 위젯 바로 아래에 표시한다 — 로그인 실패 토스트
+                (serverErrorMessage)와는 별도로, 어떤 단계에서 실패했는지 위젯과 붙여서
+                보여주기 위함 */}
+            {turnstileError && (
+              <ServerErrorBanner message={turnstileError}>
+                {/* 로봇 인증 실패 시 재시도는 사용자가 직접 트리거한다 — 자동 reset()은 서버
+                    검증이 계속 실패할 때 무한 루프를 유발하므로 사용하지 않는다(위 mutation 주석 참고) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTurnstileError(null)
+                    turnstileRef.current?.reset()
+                  }}
+                  className="text-left underline"
+                >
+                  다시 시도
+                </button>
+              </ServerErrorBanner>
+            )}
+          </>
+        }
+        secondaryLeft={<span className="opacity-50">QR 로그인(예정)</span>}
+        secondaryRight={
+          <button type="button" onClick={handleGoRegister}>
             회원가입
           </button>
-        </div>
-      </form>
-    </section>
+        }
+      />
+    </AuthCardLayout>
   )
 }
