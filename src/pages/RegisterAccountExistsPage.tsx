@@ -1,7 +1,8 @@
 import { useNavigate } from '@tanstack/react-router'
+import { useState } from 'react'
 
-import checkCircleIcon from '../assets/icons/register/check-circle.svg'
 import moreVerticalIcon from '../assets/icons/register/more-vertical.svg'
+import { AuthCardLayout, AuthFormActions, CompletedStepBadge } from '../components/auth'
 import { useRegisterFlowStore } from '../stores/registerFlowStore'
 import { formatMaskedIdentity } from '../utils/formatIdentityVerifyResult'
 
@@ -20,73 +21,80 @@ export function RegisterAccountExistsPage() {
   const identityVerifyResult = useRegisterFlowStore((s) => s.identityVerifyResult)
   const maskedIdentity = identityVerifyResult ? formatMaskedIdentity(identityVerifyResult) : ''
   const existingEmail = identityVerifyResult?.existingEmail
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false)
 
   return (
-    <div className="flex flex-1 items-center justify-center px-4 py-10">
-      <div className="w-full max-w-[336px] rounded-xl border border-[#e0e0db] bg-white px-8 py-10">
-        <div className="flex w-full flex-col items-start gap-8">
-          <h1 className="w-full text-center text-xl font-bold text-[#1a1a17]">회원가입</h1>
+    <AuthCardLayout title="회원가입">
+      <div className="flex w-full flex-col items-start gap-[60px]">
+        <CompletedStepBadge label="본인인증 완료" />
 
-          <div className="flex w-full flex-col items-start gap-[60px]">
-            <div className="flex w-full items-center gap-2">
-              <img src={checkCircleIcon} alt="" aria-hidden className="size-4 shrink-0" />
-              <p className="text-xs text-[#1a1a17]">본인인증 완료</p>
-            </div>
-
-            <div className="flex w-full flex-col items-start gap-3">
-              <div className="flex w-full flex-col items-start gap-1 text-[#1a1a17]">
-                <p className="text-xl font-bold leading-7">가입된 계정이 있습니다.</p>
-                <p className="text-xs leading-[18px]">
-                  랩매니저는 한 사람당 하나의 계정만 사용할 수 있습니다.
-                </p>
-              </div>
-
-              <div className="flex w-full items-start justify-end gap-2 rounded-xl bg-[rgba(254,199,65,0.2)] py-4 pl-5 pr-2.5">
-                <div className="flex flex-1 flex-col items-start gap-2 text-[#1a1a17]">
-                  {maskedIdentity && <p className="whitespace-pre text-[10px]">{maskedIdentity}</p>}
-                  {existingEmail && (
-                    <p className="text-base font-bold leading-5">{existingEmail}</p>
-                  )}
-                </div>
-                <img src={moreVerticalIcon} alt="" aria-hidden className="size-4 shrink-0" />
-              </div>
-            </div>
+        <div className="flex w-full flex-col items-start gap-3">
+          <div className="flex w-full flex-col items-start gap-1 text-[#1a1a17]">
+            <p className="text-xl font-bold leading-7">가입된 계정이 있습니다.</p>
+            <p className="text-xs leading-[18px]">
+              랩매니저는 한 사람당 하나의 계정만 사용할 수 있습니다.
+            </p>
           </div>
 
-          <div className="flex w-full flex-col items-start gap-5">
+          <div className="flex w-full items-start justify-end gap-2 rounded-xl bg-[rgba(254,199,65,0.2)] py-4 pl-5 pr-2.5">
+            <div className="flex flex-1 flex-col items-start gap-2 text-[#1a1a17]">
+              {maskedIdentity && <p className="whitespace-pre text-[10px]">{maskedIdentity}</p>}
+              {existingEmail && <p className="text-base font-bold leading-5">{existingEmail}</p>}
+            </div>
             <button
               type="button"
-              onClick={() => {
-                void navigate({ to: '/login' })
-              }}
-              className="flex h-11 w-full items-center justify-center rounded bg-[#001e43] text-sm font-medium text-white hover:bg-[#00152f]"
+              onClick={() => setIsMoreMenuOpen((prev) => !prev)}
+              aria-label="더보기"
+              aria-expanded={isMoreMenuOpen}
+              className="shrink-0"
             >
-              로그인
+              <img src={moreVerticalIcon} alt="" aria-hidden className="size-4" />
             </button>
-
-            <div className="flex w-full items-center justify-between text-xs font-medium text-[#1a1a17]">
-              <button
-                type="button"
-                onClick={() => {
-                  void navigate({ to: '/login' })
-                }}
-                className="opacity-50"
-              >
-                ← 로그인으로 돌아가기
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  void navigate({ to: '/find-account' })
-                }}
-                className="opacity-50"
-              >
-                비밀번호 재설정
-              </button>
-            </div>
           </div>
+
+          {isMoreMenuOpen && (
+            <button
+              type="button"
+              // [TEMP] 26.09.08 회원가입 단계(로그인 전)라 인증된 탈퇴 API(withdraw)를 호출할
+              // 수 없어 동작 없이 UI만 우선 반영. 탈퇴 플로우 연동 시 실제 동작으로 교체
+              onClick={() => {}}
+              className="w-full rounded border border-[#c9c9c4] bg-white py-[13px] text-center text-xs font-medium text-[#2b2b29] hover:bg-gray-50"
+            >
+              계정 탈퇴
+            </button>
+          )}
         </div>
       </div>
-    </div>
+
+      <AuthFormActions
+        primaryLabel="로그인"
+        primaryType="button"
+        onPrimaryClick={() => {
+          void navigate({ to: '/login' })
+        }}
+        secondaryLeft={
+          <button
+            type="button"
+            onClick={() => {
+              void navigate({ to: '/login' })
+            }}
+            className="opacity-50"
+          >
+            ← 로그인으로 돌아가기
+          </button>
+        }
+        secondaryRight={
+          <button
+            type="button"
+            onClick={() => {
+              void navigate({ to: '/register-reset-password' })
+            }}
+            className="opacity-50"
+          >
+            비밀번호 재설정
+          </button>
+        }
+      />
+    </AuthCardLayout>
   )
 }
