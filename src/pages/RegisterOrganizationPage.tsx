@@ -8,6 +8,8 @@ import clearCircleIcon from '../assets/icons/register/clear-circle.svg'
 import radioSelectedIcon from '../assets/icons/register/radio-selected.svg'
 import radioUnselectedIcon from '../assets/icons/register/radio-unselected.svg'
 import uploadIcon from '../assets/icons/register/upload.svg'
+import { AuthCardLayout, AuthFormActions } from '../components/auth'
+import { useFindAccountFlowStore } from '../stores/findAccountFlowStore'
 import { useRegisterFlowStore } from '../stores/registerFlowStore'
 import { formatDate } from '../utils/date'
 import { uploadBusinessRegistration } from '../utils/uploadBusinessRegistration'
@@ -54,13 +56,8 @@ export function RegisterOrganizationPage() {
   const clearBusinessRegistrationS3Key = useRegisterFlowStore(
     (s) => s.clearBusinessRegistrationS3Key
   )
-  const clearRegisterMethod = useRegisterFlowStore((s) => s.clearRegisterMethod)
-  const clearIdentityVerifyResult = useRegisterFlowStore((s) => s.clearIdentityVerifyResult)
-  const clearIdentityVerificationCode = useRegisterFlowStore((s) => s.clearIdentityVerificationCode)
-  const clearTermsAgreement = useRegisterFlowStore((s) => s.clearTermsAgreement)
-  const clearRegisterEmail = useRegisterFlowStore((s) => s.clearRegisterEmail)
-  const clearRegisterPassword = useRegisterFlowStore((s) => s.clearRegisterPassword)
-  const clearInvitedOrgs = useRegisterFlowStore((s) => s.clearInvitedOrgs)
+  const resetRegisterFlow = useRegisterFlowStore((s) => s.resetRegisterFlow)
+  const clearVerifiedIdentity = useFindAccountFlowStore((s) => s.clearVerifiedIdentity)
 
   const [error, setError] = useState<string | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
@@ -156,16 +153,11 @@ export function RegisterOrganizationPage() {
     onSuccess: () => {
       // 가입 완료 후에는 회원가입 플로우 상태가 남아있을 이유가 없다 — 다음에 다시 회원가입
       // 페이지에 들어와도 이전 값이 보이지 않도록 전부 초기화한다.
-      clearRegisterMethod()
-      clearIdentityVerifyResult()
-      clearIdentityVerificationCode()
-      clearTermsAgreement()
-      clearRegisterEmail()
-      clearRegisterPassword()
-      clearInvitedOrgs()
-      clearBusinessRegistrationFile()
-      clearBusinessRegistrationReview()
-      clearBusinessRegistrationS3Key()
+      resetRegisterFlow()
+      // 아이디·비밀번호 찾기를 거쳐 회원가입까지 온 경우 findAccountFlowStore에 "가입된 계정 없음"
+      // 인증 결과가 남아있는데, 가입이 끝난 지금은 사실과 다른 정보다 — 그대로 두면 이후
+      // /find-account에 다시 들어갔을 때 재인증 없이 "가입된 계정이 없습니다"가 뜬다.
+      clearVerifiedIdentity()
       // signUp은 토큰을 내려주지 않으므로 로그인 페이지로 이동해 별도로 로그인해야 한다.
       void navigate({ to: '/login' })
     },
@@ -213,202 +205,192 @@ export function RegisterOrganizationPage() {
     signUpMutation.mutate()
   }
 
+  const primaryLabel = signUpMutation.isPending
+    ? '가입 처리 중...'
+    : hasInvitedOrgs
+      ? '선택한 조직으로 가입 완료 →'
+      : uploadMutation.isSuccess
+        ? '새 조직으로 가입 완료 →'
+        : '새 조직으로 가입 →'
+
   return (
-    <div className="flex flex-1 items-center justify-center px-4 py-10">
-      <div className="w-full max-w-[336px] rounded-xl border border-[#e0e0db] bg-white px-8 py-10">
-        <form onSubmit={handleSubmit} className="flex w-full flex-col items-center gap-8">
-          <h1 className="w-full text-center text-xl font-bold text-[#1a1a17]">회원가입</h1>
+    <AuthCardLayout title="회원가입" align="center" onSubmit={handleSubmit}>
+      {hasInvitedOrgs ? (
+        <div className="flex w-full flex-col items-start gap-5">
+          <p className="w-full text-xl font-bold leading-7 text-[#1a1a17]">
+            가입할 조직을 확인해 주세요.
+          </p>
 
-          {hasInvitedOrgs ? (
-            <div className="flex w-full flex-col items-start gap-5">
-              <p className="w-full text-xl font-bold leading-7 text-[#1a1a17]">
-                가입할 조직을 확인해 주세요.
-              </p>
-
-              <div className="flex w-full flex-col items-start">
-                {invitedOrgs?.map((invite) => {
-                  const selected = invite.invitedIdx === selectedInvitedIdx
-                  return (
-                    <button
-                      key={invite.invitedIdx}
-                      type="button"
-                      onClick={() => setSelectedInvitedIdx(invite.invitedIdx)}
-                      className={`flex w-full items-center gap-4 rounded-xl border px-5 py-4 text-left ${
-                        selected ? 'border-[#fec741] bg-[#fec741]/20' : 'border-transparent'
-                      }`}
-                    >
-                      <img
-                        src={selected ? radioSelectedIcon : radioUnselectedIcon}
-                        alt=""
-                        aria-hidden
-                        className="size-5 shrink-0"
-                      />
-                      <div className="flex flex-1 flex-col items-start gap-1 text-[#1a1a17]">
-                        {/* 백엔드가 UserGrade enum 전체 값을 문서화하지 않아 한글 라벨 매핑을
-                            만들지 않았다 — 원본 값('MEMBER' 등)을 그대로 노출한다 */}
-                        <p className="text-xs font-bold leading-[18px]">
-                          {invite.orgName} · {invite.orgGrade}
-                        </p>
-                        <p className="text-[10px] leading-[normal] opacity-50">
-                          {formatDate(invite.invitedAt)} 초대
-                        </p>
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          ) : (
-            <div className="flex w-full flex-col items-start gap-5">
-              <div className="flex w-full flex-col items-start gap-1 text-[#1a1a17]">
-                <p className="text-xl font-bold leading-7">새 조직을 등록해 주세요.</p>
-                <p className="text-xs leading-[18px]">
-                  회사 정보를 등록하면 새 조직이 생성되고, 최초 가입자는 시스템 관리자로 지정됩니다.
-                </p>
-              </div>
-
-              <div className="flex w-full flex-col items-start gap-1">
-                {uploadMutation.isSuccess && uploadMutation.data ? (
-                  <div className="flex h-20 w-full items-center gap-2 rounded-xl border border-dashed border-[#c9c9c4] bg-[#fec741]/20 px-5 py-4">
-                    <div className="flex flex-1 items-center gap-3">
-                      <img src={checkMarkIcon} alt="" aria-hidden className="size-7 shrink-0" />
-                      <div className="flex flex-1 flex-col items-start gap-1 text-[#1a1a17]">
-                        <div className="flex flex-col text-xs font-bold leading-4">
-                          <p>{uploadMutation.data.review.corporateName}</p>
-                          <p>{uploadMutation.data.review.registrationNumber}</p>
-                        </div>
-                        <p className="w-full overflow-hidden text-ellipsis whitespace-nowrap text-[10px] opacity-50">
-                          {uploadMutation.variables?.name}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      aria-label="사업자등록증 삭제"
-                      onClick={handleRemove}
-                      className="flex size-4 shrink-0 items-center justify-center"
-                    >
-                      <img src={clearCircleIcon} alt="" aria-hidden className="size-3" />
-                    </button>
+          <div className="flex w-full flex-col items-start">
+            {invitedOrgs?.map((invite) => {
+              const selected = invite.invitedIdx === selectedInvitedIdx
+              return (
+                <button
+                  key={invite.invitedIdx}
+                  type="button"
+                  onClick={() => setSelectedInvitedIdx(invite.invitedIdx)}
+                  className={`flex w-full items-center gap-4 rounded-xl border px-5 py-4 text-left ${
+                    selected ? 'border-[#fec741] bg-[#fec741]/20' : 'border-transparent'
+                  }`}
+                >
+                  <img
+                    src={selected ? radioSelectedIcon : radioUnselectedIcon}
+                    alt=""
+                    aria-hidden
+                    className="size-5 shrink-0"
+                  />
+                  <div className="flex flex-1 flex-col items-start gap-1 text-[#1a1a17]">
+                    {/* 백엔드가 UserGrade enum 전체 값을 문서화하지 않아 한글 라벨 매핑을
+                        만들지 않았다 — 원본 값('MEMBER' 등)을 그대로 노출한다 */}
+                    <p className="text-xs font-bold leading-[18px]">
+                      {invite.orgName} · {invite.orgGrade}
+                    </p>
+                    <p className="text-[10px] leading-[normal] opacity-50">
+                      {formatDate(invite.invitedAt)} 초대
+                    </p>
                   </div>
-                ) : (
-                  <button
-                    type="button"
-                    aria-busy={uploadMutation.isPending}
-                    aria-disabled={uploadMutation.isPending}
-                    onClick={() => {
-                      if (uploadMutation.isPending) return
-                      fileInputRef.current?.click()
-                    }}
-                    onDragOver={(e) => {
-                      e.preventDefault()
-                      if (uploadMutation.isPending) return
-                      setIsDragOver(true)
-                    }}
-                    onDragLeave={() => setIsDragOver(false)}
-                    onDrop={handleDrop}
-                    className={`flex h-20 w-full items-center rounded-xl border border-dashed px-5 py-4 text-left ${
-                      isDragOver ? 'border-[#001e43] bg-[#f4f4f3]' : 'border-[#c9c9c4] bg-white'
-                    }`}
-                  >
-                    <div className="flex flex-1 items-center gap-3">
-                      <img src={uploadIcon} alt="" aria-hidden className="size-7 shrink-0" />
-                      <div className="flex flex-col items-start gap-1 text-[#1a1a17]">
-                        <p className="text-xs font-bold">
-                          {uploadMutation.isPending ? '확인 중...' : '사업자등록증 업로드'}
-                        </p>
-                        <p className="text-[10px] leading-[14px] opacity-50">
-                          {uploadMutation.isPending
-                            ? '사업자등록증을 확인하고 있어요...'
-                            : 'PDF 파일을 드래그하거나 클릭하여 업로드해 주세요'}
-                        </p>
-                        {!uploadMutation.isPending && (
-                          <p className="text-[10px] leading-[14px] opacity-50">최대 20MB</p>
-                        )}
-                      </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      ) : (
+        <div className="flex w-full flex-col items-start gap-5">
+          <div className="flex w-full flex-col items-start gap-1 text-[#1a1a17]">
+            <p className="text-xl font-bold leading-7">새 조직을 등록해 주세요.</p>
+            <p className="text-xs leading-[18px]">
+              회사 정보를 등록하면 새 조직이 생성되고, 최초 가입자는 시스템 관리자로 지정됩니다.
+            </p>
+          </div>
+
+          <div className="flex w-full flex-col items-start gap-1">
+            {uploadMutation.isSuccess && uploadMutation.data ? (
+              <div className="flex h-20 w-full items-center gap-2 rounded-xl border border-dashed border-[#c9c9c4] bg-[#fec741]/20 px-5 py-4">
+                <div className="flex flex-1 items-center gap-3">
+                  <img src={checkMarkIcon} alt="" aria-hidden className="size-7 shrink-0" />
+                  <div className="flex flex-1 flex-col items-start gap-1 text-[#1a1a17]">
+                    <div className="flex flex-col text-xs font-bold leading-4">
+                      <p>{uploadMutation.data.review.corporateName}</p>
+                      <p>{uploadMutation.data.review.registrationNumber}</p>
                     </div>
-                  </button>
-                )}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="application/pdf"
-                  aria-label="사업자등록증 파일 선택"
-                  className="hidden"
-                  onChange={(e) => applyFile(e.target.files?.[0])}
-                />
-                {(error ?? uploadError) && (
-                  <p className="text-[10px] text-red-600">{error ?? uploadError}</p>
-                )}
+                    <p className="w-full overflow-hidden text-ellipsis whitespace-nowrap text-[10px] opacity-50">
+                      {uploadMutation.variables?.name}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  aria-label="사업자등록증 삭제"
+                  onClick={handleRemove}
+                  className="flex size-4 shrink-0 items-center justify-center"
+                >
+                  <img src={clearCircleIcon} alt="" aria-hidden className="size-3" />
+                </button>
               </div>
-            </div>
-          )}
-
-          {/* [TEMP] 26.09.02 회원가입 진행 데이터 확인용 임시 디버그 패널 — 각 단계에서 수집한 값이
-              최종 제출 직전 실제로 올바르게 저장돼 있는지 눈으로 확인하기 위한 것으로, 실제 사용자에게
-              보여줄 UI가 아니다. QA 확인 완료 후 제거 예정 */}
-          <div className="flex w-full flex-col items-start gap-1 rounded-xl border border-dashed border-red-400 bg-red-50 p-3 text-[10px] text-red-600">
-            <p className="font-bold">[임시] 회원가입 진행 데이터 확인</p>
-            <p>가입 방법(registerMethod): {registerMethod ?? '-'}</p>
-            <p>이메일(registerEmail): {registerEmail ?? '-'}</p>
-            <p>비밀번호(registerPassword): {registerPassword ?? '-'}</p>
-            <p>초대 조직(invitedOrgs): {invitedOrgs ? JSON.stringify(invitedOrgs) : '-'}</p>
-            <p>본인인증 키(identityVerificationCode): {identityVerificationCode ?? '-'}</p>
-            <p>
-              본인인증 결과(identityVerifyResult):{' '}
-              {identityVerifyResult ? JSON.stringify(identityVerifyResult) : '-'}
-            </p>
-            <p>
-              마케팅 수신 동의(termsAgreement.marketingOptIn):{' '}
-              {termsAgreement ? String(termsAgreement.marketingOptIn) : '-'}
-            </p>
-            <p>
-              사업자등록증 분석 결과(businessRegistrationReview):{' '}
-              {businessRegistrationReview ? JSON.stringify(businessRegistrationReview) : '-'}
-            </p>
-            <p>사업자등록증 S3 키(businessRegistrationS3Key): {businessRegistrationS3Key ?? '-'}</p>
-          </div>
-
-          {/* [TEMP] 26.09.02 signUp API로 실제 전송될 request body 미리보기 — 위 데이터들이
-              최종적으로 어떤 형태로 조합돼 전송되는지 확인하기 위한 것으로, 실제 사용자에게
-              보여줄 UI가 아니다. QA 확인 완료 후 제거 예정 */}
-          <div className="flex w-full flex-col items-start gap-1 rounded-xl border border-dashed border-red-400 bg-red-50 p-3 text-[10px] text-red-600">
-            <p className="font-bold">[임시] signUp API 요청(request) 데이터</p>
-            <pre className="w-full whitespace-pre-wrap break-all font-mono">
-              {JSON.stringify(signUpRequestPreview, null, 2)}
-            </pre>
-          </div>
-
-          <div className="flex w-full flex-col items-start gap-5">
-            <button
-              type="submit"
-              disabled={!canSubmit}
-              className="flex h-11 w-full items-center justify-center rounded bg-[#001e43] text-sm font-medium text-white hover:bg-[#00152f] disabled:opacity-50"
-            >
-              {signUpMutation.isPending
-                ? '가입 처리 중...'
-                : hasInvitedOrgs
-                  ? '선택한 조직으로 가입 완료 →'
-                  : uploadMutation.isSuccess
-                    ? '새 조직으로 가입 완료 →'
-                    : '새 조직으로 가입 →'}
-            </button>
-            {signUpError && <p className="text-[10px] text-red-600">{signUpError}</p>}
-
-            <div className="flex w-full items-center justify-between text-xs font-medium text-[#1a1a17]">
+            ) : (
               <button
                 type="button"
+                aria-busy={uploadMutation.isPending}
+                aria-disabled={uploadMutation.isPending}
                 onClick={() => {
-                  void navigate({ to: '/register-password' })
+                  if (uploadMutation.isPending) return
+                  fileInputRef.current?.click()
                 }}
-                className="opacity-50"
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  if (uploadMutation.isPending) return
+                  setIsDragOver(true)
+                }}
+                onDragLeave={() => setIsDragOver(false)}
+                onDrop={handleDrop}
+                className={`flex h-20 w-full items-center rounded-xl border border-dashed px-5 py-4 text-left ${
+                  isDragOver ? 'border-[#001e43] bg-[#f4f4f3]' : 'border-[#c9c9c4] bg-white'
+                }`}
               >
-                ← 이전
+                <div className="flex flex-1 items-center gap-3">
+                  <img src={uploadIcon} alt="" aria-hidden className="size-7 shrink-0" />
+                  <div className="flex flex-col items-start gap-1 text-[#1a1a17]">
+                    <p className="text-xs font-bold">
+                      {uploadMutation.isPending ? '확인 중...' : '사업자등록증 업로드'}
+                    </p>
+                    <p className="text-[10px] leading-[14px] opacity-50">
+                      {uploadMutation.isPending
+                        ? '사업자등록증을 확인하고 있어요...'
+                        : 'PDF 파일을 드래그하거나 클릭하여 업로드해 주세요'}
+                    </p>
+                    {!uploadMutation.isPending && (
+                      <p className="text-[10px] leading-[14px] opacity-50">최대 20MB</p>
+                    )}
+                  </div>
+                </div>
               </button>
-            </div>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/pdf"
+              aria-label="사업자등록증 파일 선택"
+              className="hidden"
+              onChange={(e) => applyFile(e.target.files?.[0])}
+            />
+            {(error ?? uploadError) && (
+              <p className="text-[10px] text-red-600">{error ?? uploadError}</p>
+            )}
           </div>
-        </form>
+        </div>
+      )}
+
+      {/* [TEMP] 26.09.02 회원가입 진행 데이터 확인용 임시 디버그 패널 — 각 단계에서 수집한 값이
+          최종 제출 직전 실제로 올바르게 저장돼 있는지 눈으로 확인하기 위한 것으로, 실제 사용자에게
+          보여줄 UI가 아니다. QA 확인 완료 후 제거 예정 */}
+      <div className="flex w-full flex-col items-start gap-1 rounded-xl border border-dashed border-red-400 bg-red-50 p-3 text-[10px] text-red-600">
+        <p className="font-bold">[임시] 회원가입 진행 데이터 확인</p>
+        <p>가입 방법(registerMethod): {registerMethod ?? '-'}</p>
+        <p>이메일(registerEmail): {registerEmail ?? '-'}</p>
+        <p>비밀번호(registerPassword): {registerPassword ?? '-'}</p>
+        <p>초대 조직(invitedOrgs): {invitedOrgs ? JSON.stringify(invitedOrgs) : '-'}</p>
+        <p>본인인증 키(identityVerificationCode): {identityVerificationCode ?? '-'}</p>
+        <p>
+          본인인증 결과(identityVerifyResult):{' '}
+          {identityVerifyResult ? JSON.stringify(identityVerifyResult) : '-'}
+        </p>
+        <p>
+          마케팅 수신 동의(termsAgreement.marketingOptIn):{' '}
+          {termsAgreement ? String(termsAgreement.marketingOptIn) : '-'}
+        </p>
+        <p>
+          사업자등록증 분석 결과(businessRegistrationReview):{' '}
+          {businessRegistrationReview ? JSON.stringify(businessRegistrationReview) : '-'}
+        </p>
+        <p>사업자등록증 S3 키(businessRegistrationS3Key): {businessRegistrationS3Key ?? '-'}</p>
       </div>
-    </div>
+
+      {/* [TEMP] 26.09.02 signUp API로 실제 전송될 request body 미리보기 — 위 데이터들이
+          최종적으로 어떤 형태로 조합돼 전송되는지 확인하기 위한 것으로, 실제 사용자에게
+          보여줄 UI가 아니다. QA 확인 완료 후 제거 예정 */}
+      <div className="flex w-full flex-col items-start gap-1 rounded-xl border border-dashed border-red-400 bg-red-50 p-3 text-[10px] text-red-600">
+        <p className="font-bold">[임시] signUp API 요청(request) 데이터</p>
+        <pre className="w-full whitespace-pre-wrap break-all font-mono">
+          {JSON.stringify(signUpRequestPreview, null, 2)}
+        </pre>
+      </div>
+
+      <AuthFormActions
+        primaryLabel={primaryLabel}
+        primaryDisabled={!canSubmit}
+        belowPrimary={signUpError && <p className="text-[10px] text-red-600">{signUpError}</p>}
+        secondaryLeft={
+          <button
+            type="button"
+            onClick={() => {
+              void navigate({ to: '/register-password' })
+            }}
+            className="opacity-50"
+          >
+            ← 이전
+          </button>
+        }
+      />
+    </AuthCardLayout>
   )
 }
