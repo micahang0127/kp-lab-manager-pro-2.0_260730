@@ -67,4 +67,46 @@ describe('RegisterOptionCard', () => {
       'true'
     )
   })
+
+  it('badge가 있으면 뱃지 텍스트를 렌더링한다', () => {
+    render(
+      <RegisterOptionCard
+        icon="icon.svg"
+        title="초대받은 조직에 가입"
+        subtitle="조직 초대 필요"
+        badge="추천"
+        onClick={vi.fn()}
+      />
+    )
+
+    expect(screen.getByText('추천')).toBeInTheDocument()
+  })
+
+  it('badge가 없으면 뱃지를 렌더링하지 않는다', () => {
+    render(
+      <RegisterOptionCard
+        icon="icon.svg"
+        title="새 조직 만들기"
+        subtitle="사업자등록증 필요"
+        onClick={vi.fn()}
+      />
+    )
+
+    expect(screen.queryByText('추천')).not.toBeInTheDocument()
+  })
+
+  it('subtitle에 개행이 포함되면 줄바꿈되어 렌더링된다', () => {
+    render(
+      <RegisterOptionCard
+        icon="icon.svg"
+        title="새 조직 만들기"
+        subtitle={'첫 번째 줄\n두 번째 줄'}
+        onClick={vi.fn()}
+      />
+    )
+
+    expect(
+      screen.getByText((_, element) => element?.textContent === '첫 번째 줄\n두 번째 줄')
+    ).toBeInTheDocument()
+  })
 })

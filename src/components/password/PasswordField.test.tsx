@@ -19,17 +19,12 @@ describe('PasswordField', () => {
     expect(screen.getByPlaceholderText('비밀번호를 입력해 주세요')).toBeInTheDocument()
   })
 
-  it('기본적으로 마스킹(type=password)되고, 표시 아이콘을 클릭하면 평문(type=text)으로 전환된다', async () => {
+  it('항상 마스킹(type=password)되고, 표시/숨기기 토글 버튼을 렌더링하지 않는다', () => {
     render(<PasswordField id="password" label="비밀번호" value="abcd1234" onChange={vi.fn()} />)
 
-    const input = screen.getByLabelText('비밀번호')
-    expect(input).toHaveAttribute('type', 'password')
-
-    await userEvent.click(screen.getByRole('button', { name: '비밀번호 표시' }))
-    expect(input).toHaveAttribute('type', 'text')
-
-    await userEvent.click(screen.getByRole('button', { name: '비밀번호 숨기기' }))
-    expect(input).toHaveAttribute('type', 'password')
+    expect(screen.getByLabelText('비밀번호')).toHaveAttribute('type', 'password')
+    expect(screen.queryByRole('button', { name: '비밀번호 표시' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '비밀번호 숨기기' })).not.toBeInTheDocument()
   })
 
   it('값이 없으면 지우기 버튼을 렌더링하지 않는다', () => {

@@ -27,6 +27,14 @@ const fullReview: BusinessRegistrationReviewData = {
   issueDate: '2020-01-01',
 }
 
+const mockPresignedFields = {
+  'Content-Type': 'application/pdf',
+  bucket: 'test-bucket',
+  key: 'PRODUCTION/BusinessRegistration/260901/xxxxxxxx.pdf',
+  Policy: 'encoded-policy',
+  'X-Amz-Signature': 'signature',
+}
+
 const mockPresignedSuccess = (s3Key = 'PRODUCTION/BusinessRegistration/260901/xxxxxxxx.pdf') => {
   vi.mocked(createPresignedUploadUrl).mockResolvedValue({
     result: true,
@@ -35,7 +43,8 @@ const mockPresignedSuccess = (s3Key = 'PRODUCTION/BusinessRegistration/260901/xx
       urls: [
         {
           originFileName: '사업자등록증.pdf',
-          presignedUrl: 'https://s3.example.com/bucket/key.pdf?X-Amz-Signature=abc',
+          presignedUrl: 'https://s3.example.com/bucket/',
+          presignedFields: mockPresignedFields,
           s3Key,
         },
       ],
@@ -69,9 +78,15 @@ describe('uploadBusinessRegistration', () => {
     expect(result.review).toEqual(fullReview)
     expect(result.s3Key).toBe('PRODUCTION/BusinessRegistration/260901/xxxxxxxx.pdf')
     expect(fetch).toHaveBeenCalledWith(
-      'https://s3.example.com/bucket/key.pdf?X-Amz-Signature=abc',
-      expect.objectContaining({ method: 'PUT', headers: { 'Content-Type': 'application/pdf' } })
+      'https://s3.example.com/bucket/',
+      expect.objectContaining({ method: 'POST', body: expect.any(FormData) })
     )
+    const [, callOptions] = vi.mocked(fetch).mock.calls[0] ?? []
+    const sentFormData = callOptions?.body as FormData
+    for (const [key, value] of Object.entries(mockPresignedFields)) {
+      expect(sentFormData.get(key)).toBe(value)
+    }
+    expect(sentFormData.get('file')).toBeInstanceOf(File)
   })
 
   it('presigned URL 발급에 실패하면 에러를 던진다', async () => {

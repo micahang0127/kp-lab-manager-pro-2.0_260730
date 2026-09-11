@@ -28,6 +28,7 @@ export function RegisterEmailVerificationPage() {
   const navigate = useNavigate()
   const registerEmailInStore = useRegisterFlowStore((s) => s.registerEmail)
   const setRegisterEmail = useRegisterFlowStore((s) => s.setRegisterEmail)
+  const setRegisterEmailCode = useRegisterFlowStore((s) => s.setRegisterEmailCode)
   const setInvitedOrgs = useRegisterFlowStore((s) => s.setInvitedOrgs)
 
   // 회원가입(authType: '0') 인증코드 발송 API의 필수 파라미터라서 값을 채워 보낸다. 발송
@@ -84,6 +85,10 @@ export function RegisterEmailVerificationPage() {
     onSuccess: (res) => {
       if (!res.data?.success) return
       setRegisterEmail(email)
+      // 최종 회원가입 제출(signUp)의 code 파라미터로 그대로 재사용한다 — 서버가 email+code
+      // 조합으로 SIGNUP 타입 이메일 인증 완료 이력을 다시 확인하므로, 방금 인증에 성공한
+      // 코드 그대로 저장해야 한다.
+      setRegisterEmailCode(emailCode)
       invitedOrgsMutation.mutate()
       void navigate({ to: '/register-password' })
     },
@@ -147,11 +152,13 @@ export function RegisterEmailVerificationPage() {
             afterSecondary={
               // [TEMP] 26.09.02 임시 스킵 버튼 — 이메일 인증 없이 다음 단계 확인용. 작업 완료 시 제거
               // /register-password 라우트 가드가 registerEmail이 없으면 이 페이지로 되돌려보내므로,
-              // 스킵 시에도 더미 값을 채워 가드를 통과시킨다.
+              // 스킵 시에도 더미 값을 채워 가드를 통과시킨다. registerEmailCode도 최종 회원가입
+              // 제출(signUp)의 code 파라미터로 필요하므로 함께 더미 값을 채워둔다.
               <button
                 type="button"
                 onClick={() => {
                   setRegisterEmail(email || 'temp-skip@example.com')
+                  setRegisterEmailCode(emailCode || '000000')
                   void navigate({ to: '/register-password' })
                 }}
                 className="flex h-11 w-full items-center justify-center rounded border border-dashed border-[#001e43] text-sm font-medium text-[#001e43]"

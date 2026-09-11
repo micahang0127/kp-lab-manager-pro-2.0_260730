@@ -15,7 +15,7 @@ vi.mock('@tanstack/react-router', () => ({
   }),
 }))
 
-import { requireAuth, isAuthValid } from './requireAuth'
+import { isAuthValid, redirectIfAuthenticated, requireAuth } from './requireAuth'
 
 describe('requireAuth', () => {
   beforeEach(() => {
@@ -112,5 +112,36 @@ describe('isAuthValid', () => {
   it('만료된 토큰이면 false를 반환한다', () => {
     sessionStorage.setItem('accessToken', EXPIRED_JWT_TOKEN)
     expect(isAuthValid()).toBe(false)
+  })
+})
+
+describe('redirectIfAuthenticated', () => {
+  beforeEach(() => {
+    sessionStorage.clear()
+    vi.clearAllMocks()
+  })
+
+  it('토큰이 없으면 아무것도 하지 않는다', () => {
+    expect(() => redirectIfAuthenticated()).not.toThrow()
+  })
+
+  it('유효한 JWT 토큰이 있으면 /main으로 redirect를 throw한다', () => {
+    sessionStorage.setItem('accessToken', VALID_JWT_TOKEN)
+
+    expect(() => redirectIfAuthenticated()).toThrow()
+  })
+
+  // requireAuth와 판단 기준이 다르면 /login ↔ /main 리다이렉트 왕복이 발생하므로,
+  // isAuthValid 기준(형식+만료)까지 동일하게 걸러지는지 명시적으로 검증한다.
+  it('형식이 깨진 토큰이 남아있어도 /main으로 보내지 않는다 (requireAuth와 판단 기준 통일)', () => {
+    sessionStorage.setItem('accessToken', 'not-a-jwt-token')
+
+    expect(() => redirectIfAuthenticated()).not.toThrow()
+  })
+
+  it('만료된 토큰이 남아있어도 /main으로 보내지 않는다 (requireAuth와 판단 기준 통일)', () => {
+    sessionStorage.setItem('accessToken', EXPIRED_JWT_TOKEN)
+
+    expect(() => redirectIfAuthenticated()).not.toThrow()
   })
 })

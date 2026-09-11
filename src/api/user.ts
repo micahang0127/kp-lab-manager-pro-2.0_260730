@@ -1,45 +1,11 @@
-import type { TurnstileServerValidationErrorCode } from '@marsidev/react-turnstile'
-
 import type { ApiResponse } from '.'
 import { api } from '.'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export interface LoginRequest {
-  email: string
-  password: string
-}
-
-export interface LoginData {
-  type: 'T' | 'O'
-  token?: string
-}
-
-export interface EmailVerificationLoginRequest {
-  email: string
-  code: string
-}
-
-export interface EmailVerificationLoginData {
-  token: string
-}
-
 export interface ChangePasswordRequest {
   currentPassword: string
   newPassword: string
-}
-
-export interface VerifyTurnstileRequest {
-  /** Turnstile 위젯이 발급한 응답 토큰 (cf-turnstile-response) */
-  token: string
-}
-
-export interface VerifyTurnstileResult {
-  /** Cloudflare 서버 검증 성공 여부. 토큰 만료(발급 후 300초 경과) 또는 재사용(일회용) 시 false */
-  isVerified: boolean
-  /** isVerified가 false일 때 원인 코드 목록. Cloudflare siteverify 표준 에러 코드
-   *  (@marsidev/react-turnstile의 TurnstileServerValidationErrorCode 참고) */
-  errorCodes?: TurnstileServerValidationErrorCode[]
 }
 
 export interface FingerprintData {
@@ -54,6 +20,17 @@ export interface SignUpRequest {
   password: string
   /** 포트원 본인인증 요청 시 발급된 인증 키(identityVerificationId) */
   verificationCode: string
+  /** 5단계(이메일 인증)에서 실제로 인증에 성공한 6자리 인증코드 — email과 동일한 조합으로 서버가
+   *  SIGNUP 타입 이메일 인증 완료 이력을 다시 확인한다(getInvitedOrgs와 동일한 email+code 규칙) */
+  code: string
+  /** 가입 방법. 0 = 신규 조직생성(regFile), 1 = 기존 조직가입(orgIdx+invitedIdx) —
+   *  실제로 채운 조직 관련 필드(orgIdx vs regFile)와 항상 일치해야 한다 */
+  joinType: 0 | 1
+  /** 필수 약관(이용약관·개인정보 수집·이용) 동의 여부. 'Y'가 아니면 409(S_052)로 거절되며,
+   *  회원가입 4단계에서 모두 동의해야만 이후 단계로 넘어올 수 있으므로 항상 'Y'로 전송한다 */
+  termsYn: 'Y' | 'N'
+  /** 마케팅 정보 수신 동의(선택) 여부 — registerFlowStore의 termsAgreement.marketingOptIn을 그대로 변환 */
+  marketingYn: 'Y' | 'N'
   /** 가입할 회사 아이디 — "기존 조직에 가입"일 때 사용. regFile과 정확히 하나만 입력해야 함(XOR) */
   orgIdx?: number
   /** 가입할 초대 아이디 — orgIdx로 가입할 때(기존 조직에 가입) 반드시 함께 입력해야 함 */
@@ -79,6 +56,22 @@ export interface SignUpData {
   userIdx: string
   /** 가입한 이메일 주소 */
   email: string
+  /** 마케팅 정보 수신 동의 여부 */
+  marketingYn: 'Y' | 'N'
+  /** 가입 일시 (ISO 8601, UTC) */
+  createdAt: string
+  /** 가입한 조직 아이디 */
+  orgIdx: string
+  /** 가입한 조직명 */
+  orgName: string
+  /** 가입한 조직 내 등급(백엔드 UserGrade enum 값, 예: 'SYSTEM') */
+  orgGrade: string
+  /** 가입한 조직의 기본 그룹 아이디 */
+  groupIdx: string
+  /** 초대 수락으로 가입했으면 그 초대 아이디, 신규 조직생성으로 가입했으면 null */
+  acceptedInvitedIdx: string | null
+  /** 가입과 동시에 자동 거절된, 다른 회사로부터의 대기중이던 초대 건수 */
+  rejectedInviteCount: number
 }
 
 export interface CheckEmailDuplicateRequest {
@@ -116,34 +109,21 @@ export interface GetInvitedOrgsData {
   invites: InvitedOrg[]
 }
 
+export interface ResetPasswordRequest {
+  /** 본인인증 키 — 회원가입 2단계(본인인증)에서 발급받아 registerFlowStore.identityVerificationCode에
+   *  저장해둔 값을 그대로 재사용한다 */
+  identityVerificationId: string
+  /** 새 비밀번호. 최소 8자리 이상, 영문과 숫자를 모두 포함해야 하며 작은따옴표(')는 사용 불가 */
+  password: string
+  /** 새 비밀번호 재확인 */
+  passwordConfirm: string
+}
+
+export interface ResetPasswordData {
+  success: boolean
+}
+
 // ─── API ─────────────────────────────────────────────────────────────────────
-
-/**
- * 로그인 — 인증 불필요(skipAuth). Turnstile 검증은 `verifyTurnstile`로 로그인 전에 별도 처리하므로
- * body에는 이메일/비밀번호만 포함한다. 신규 기기(브라우저) + 신규 이메일 조합으로 판단되면 응답
- * `type: 'O'`가 내려오며, 이 경우 이메일 2차 인증 단계로 진행한다.
- */
-export const login = (body: LoginRequest): Promise<ApiResponse<LoginData>> =>
-  api.post<LoginData>('/user/login', body, { skipAuth: true })
-
-/**
- * Turnstile 토큰 검증 — 클라이언트가 위젯에서 발급받은 토큰(cf-turnstile-response)을 서버가
- * Cloudflare에 검증한다. 로그인 전에 호출하므로 인증 불필요(skipAuth). 토큰은 일회용이며 발급 후
- * 300초가 지나면 만료되고, 만료/재사용 시 isVerified가 false로 내려온다. Cloudflare와 통신 자체가
- * 실패하면 502 에러가 발생한다 (공통 api 클라이언트가 ApiError로 throw).
- */
-export const verifyTurnstile = (
-  body: VerifyTurnstileRequest
-): Promise<ApiResponse<VerifyTurnstileResult>> =>
-  api.post<VerifyTurnstileResult>('/v1/user/turnstile/verify', body, { skipAuth: true })
-
-/** 이메일 인증번호 로그인 — 인증 불필요(skipAuth) */
-export const loginWithEmailVerificationCode = (
-  body: EmailVerificationLoginRequest
-): Promise<ApiResponse<EmailVerificationLoginData>> =>
-  api.post<EmailVerificationLoginData>('/user/email-verification-login', body, {
-    skipAuth: true,
-  })
 
 /** 회원탈퇴 */
 export const withdraw = (): Promise<ApiResponse<boolean>> => api.delete('/auth/withdraw')
@@ -227,18 +207,25 @@ const validateOrgSelection = (body: SignUpRequest): Error | null => {
  * 실패 시 회원은 생성되지 않으며(data는 세 경우 모두 null), `request()`가 message 형태를
  * 통일해 첫 메시지를 `ApiError.message`에 담아주므로 호출 측은 `err.message`만 쓰면 된다:
  * - 400 (ValidationPipe/DTO 검증 실패, message는 `{ 필드명: [메시지] }` 객체): email/password/
- *   verificationCode 누락·형식 오류, orgIdx/invitedIdx가 정수가 아님 등 — 어긴 필드만 담겨온다
- * - 409 (ConflictException, message는 문자열 배열 — 아래 표의 메시지 중 하나):
- *   - orgIdx·regFile 둘 다 입력 또는 둘 다 미입력(XOR 위반) → '회사 아이디와 사업자 등록증 파일
- *     키 중 하나만 입력해주세요'
- *   - regFile은 입력했는데 orgName/ceoName/regNo 중 하나라도 빠짐 → '파일 키를 입력하면
- *     사업자명, 대표자명, 사업자 등록 번호를 모두 입력해야 합니다'
- *   - orgIdx는 입력했는데 invitedIdx가 없음 → '가입할 초대 아이디를 입력해주세요'
- *   - 포트원 본인인증 결과가 VERIFIED가 아님 → '본인인증에 실패했습니다'
- *   - 이미 같은 이메일 또는 같은 CI로 가입된 사용자가 있음 → '이미 가입된 사용자입니다'
- *   - invitedIdx+orgIdx+email 조합으로 대기중(PENDING) 초대를 찾지 못함(초대 도용 포함) →
- *     '유효하지 않은 초대입니다' 계열 메시지
- *   - 초대는 유효하지만 해당 orgIdx의 회사를 찾을 수 없음 → '존재하지 않는 회사입니다'
+ *   verificationCode/code/joinType/termsYn/marketingYn 누락·형식 오류, orgIdx/invitedIdx가
+ *   정수가 아님 등 — 어긴 필드만 담겨온다
+ * - 401 (서비스 로직이 직접 던짐, message는 문자열 배열): email+code 조합으로 SIGNUP 타입
+ *   이메일 인증을 완료한 이력이 없음 → '이메일 인증을 먼저 완료해주세요'
+ * - 409 (ConflictException, message는 문자열 배열 — userService.signUp()이 검증하는 순서 그대로):
+ *   1. termsYn이 'Y'가 아님 → '필수 약관에 동의해야 가입할 수 있습니다'
+ *   2. orgIdx·regFile 둘 다 입력 또는 둘 다 미입력(XOR 위반) → '회사 아이디와 사업자 등록증 파일
+ *      키 중 하나만 입력해주세요'
+ *   3. joinType이 기존 조직가입(1)인데 orgIdx가 없음 → '기존 조직가입을 선택한 경우 초대받은
+ *      조직으로만 가입할 수 있습니다'
+ *   4. regFile은 입력했는데 orgName/ceoName/regNo 중 하나라도 빠짐 → '사업자 등록증 파일 키를
+ *      입력하면 사업자명, 대표자명, 사업자 등록 번호를 모두 입력해야 합니다'
+ *   5. orgIdx는 입력했는데 invitedIdx가 없음 → '가입할 초대 아이디를 입력해주세요'
+ *   6. 포트원 본인인증 결과가 VERIFIED가 아님 → '본인인증에 실패했습니다'
+ *   7. 이미 같은 이메일 또는 같은 CI로 가입된 사용자가 있음 → '이미 가입된 사용자입니다'
+ *   8. invitedIdx+orgIdx+email 조합으로 대기중(PENDING) 초대를 찾지 못함(초대 도용·이미 처리된
+ *      초대 포함) → '초대된 회사가 아닙니다'
+ *   9. 초대는 유효하지만 해당 orgIdx의 회사에 기본 그룹이 없는 비정상 상태 → '존재하지 않는
+ *      회사입니다'
  * - 500: 포트원 본인인증 조회(axios) 실패 등 예상하지 못한 런타임 예외 — 원인은 서버 로그에만
  *   남고 고정 메시지만 내려온다 → '서버 오류가 발생했습니다'
  */
@@ -251,3 +238,22 @@ export const signUp = (body: SignUpRequest): Promise<ApiResponse<SignUpData>> =>
   }
   return api.post<SignUpData>('/v1/user/signUp', body, { skipAuth: true })
 }
+
+/**
+ * 비밀번호 재설정 — 인증 불필요(skipAuth). 회원가입 플로우 중 본인인증까지만 마친(로그인 전) 상태에서,
+ * 이미 가입되어 있는 계정의 비밀번호를 재설정한다.
+ *
+ * 실패 시 `request()`가 message 형태를 통일해 첫 메시지를 `ApiError.message`에 담아준다:
+ * - 400 (ValidationPipe/DTO 검증 실패, message는 `{ 필드명: [메시지] }` 객체): identityVerificationId/
+ *   password/passwordConfirm 누락·형식 오류
+ * - 409 (ConflictException, message는 문자열 배열, 검증 순서대로):
+ *   1. password ≠ passwordConfirm → '새 비밀번호가 일치하지 않습니다'
+ *   2. 포트원 본인인증 상태가 VERIFIED가 아님 → '본인인증에 실패했습니다'
+ * - 404 (NotFoundException, message는 문자열 배열): CI 해시로 조회한 가입 계정을 찾을 수 없음 →
+ *   '가입된 계정을 찾을 수 없습니다'
+ * - 500: 포트원 본인인증 조회(axios) 실패 등 예상치 못한 서버 오류 → 고정 메시지
+ */
+export const resetPassword = (
+  body: ResetPasswordRequest
+): Promise<ApiResponse<ResetPasswordData>> =>
+  api.post<ResetPasswordData>('/v1/user/password/reset', body, { skipAuth: true })

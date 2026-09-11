@@ -53,7 +53,6 @@ describe('IdentityVerificationButton', () => {
     await userEvent.click(screen.getByRole('button', { name: /핸드폰인증/ }))
 
     expect(await screen.findByText(/사용자가 핸드폰인증을 취소했습니다./)).toBeInTheDocument()
-    expect(screen.queryByRole('alert')).toBeInTheDocument()
   })
 
   it('SDK 호출 중 에러 메시지를 표시한다', async () => {

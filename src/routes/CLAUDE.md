@@ -35,22 +35,33 @@ export const Route = createFileRoute('/labs')({
 ## 공개 라우트 템플릿 (로그인 페이지)
 
 ```typescript
-import { createFileRoute, redirect } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 
 import { LoginPage } from '../pages/LoginPage'
+import { redirectIfAuthenticated } from '../utils/requireAuth'
 
 export const Route = createFileRoute('/login')({
-  beforeLoad: () => {
-    if (sessionStorage.getItem('accessToken')) {
-      return redirect({ to: '/main' })
-    }
-  },
+  beforeLoad: redirectIfAuthenticated,
   component: LoginPage,
 })
 ```
 
-- 이미 로그인된 사용자가 `/login` 접근 시 `/main`으로 리다이렉트
-- 실제 예시: `src/routes/login.tsx`
+- `redirectIfAuthenticated`: 이미 로그인된 사용자(`requireAuth`와 동일하게 형식+만료까지 검증)가
+  `/login` 접근 시 `/main`으로 리다이렉트
+- **`sessionStorage.getItem('accessToken')` 존재 여부만으로 직접 판단하지 말 것** — 형식이
+  깨졌거나 만료된 토큰이 남아있는 상태에서 `/main`으로 보내면, `requireAuth`가 다시 `/login`으로
+  돌려보내는 불필요한 리다이렉트 왕복이 발생한다. 반드시 `redirectIfAuthenticated`를 사용해
+  `requireAuth`와 판단 기준을 통일할 것
+- 추가 가드 로직이 필요하면(회원가입 단계별 순서 검증 등) `beforeLoad`를 함수로 작성하고 맨 앞에서
+  `redirectIfAuthenticated()`를 호출해 반환값이 있으면 그대로 반환한다:
+  ```typescript
+  beforeLoad: () => {
+    const authRedirect = redirectIfAuthenticated()
+    if (authRedirect) return authRedirect
+    // ...추가 가드
+  }
+  ```
+- 실제 예시: `src/routes/login.tsx`, `src/routes/register-organization.tsx`(추가 가드 포함)
 
 ## 새 라우트 추가 체크리스트
 

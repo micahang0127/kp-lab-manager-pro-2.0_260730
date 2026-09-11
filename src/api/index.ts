@@ -1,3 +1,5 @@
+import { useAuthStore } from '../stores/authStore'
+
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? ''
 const REQUEST_TIMEOUT = 10_000 // 10초
 
@@ -14,8 +16,10 @@ export interface PagedData {
  * 에러 메시지 형태 — 백엔드가 검증 단계에 따라 다르게 내려준다.
  * - 문자열 배열: 서비스 로직이 직접 던진 에러 (예: 발송 횟수 초과, 필수값 조합 검증)
  * - `{ 필드명: [메시지] }` 객체: ValidationPipe(DTO) 검증 실패 — 필드별 메시지 목록
+ * - 순수 문자열: CommonResponsePayload 포맷을 거치지 않은 원본 예외(Nest 기본 예외 필터가 그대로
+ *   내려주는 5xx 등, 예: `{ statusCode, error, message: "..." }`)의 message
  */
-export type ApiErrorMessage = string[] | Record<string, string[]>
+export type ApiErrorMessage = string[] | Record<string, string[]> | string
 
 /**
  * 모든 API 응답이 공통으로 따르는 표준 응답 형태 (백엔드 CommonResponsePayload와 동일)
@@ -42,10 +46,15 @@ export interface RequestOptions {
 
 export class ApiError extends Error {
   statusCode: number
+  /** ValidationPipe(DTO) 검증 실패로 message가 `{ 필드명: [메시지] }` 객체 형태일 때만 채워진다.
+   *  extractErrorMessage()가 첫 메시지만 꺼내며 버리는 필드명 정보를 보존하기 위한 필드 —
+   *  `src/utils/apiError.ts`의 getFieldErrors()로 꺼내 쓴다. */
+  fieldErrors?: Record<string, string[]>
 
-  constructor(message: string, statusCode: number) {
+  constructor(message: string, statusCode: number, fieldErrors?: Record<string, string[]>) {
     super(message)
     this.statusCode = statusCode
+    this.fieldErrors = fieldErrors
     Object.setPrototypeOf(this, ApiError.prototype)
   }
 }
@@ -64,13 +73,32 @@ const getToken = () => sessionStorage.getItem('accessToken')?.trim()
 
 /**
  * 에러 응답의 message에서 사용자에게 보여줄 첫 번째 메시지를 꺼낸다.
- * 문자열 배열이면 첫 원소를, `{ 필드명: [메시지] }` 객체(DTO 검증 실패)면 첫 번째 필드의
- * 첫 메시지를 반환한다. null이거나 빈 값이면 undefined를 반환해 호출 측이 기본 문구로 대체하게 한다.
+ * 순수 문자열이면 그대로, 문자열 배열이면 첫 원소를, `{ 필드명: [메시지] }` 객체(DTO 검증 실패)면
+ * 첫 번째 필드의 첫 메시지를 반환한다 — 순수 문자열 케이스를 배열/객체와 같이 처리하면
+ * `Object.values(문자열)`이 문자 단위로 쪼개져 첫 글자만 남는 버그가 생기므로 반드시 먼저
+ * 분기해야 한다. null이거나 빈 값이면 undefined를 반환해 호출 측이 기본 문구로 대체하게 한다.
  */
 function extractErrorMessage(message: ApiErrorMessage | null): string | undefined {
   if (!message) return undefined
+  if (typeof message === 'string') return message
   if (Array.isArray(message)) return message[0]
   return Object.values(message)[0]?.[0]
+}
+
+/**
+ * ApiErrorMessage → ApiError 변환을 한 곳에서 처리한다. 메시지 추출(extractErrorMessage)과
+ * fieldErrors 보존(message가 `{ 필드명: [메시지] }` 객체 형태일 때만)을 함께 수행해, 401 분기와
+ * 일반 실패 분기가 각자 따로 fieldErrors를 추출하지 않도록 한다.
+ */
+function toApiError(
+  message: ApiErrorMessage | null,
+  statusCode: number,
+  fallback: string
+): ApiError {
+  const errorMessage = extractErrorMessage(message) || fallback
+  const fieldErrors =
+    message && typeof message === 'object' && !Array.isArray(message) ? message : undefined
+  return new ApiError(errorMessage, statusCode, fieldErrors)
 }
 
 // ─── Base request ─────────────────────────────────────────────────────────────
@@ -100,20 +128,22 @@ async function request<T>(
     })
     const json = (await res.json()) as ApiResponse<T>
 
-    // 401 Unauthorized: 응답 메시지 사용, 만료된 경우만 자동 로그아웃
+    // 401 Unauthorized: sessionStorage에 실제로 토큰이 있었던 요청에서만 자동 로그아웃 + /login
+    // 리다이렉트. skipAuth 여부가 아니라 토큰 존재 여부로 판단해야 한다 — 로그인 전(토큰 없음)에도
+    // 메시지에 "만료"가 포함된 401이 올 수 있으므로(예: 로그인 2차 인증의 "인증코드가
+    // 만료되었습니다"), 이 경우는 세션 만료가 아니라 로그인 실패 같은 도메인 로직 에러다 —
+    // 컴포넌트가 ServerErrorBanner 등으로 인라인 표시해야 하므로 여기서 가로채지 않는다.
     if (res.status === 401) {
-      const errorMessage = extractErrorMessage(json.message) || '인증이 필요합니다.'
+      const error = toApiError(json.message, 401, '인증이 필요합니다.')
 
-      // 토큰 만료로 인한 401인 경우에만 자동 로그아웃
-      // (api 요청 중 토큰이 만료된 경우 = Silent Refresh 필요)
-      if (errorMessage.includes('만료') || errorMessage.includes('expired')) {
-        sessionStorage.removeItem('accessToken')
+      if (token) {
+        useAuthStore.getState().logout()
         if (typeof window !== 'undefined') {
           window.location.replace('/login')
         }
       }
 
-      throw new ApiError(errorMessage, 401)
+      throw error
     }
 
     // result가 요청 성공 여부의 단일 기준 (statusCode는 부가 정보)
@@ -121,9 +151,11 @@ async function request<T>(
       return json
     }
 
-    // 에러 발생 시 에러 객체를 던짐
-    const errorMessage = extractErrorMessage(json.message) || '알 수 없는 오류가 발생했습니다.'
-    throw new ApiError(errorMessage, json.statusCode)
+    // 에러 발생 시 에러 객체를 던짐 — 5xx를 포함해 별도의 전역 처리 없이 각 컴포넌트가
+    // ApiError.message를 그대로 인라인으로 노출한다.
+    const error = toApiError(json.message, json.statusCode, '알 수 없는 오류가 발생했습니다.')
+
+    throw error
   } catch (err) {
     // ApiError는 백엔드가 사용자에게 보여줄 목적으로 준 메시지이므로 그대로 전달한다.
     if (err instanceof ApiError) {

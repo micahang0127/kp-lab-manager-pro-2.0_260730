@@ -12,12 +12,15 @@ import { isNewPasswordFieldsValid } from '../utils/rules/validationRules'
 // ─── Component ─────────────────────────────────────────────────────────────────
 
 /**
- * 아이디·비밀번호 찾기 화면에서 "가입된 계정이 있습니다" 안내 후 "비밀번호 재설정"을 눌러
- * 진입하는 비밀번호 재설정 화면.
+ * "가입된 계정이 있습니다" 안내 후 "비밀번호 재설정"을 눌러 진입하는 비밀번호 재설정 화면.
+ * 아이디·비밀번호 찾기(FindAccountPage)뿐 아니라 회원가입 3단계(RegisterAccountExistsPage —
+ * 본인인증 결과 기존 계정이 있는 경우)에서도 이 화면을 그대로 재사용한다. 두 플로우 모두 별도의
+ * 재설정 화면을 두지 않고 이 화면으로 모이도록, 회원가입 쪽에서는 이동 전에 registerFlowStore의
+ * 본인인증 결과를 findAccountFlowStore로 옮겨 담는다(RegisterAccountExistsPage 참고).
  * 새 비밀번호/확인 입력은 회원가입 비밀번호 설정 화면과 동일하게 형식·일치 여부를 검증한다
- * (NewPasswordFields 공통 컴포넌트, RegisterResetPasswordPage와 동일 패턴).
- * API 요청에 필요한 본인인증 키(identityVerificationId)는 find-account 본인인증 완료 시
- * findAccountFlowStore에 저장해둔 값을 그대로 재사용한다 — 이 화면에서 본인인증을 다시 요구하지 않는다.
+ * (NewPasswordFields 공통 컴포넌트).
+ * API 요청에 필요한 본인인증 키(identityVerificationId)는 findAccountFlowStore에 저장된 값을
+ * 그대로 재사용한다 — 이 화면에서 본인인증을 다시 요구하지 않는다.
  */
 export function FindAccountResetPasswordPage() {
   const navigate = useNavigate()
@@ -44,7 +47,8 @@ export function FindAccountResetPasswordPage() {
     },
     onSuccess: () => {
       // 비밀번호 재설정 흐름은 여기서 끝나고 로그인 페이지로 이동해 새 비밀번호로 다시
-      // 로그인해야 하므로, RegisterResetPasswordPage와 동일한 이유로 findAccountFlowStore를 비운다.
+      // 로그인해야 하므로, 이 화면 진입 경로(아이디·비밀번호 찾기/회원가입 공통)와 무관하게
+      // findAccountFlowStore를 비운다.
       clearVerifiedIdentity()
       void navigate({ to: '/register-reset-password-complete' })
     },

@@ -6,7 +6,8 @@ import { AuthCardLayout } from '../components/auth'
 
 /**
  * 비밀번호 재설정 성공 화면 (Figma node-id=684-3529 기준).
- * RegisterResetPasswordPage에서 비밀번호 재설정 API 성공 후 이 화면으로 이동한다.
+ * FindAccountResetPasswordPage에서 비밀번호 재설정 API 성공 후 이 화면으로 이동한다
+ * (아이디·비밀번호 찾기, 회원가입 두 플로우 모두 이 화면을 공유한다).
  * [TEMP] 아니지만 참고: Figma 디자인의 80x80 아이콘 프레임은 실제 벡터 데이터 없이 빈 이미지로만
  * 내려와(디자인 파일 쪽 에셋 누락) 아이콘 없이 텍스트 + 뒤로가기 링크만 구현했다.
  */

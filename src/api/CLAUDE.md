@@ -54,7 +54,7 @@ interface ApiResponse<T> {
 - 성공: `response.data`에서 추출 — **`data`는 `T | null` 타입이므로 접근 시 옵셔널 체이닝(`?.`) 또는 널 가드 필수**
 - 실패: `ApiError` throw됨 — `.statusCode`, `.message`로 접근 (`request()` 내부에서 `result`가 `false`면 자동으로 throw하므로, `res.result`가 `true`인 응답만 컴포넌트에 도달함)
 - **`message`는 두 가지 형태가 온다** — 서비스 로직이 직접 던진 에러는 문자열 배열(`['...']`), `ValidationPipe`(DTO) 검증 실패는 `{ 필드명: ['...'] }` 객체. `request()`가 내부 `extractErrorMessage()`로 두 형태를 통일해서 첫 메시지를 `ApiError.message`에 담아주므로, 도메인 API 함수·컴포넌트는 형태를 신경 쓸 필요 없이 `err.message`만 쓰면 된다
-- **401 자동 처리**: 만료 감지 시 자동 로그아웃 + `/login` 리다이렉트. 컴포넌트에서 별도 처리 금지
+- **401 자동 처리**: 만료 감지 시 자동 로그아웃 + `/login` 리다이렉트. 컴포넌트에서 별도 처리 금지 (단, sessionStorage에 저장된 토큰이 실제로 있었을 때만 동작 — 로그인 전에도 메시지에 "만료"가 포함된 401이 올 수 있으므로(예: 로그인 2차 인증의 "인증코드가 만료되었습니다"), 토큰이 없으면 리다이렉트 없이 `ApiError`만 던진다)
 
 ## 옵션
 

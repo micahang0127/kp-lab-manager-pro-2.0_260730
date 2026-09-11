@@ -18,7 +18,7 @@ describe('RegisterTermsPage', () => {
   beforeEach(() => {
     vi.mocked(useNavigate).mockReturnValue(mockNavigate)
     vi.clearAllMocks()
-    useRegisterFlowStore.setState({ termsAgreement: null })
+    useRegisterFlowStore.setState({ termsAgreement: null, identityVerifySource: 'register' })
   })
 
   it('페이지 제목과 약관 항목들을 렌더링한다', () => {
@@ -143,6 +143,15 @@ describe('RegisterTermsPage', () => {
     await userEvent.click(screen.getByRole('button', { name: /이전/ }))
 
     expect(mockNavigate).toHaveBeenCalledWith({ to: '/register-account-check' })
+  })
+
+  it('아이디·비밀번호 찾기에서 2·3단계를 건너뛰고 온 경우(identityVerifySource가 \'find-account\') "← 이전" 버튼은 1단계(가입 방법 선택)로 이동한다', async () => {
+    useRegisterFlowStore.setState({ identityVerifySource: 'find-account' })
+    render(<RegisterTermsPage />)
+
+    await userEvent.click(screen.getByRole('button', { name: /이전/ }))
+
+    expect(mockNavigate).toHaveBeenCalledWith({ to: '/register' })
   })
 
   it('"더보기"를 클릭하면 aria-expanded가 토글된다', async () => {

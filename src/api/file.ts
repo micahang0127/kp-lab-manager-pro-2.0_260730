@@ -20,8 +20,14 @@ export interface CreatePresignedUploadUrlRequest {
 export interface PresignedUploadUrlItem {
   /** 업로드할 파일의 원본 이름 */
   originFileName: string
-  /** 업로드할 presigned URL */
+  /** S3 presigned POST 업로드 대상 URL(버킷 루트). key를 포함하지 않으므로 단독으로는 사용할 수
+   *  없고, 반드시 presignedFields와 함께 multipart/form-data POST로 전송해야 한다 */
   presignedUrl: string
+  /** S3 presigned POST 요청 시 파일 데이터보다 먼저 FormData에 담아야 하는 필드들(Policy,
+   *  X-Amz-Signature, key 등). Swagger 문서(FilePresignedUploadUrlItemPayload)엔 선언돼 있지
+   *  않지만 실제 응답에는 포함되며, 이 필드 없이 업로드하면 S3가 익명 요청으로 간주해
+   *  AccessDenied를 반환한다 */
+  presignedFields: Record<string, string>
   /** 업로드될 S3 객체 키 (예: 'PRODUCTION/BusinessRegistration/260901/xxxxxxxx.pdf').
    *  Swagger 문서(FilePresignedUploadUrlItemPayload)엔 선언돼 있지 않지만 실제 응답에는
    *  포함된다 — business-registration/review 등 후속 API 호출 시 이 값을 그대로 사용 */

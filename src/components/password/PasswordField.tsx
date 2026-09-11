@@ -1,10 +1,7 @@
-import { useState } from 'react'
-
 import clearCircleIcon from '../../assets/icons/register/clear-circle.svg'
-import eyeHideIcon from '../../assets/icons/register/eye-hide.svg'
-import eyeShowIcon from '../../assets/icons/register/eye-show.svg'
 import { HANGUL_INPUT_MESSAGE, sanitizePasswordInput } from '../../utils/rules/validationRules'
 import { useHangulGuardedInput } from '../../utils/useHangulGuardedInput'
+import { ErrorMessage } from '../error/ErrorMessage'
 import { RequiredMark } from '../form'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -32,7 +29,7 @@ interface PasswordFieldProps {
 // ─── Component ─────────────────────────────────────────────────────────────────
 
 /**
- * 비밀번호 입력칸 공통 컴포넌트 — 눈 아이콘으로 평문/마스킹 표시를 전환하고, 값이 있을 때만
+ * 비밀번호 입력칸 공통 컴포넌트 — 항상 마스킹(type=password)되며, 값이 있을 때만
  * 지우기(x) 아이콘을 보여준다. 한글(한글 키보드) 입력은 허용되지 않으므로 useHangulGuardedInput을
  * 통해 조합(IME) 중에는 값을 건드리지 않고, 조합이 끝난 시점에만 한글을 제거해 반영하며 전용
  * 안내 문구를 보여준다. 그 외 형식/일치 오류는 error prop으로 전달받아 표시한다.
@@ -48,7 +45,6 @@ export function PasswordField({
   hint,
   required = false,
 }: PasswordFieldProps) {
-  const [isVisible, setIsVisible] = useState(false)
   const { hasHangulInput, handleChange, handleCompositionStart, handleCompositionEnd } =
     useHangulGuardedInput({ sanitize: sanitizePasswordInput, onChange })
 
@@ -70,7 +66,7 @@ export function PasswordField({
       >
         <input
           id={id}
-          type={isVisible ? 'text' : 'password'}
+          type="password"
           value={value}
           onChange={handleChange}
           onCompositionStart={handleCompositionStart}
@@ -88,17 +84,9 @@ export function PasswordField({
             <img src={clearCircleIcon} alt="" aria-hidden className="size-3" />
           </button>
         )}
-        <button
-          type="button"
-          aria-label={isVisible ? '비밀번호 숨기기' : '비밀번호 표시'}
-          onClick={() => setIsVisible((prev) => !prev)}
-          className="flex size-4 shrink-0 items-center justify-center"
-        >
-          <img src={isVisible ? eyeShowIcon : eyeHideIcon} alt="" aria-hidden className="size-4" />
-        </button>
       </div>
       {hasError ? (
-        <p className="text-[10px] text-red-600">{displayError}</p>
+        <ErrorMessage message={displayError} />
       ) : (
         hint && <p className="text-[10px] leading-[14px] text-[#6b6b66] opacity-50">{hint}</p>
       )}

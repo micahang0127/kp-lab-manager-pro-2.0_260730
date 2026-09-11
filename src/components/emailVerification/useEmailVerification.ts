@@ -1,7 +1,7 @@
 import { useMutation } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 
-import type { ApiResponse } from '../../api'
+import { ApiError, type ApiResponse } from '../../api'
 import {
   type EmailVerificationLimitPurpose,
   formatLimitWindowHours,
@@ -61,11 +61,16 @@ export interface UseEmailVerificationResult {
   sendCode: () => void
   isSending: boolean
   sendCodeError: string | null
-  /** sendLimit으로 지정한 한도에 도달한 상태에서 사용자가 실제로 전송을 시도했는지 여부.
-   *  sendLimit 미지정 시 항상 false다. 한도에 딱 도달한 시점(정상적으로 성공한 마지막 시도)
-   *  자체는 포함하지 않고, 그 이후에 한 번 더 시도했을 때만 true가 된다 — 그래야 정상적으로
-   *  성공한 마지막 시도에 대해 에러처럼 보이는 문구가 뜨지 않는다. true면 "인증번호 전송"/
-   *  "재전송" 버튼을 비활성화하고 한도 초과 안내를 보여주는 데 사용한다 */
+  /** 발송 횟수 한도 초과 여부 — 아래 두 경우 중 하나라도 해당하면 true다:
+   *  ① sendLimit으로 지정한 로컬(쿠키) 한도에 도달한 상태에서 사용자가 실제로 전송을 다시
+   *  시도한 경우. 한도에 딱 도달한 시점(정상적으로 성공한 마지막 시도) 자체는 포함하지 않고,
+   *  그 이후에 한 번 더 시도했을 때만 true가 된다 — 그래야 정상적으로 성공한 마지막 시도에
+   *  대해 에러처럼 보이는 문구가 뜨지 않는다.
+   *  ② 로컬 쿠키에는 기록이 없어 실제로 발송 API를 호출했는데, 서버가 409(발송 횟수 초과)로
+   *  거절한 경우 — 다른 브라우저/기기에서 이미 한도를 채웠거나 쿠키가 삭제된 경우에도 화면
+   *  진입 즉시(자동 발송 등) 초과 상태를 정확히 반영하기 위함이다.
+   *  true면 "인증번호 전송"/"재전송" 버튼을 비활성화하고(또는 숨기고) 한도 초과 안내를
+   *  보여주는 데 사용한다 */
   isSendLimitExceeded: boolean
 }
 
@@ -121,8 +126,6 @@ export function useEmailVerification({
     setIsSendLimitReached(false)
   }
 
-  const isSendLimitExceeded = isSendLimitReached && isAtOrOverSendLimit
-
   // ─── 인증번호 유효 시간 타이머 ─────────────────────────────────────────────────
 
   useEffect(() => {
@@ -162,11 +165,25 @@ export function useEmailVerification({
     sendCodeMutation.mutate()
   }
 
+  // 로컬 쿠키에는 기록이 없어(예: 쿠키 삭제, 다른 브라우저/기기에서의 이전 발송) 프론트 선제
+  // 가드를 통과했지만 실제로 서버가 409(발송 횟수 초과)로 거절한 경우도 "초과 상태"로 간주해야
+  // 한다 — 그렇지 않으면 이 화면에 처음 들어왔을 뿐인데 서버는 이미 잠겨 있는 계정에서 에러
+  // 문구도 없이 재전송 버튼만 무한정 눌리는 상태가 된다.
+  const isServerConfirmedSendLimit =
+    sendCodeMutation.error instanceof ApiError && sendCodeMutation.error.statusCode === 409
+  const isSendLimitExceeded =
+    (isSendLimitReached && isAtOrOverSendLimit) || isServerConfirmedSendLimit
+
+  // 실제 서버 에러(sendCodeMutation.error)가 있으면 그 문구를 최우선으로 보여준다 — 서버가 내려준
+  // 문구가 항상 가장 정확한 사실이기 때문이다. 로컬 가드가 API 호출 전에 선제 차단한 경우(실제
+  // 에러가 아직 없음)에만 프론트에서 조합한 안내 문구로 대체하며, 이 문구는 서버가 실제로
+  // 내려주는 409 문구(마침표 없음, src/api/auth.ts의 sendEmailVerificationCode JSDoc 참고)와
+  // 글자 단위로 동일하게 맞춘다.
   const sendCodeError =
-    isSendLimitExceeded && sendLimit
-      ? `인증코드 발송 횟수(${sendLimit.maxAttempts}회)를 초과했습니다. 마지막 발송 후 ${formatLimitWindowHours(sendLimit.windowMs)}이 지나면 다시 요청할 수 있습니다.`
-      : sendCodeMutation.error instanceof Error
-        ? sendCodeMutation.error.message
+    sendCodeMutation.error instanceof Error
+      ? sendCodeMutation.error.message
+      : isSendLimitExceeded && sendLimit
+        ? `인증코드 발송 횟수(${sendLimit.maxAttempts}회)를 초과했습니다. 마지막 발송 후 ${formatLimitWindowHours(sendLimit.windowMs)}이 지나면 다시 요청할 수 있습니다`
         : null
 
   return {

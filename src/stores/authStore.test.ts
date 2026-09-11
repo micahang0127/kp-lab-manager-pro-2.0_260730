@@ -2,6 +2,14 @@ import { beforeEach, describe, expect, it } from 'vitest'
 
 import { useAuthStore } from './authStore'
 
+const SESSION = {
+  userIdx: '1',
+  userName: '홍길동',
+  orgIdx: '1',
+  orgName: '테스트 회사',
+  userGrade: 0,
+}
+
 describe('authStore', () => {
   beforeEach(() => {
     // 각 테스트 전 sessionStorage + store 초기화
@@ -9,6 +17,7 @@ describe('authStore', () => {
     // store를 초기 상태로 리셋
     useAuthStore.setState({
       isLoggedIn: false,
+      userSession: null,
     })
   })
 
@@ -50,6 +59,24 @@ describe('authStore', () => {
 
     expect(useAuthStore.getState().isLoggedIn).toBe(false)
     expect(sessionStorage.getItem('accessToken')).toBeNull()
+  })
+
+  it('login()은 accessToken과 사용자 세션을 sessionStorage에 저장하고 로그인 상태로 만든다', () => {
+    useAuthStore.getState().login('access-token-abc', SESSION)
+
+    expect(useAuthStore.getState().isLoggedIn).toBe(true)
+    expect(useAuthStore.getState().userSession).toEqual(SESSION)
+    expect(sessionStorage.getItem('accessToken')).toBe('access-token-abc')
+    expect(JSON.parse(sessionStorage.getItem('userSession') ?? 'null')).toEqual(SESSION)
+  })
+
+  it('logout()은 userSession도 함께 제거한다', () => {
+    useAuthStore.getState().login('access-token-abc', SESSION)
+
+    useAuthStore.getState().logout()
+
+    expect(useAuthStore.getState().userSession).toBeNull()
+    expect(sessionStorage.getItem('userSession')).toBeNull()
   })
 
   it('스토어는 여러 상태 변경을 지원한다', () => {

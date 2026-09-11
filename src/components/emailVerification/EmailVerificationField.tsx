@@ -1,19 +1,14 @@
-import checkCircleIcon from '../../assets/icons/register/check-circle.svg'
+import clearCircleIcon from '../../assets/icons/register/clear-circle.svg'
+import { formatTimeLeft } from '../../utils/formatTimeLeft'
 import {
   EMAIL_CODE_LENGTH,
   EMAIL_RULE_MESSAGE,
   HANGUL_INPUT_MESSAGE,
 } from '../../utils/rules/validationRules'
 import { useHangulGuardedInput } from '../../utils/useHangulGuardedInput'
+import { ErrorMessage } from '../error/ErrorMessage'
 import { EmailCodeInput } from './EmailCodeInput'
 import type { UseEmailVerificationResult } from './useEmailVerification'
-
-// ─── Helpers ───────────────────────────────────────────────────────────────────
-
-/** 초 단위 남은 시간을 'MM:SS' 형식으로 변환 */
-function formatTimeLeft(seconds: number): string {
-  return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`
-}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -32,12 +27,14 @@ interface EmailVerificationFieldProps {
   codeLength?: number
   /** useEmailVerification 훅의 반환값 — 이메일/인증번호 발송 상태를 그대로 전달받는다 */
   verification: UseEmailVerificationResult
-  /** 인증번호 최종 확인(호출 측 verify mutation) 실패 시 에러 메시지 */
+  /** 인증번호 최종 확인(호출 측 verify mutation) 실패 시 에러 메시지 — 서버가 내려준 메시지를
+   *  그대로 표시한다 */
   codeError?: string | null
-  /** 인증번호 입력칸을 강제로 비활성화할지 여부(기본 false). 호출 측이 자체적으로 판단한 한도
-   *  초과(예: 인증 실패 5회 초과) 등을 반영할 때 사용하며, 이 컴포넌트는 "한도"라는 개념 자체는
-   *  몰라도 되도록 boolean만 받는다 */
-  codeDisabled?: boolean
+  /** true면 이메일 입력칸을 비활성화(disabled)한다(기본 false). 로그인 2차 인증처럼 이전
+   *  단계에서 이메일이 이미 확정되어 변경하면 검증이 깨지는 화면에서 사용한다. 비활성화 상태일
+   *  때는 한글/형식 오류 문구를 표시하지 않는다(사용자가 직접 입력한 값이 아니므로 검증 대상이
+   *  아님) */
+  emailDisabled?: boolean
 }
 
 // ─── Component ─────────────────────────────────────────────────────────────────
@@ -57,7 +54,7 @@ export function EmailVerificationField({
   codeLength = EMAIL_CODE_LENGTH,
   verification,
   codeError,
-  codeDisabled = false,
+  emailDisabled = false,
 }: EmailVerificationFieldProps) {
   const {
     email,
@@ -85,12 +82,15 @@ export function EmailVerificationField({
   } = useHangulGuardedInput({ onChange: setEmail })
 
   // 한글은 아니지만 형식 자체가 이메일이 아닌 경우(예: '@' 누락) — 아직 입력 중일 수 있는
-  // 빈 값에는 표시하지 않는다
-  const isEmailFormatInvalid = email.length > 0 && !hasHangulInput && !isEmailValid
+  // 빈 값에는 표시하지 않는다. emailDisabled일 때는 사용자가 직접 입력한 값이 아니므로
+  // (이전 단계에서 이미 검증된 값) 한글/형식 오류 자체를 판정하지 않는다
+  const isEmailFormatInvalid =
+    !emailDisabled && email.length > 0 && !hasHangulInput && !isEmailValid
+  const showHangulError = !emailDisabled && hasHangulInput
 
   // 입력값 자체가 잘못된 경우(한글 입력, 형식 오류) + 서버가 이메일 자체를 거부한 경우(발송 실패)를
   // 묶어 "이메일 입력 오류" 상태로 취급 — 입력칸 테두리를 빨간색으로 강조한다
-  const hasEmailError = hasHangulInput || isEmailFormatInvalid || Boolean(sendCodeError)
+  const hasEmailError = showHangulError || isEmailFormatInvalid || Boolean(sendCodeError)
 
   return (
     <>
@@ -100,23 +100,35 @@ export function EmailVerificationField({
         </label>
         <div className="flex w-full items-start gap-1">
           <div
-            className={`flex h-10 flex-1 items-center gap-2 rounded border bg-white px-3 ${
-              hasEmailError ? 'border-[#bf3329]' : 'border-[#c9c9c4]'
-            }`}
+            className={`flex h-10 flex-1 items-center gap-2 rounded border px-3 ${
+              emailDisabled ? 'bg-gray-100' : 'bg-white'
+            } ${hasEmailError ? 'border-[#bf3329]' : 'border-[#c9c9c4]'}`}
           >
             <input
               id={emailId}
               type="email"
               required
+              disabled={emailDisabled}
               value={email}
               onChange={handleEmailChange}
               onCompositionStart={handleEmailCompositionStart}
               onCompositionEnd={handleEmailCompositionEnd}
               placeholder={emailPlaceholder}
-              className="flex-1 text-xs text-black outline-none"
+              className={`flex-1 bg-transparent text-xs outline-none ${
+                emailDisabled ? 'text-[#6b6b66]' : 'text-black'
+              }`}
             />
-            {isEmailValid && (
-              <img src={checkCircleIcon} alt="" aria-hidden className="size-4 shrink-0" />
+            {/* emailDisabled(로그인 2차 인증처럼 이메일이 이전 단계에서 이미 확정된 화면)일 때는
+                지울 수 있는 값이 아니므로 지우기 버튼 자체를 노출하지 않는다 */}
+            {!emailDisabled && email && (
+              <button
+                type="button"
+                aria-label="이메일 입력값 지우기"
+                onClick={() => setEmail('')}
+                className="flex size-4 shrink-0 items-center justify-center"
+              >
+                <img src={clearCircleIcon} alt="" aria-hidden className="size-3" />
+              </button>
             )}
           </div>
           <button
@@ -125,14 +137,12 @@ export function EmailVerificationField({
             onClick={sendCode}
             className="flex h-10 w-[100px] shrink-0 items-center justify-center rounded border border-[#c9c9c4] bg-white px-2 text-center text-xs text-[#2b2b29] disabled:opacity-30"
           >
-            {isSending ? '전송 중...' : '인증번호 전송'}
+            인증번호 전송
           </button>
         </div>
-        {hasHangulInput && <p className="text-[10px] text-red-600">{HANGUL_INPUT_MESSAGE}</p>}
-        {!hasHangulInput && isEmailFormatInvalid && (
-          <p className="text-[10px] text-red-600">{EMAIL_RULE_MESSAGE}</p>
-        )}
-        {sendCodeError && <p className="text-[10px] text-red-600">{sendCodeError}</p>}
+        {showHangulError && <ErrorMessage message={HANGUL_INPUT_MESSAGE} />}
+        {!showHangulError && isEmailFormatInvalid && <ErrorMessage message={EMAIL_RULE_MESSAGE} />}
+        <ErrorMessage message={sendCodeError} />
       </div>
 
       <div className="flex w-full flex-col items-start gap-1">
@@ -142,17 +152,15 @@ export function EmailVerificationField({
             length={codeLength}
             value={emailCode}
             onChange={setEmailCode}
-            disabled={!isCodeSent || isCodeExpired || codeDisabled}
+            disabled={!isCodeSent || isCodeExpired}
             error={Boolean(codeError)}
             ariaLabel={codeAriaLabel}
           />
           <div className="flex w-full items-center justify-between">
             <p className="text-xs font-medium text-[#1a1a17] opacity-50">
-              {codeDisabled
-                ? ''
-                : isCodeSent
-                  ? `남은 시간 ${formatTimeLeft(timeLeft)}`
-                  : '이메일 인증번호를 전송해 주세요'}
+              {isCodeSent
+                ? `남은 시간 ${formatTimeLeft(timeLeft)}`
+                : '이메일 인증번호를 전송해 주세요'}
             </p>
             <button
               type="button"
@@ -164,19 +172,8 @@ export function EmailVerificationField({
             </button>
           </div>
         </div>
-        {/* 인증 실패 횟수 초과로 잠긴 상태(codeDisabled)에서는 잠금 안내(codeError)만 보여주고,
-            "인증 시간이 만료되었습니다" 안내는 모순되어 보이므로 함께 띄우지 않는다 */}
-        {isCodeExpired && !codeDisabled && (
-          <p className="text-[10px] text-red-600">인증 시간이 만료되었습니다. 재전송해 주세요.</p>
-        )}
-        {codeError && (
-          <>
-            <p className="text-[10px] text-red-600">{codeError}</p>
-            {/* [Figma] 396:11296 — "인증번호를 다시 확인해 주세요 (인증 실패 N/5)" 문구는
-                백엔드 message를 그대로 쓰기로 해 제외하고, 아래 제한 안내만 반영한다 */}
-            <p className="text-[10px] text-red-600">5회 실패 시 24시간 동안 인증이 제한됩니다.</p>
-          </>
-        )}
+        {isCodeExpired && <ErrorMessage message="인증 시간이 만료되었습니다. 재전송해 주세요." />}
+        <ErrorMessage message={codeError} />
       </div>
     </>
   )

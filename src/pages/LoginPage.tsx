@@ -4,7 +4,6 @@ import { useMutation } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { useEffect, useRef, useState } from 'react'
 
-import { ApiError } from '../api'
 import { login, verifyTurnstile } from '../api/auth'
 import { AuthCardLayout, AuthFormActions } from '../components/auth'
 import { ErrorToast } from '../components/error/ErrorToast'
@@ -130,6 +129,10 @@ export function LoginPage() {
       fingerprintCode: string
       device: ReturnType<typeof getLoginDevice>
     }) => login(vars),
+    // 비밀번호 오류·계정 잠금 등은 아래 serverErrorMessage(ErrorToast)로 이미 화면에 안내하므로,
+    // queryClient의 콘솔 안전망 로깅은 건너뛴다(정상적인 사용자 입력 오류가 콘솔에 에러로
+    // 남아 실제 버그와 헷갈리는 것을 방지).
+    meta: { suppressConsoleLog: true },
     onSuccess: (res, vars) => {
       if (!res.data) return
 
@@ -198,8 +201,6 @@ export function LoginPage() {
 
   const serverErrorMessage =
     loginMutation.error instanceof Error ? loginMutation.error.message : null
-  const isLockedOrInvalidCredentials =
-    loginMutation.error instanceof ApiError && loginMutation.error.statusCode === 401
 
   return (
     <AuthCardLayout title="로그인" align="center" onSubmit={handleSubmit}>
@@ -248,19 +249,7 @@ export function LoginPage() {
         </div>
       </div>
 
-      {serverErrorMessage && (
-        <ErrorToast message={serverErrorMessage}>
-          {isLockedOrInvalidCredentials && (
-            <button
-              type="button"
-              onClick={handleGoFindAccount}
-              className="text-left text-[10px] underline"
-            >
-              비밀번호 찾기
-            </button>
-          )}
-        </ErrorToast>
-      )}
+      {serverErrorMessage && <ErrorToast message={serverErrorMessage} />}
 
       <AuthFormActions
         primaryLabel={loginMutation.isPending ? '로그인 중...' : '로그인'}

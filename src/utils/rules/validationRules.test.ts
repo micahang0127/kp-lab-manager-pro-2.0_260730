@@ -4,6 +4,7 @@ import {
   containsHangul,
   EMAIL_CODE_RULE_MESSAGE,
   EMAIL_RULE_MESSAGE,
+  isNewPasswordFieldsValid,
   isValidEmail,
   isValidEmailCode,
   isValidPassword,
@@ -74,20 +75,24 @@ describe('validationRules', () => {
   })
 
   describe('isValidPassword', () => {
-    it('영문+숫자를 포함한 8자 이상은 통과한다', () => {
-      expect(isValidPassword('abcdefg1')).toBe(true)
+    it('영문+숫자+특수기호를 포함한 8자 이상은 통과한다', () => {
+      expect(isValidPassword('abcdef1!')).toBe(true)
       expect(isValidPassword('Password1!')).toBe(true)
     })
 
-    it('영문만 포함되면 실패한다 (숫자 미포함)', () => {
+    it('특수기호가 없으면 실패한다 (영문+숫자만 포함)', () => {
+      expect(isValidPassword('abcdefg1')).toBe(false)
+    })
+
+    it('영문만 포함되면 실패한다 (숫자·특수기호 미포함)', () => {
       expect(isValidPassword('abcdefgh')).toBe(false)
     })
 
-    it('숫자만 포함되면 실패한다 (영문 미포함)', () => {
+    it('숫자만 포함되면 실패한다 (영문·특수기호 미포함)', () => {
       expect(isValidPassword('12345678')).toBe(false)
     })
 
-    it('특수문자만 포함되면 실패한다', () => {
+    it('특수문자만 포함되면 실패한다 (영문·숫자 미포함)', () => {
       expect(isValidPassword('!@#$%^&*')).toBe(false)
     })
 
@@ -96,32 +101,33 @@ describe('validationRules', () => {
     })
 
     it('경계값 8자는 통과한다', () => {
-      expect(isValidPassword('abcdefg1')).toBe(true)
+      expect(isValidPassword('abcdef1!')).toBe(true)
     })
 
     it('한글이 포함되면 실패한다', () => {
-      expect(isValidPassword('abcdefg1가')).toBe(false)
+      expect(isValidPassword('abcdef1!가')).toBe(false)
     })
 
     it('공백이 포함되면 실패한다', () => {
-      expect(isValidPassword('abcd efg1')).toBe(false)
+      expect(isValidPassword('abcd ef1!')).toBe(false)
     })
 
     it('길이 상한 없이 통과한다 (최대 길이 제한 없음)', () => {
-      expect(isValidPassword('a1'.repeat(50))).toBe(true)
+      expect(isValidPassword('a1!'.repeat(20))).toBe(true)
     })
 
     it("작은따옴표(')가 포함되면 실패한다", () => {
-      expect(isValidPassword("abcdefg1'")).toBe(false)
+      expect(isValidPassword("abcdef1!'")).toBe(false)
     })
 
-    it('대문자로만 구성되어도 영문+숫자 조합이면 통과한다 (대소문자 구분 없음)', () => {
-      expect(isValidPassword('ABCDEFG1')).toBe(true)
+    it('대문자로만 구성되어도 영문+숫자+특수기호 조합이면 통과한다 (대소문자 구분 없음)', () => {
+      expect(isValidPassword('ABCDEF1!')).toBe(true)
     })
   })
 
   it('PASSWORD_RULE_MESSAGE는 규칙 안내 문구를 담고 있다', () => {
-    expect(PASSWORD_RULE_MESSAGE).toContain('8자리 이상')
+    expect(PASSWORD_RULE_MESSAGE).toContain('8자 이상')
+    expect(PASSWORD_RULE_MESSAGE).toContain('특수기호')
     expect(PASSWORD_RULE_MESSAGE).toContain("'")
   })
 
@@ -140,6 +146,24 @@ describe('validationRules', () => {
 
     it('영문·숫자·특수문자(작은따옴표 제외)는 그대로 유지한다', () => {
       expect(sanitizePasswordInput('Abc123!@#')).toBe('Abc123!@#')
+    })
+  })
+
+  describe('isNewPasswordFieldsValid', () => {
+    it('형식에 맞고 서로 일치하면 true를 반환한다', () => {
+      expect(isNewPasswordFieldsValid('abcd1234!', 'abcd1234!')).toBe(true)
+    })
+
+    it('형식에 맞지 않으면 false를 반환한다', () => {
+      expect(isNewPasswordFieldsValid('abc', 'abc')).toBe(false)
+    })
+
+    it('특수기호가 없으면 서로 일치해도 false를 반환한다', () => {
+      expect(isNewPasswordFieldsValid('abcd1234', 'abcd1234')).toBe(false)
+    })
+
+    it('서로 일치하지 않으면 false를 반환한다', () => {
+      expect(isNewPasswordFieldsValid('abcd1234!', 'different1!')).toBe(false)
     })
   })
 

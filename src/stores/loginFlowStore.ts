@@ -1,11 +1,18 @@
 import { create } from 'zustand'
 
+import type { LoginDevice } from '../api/auth'
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface PendingVerification {
   email: string
-  /** 이메일 인증번호 만료 시각 (Date.now() 기준 ms) */
-  expiresAt: number
+  /** verify-device가 비밀번호를 다시 요구하므로(코드만으로 토큰 발급 방지) 1차 로그인 입력값을
+   *  그대로 들고 간다. Figma 2차 인증 화면에 비밀번호 입력칸이 없어 재입력을 요구하지 않는다.
+   *  registerFlowStore.registerPassword와 동일한 정책 — persist하지 않아 새로고침 시 사라진다 */
+  password: string
+  /** 1차 로그인에 사용한 값을 그대로 재사용해야 두 요청의 조합이 어긋나지 않는다 */
+  fingerprintCode: string
+  device: LoginDevice
 }
 
 interface LoginFlowState {

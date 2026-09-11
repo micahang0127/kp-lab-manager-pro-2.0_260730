@@ -19,6 +19,7 @@ import { formatMaskedIdentity } from '../utils/formatIdentityVerifyResult'
 export function RegisterAccountCheckPage() {
   const navigate = useNavigate()
   const identityVerifyResult = useRegisterFlowStore((s) => s.identityVerifyResult)
+  const resetRegisterFlow = useRegisterFlowStore((s) => s.resetRegisterFlow)
   const maskedIdentity = identityVerifyResult ? formatMaskedIdentity(identityVerifyResult) : ''
 
   const handleContinue = () => {
@@ -49,11 +50,12 @@ export function RegisterAccountCheckPage() {
           <button
             type="button"
             onClick={() => {
-              void navigate({ to: '/register-identity-verification' })
+              resetRegisterFlow()
+              void navigate({ to: '/login' })
             }}
             className="opacity-50"
           >
-            ← 이전
+            ← 로그인으로 돌아가기
           </button>
         }
       />

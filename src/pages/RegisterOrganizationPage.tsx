@@ -4,11 +4,13 @@ import { useRef, useState } from 'react'
 
 import { signUp } from '../api/user'
 import checkMarkIcon from '../assets/icons/register/check-mark.svg'
-import clearCircleIcon from '../assets/icons/register/clear-circle.svg'
+import closeIcon from '../assets/icons/register/close-x.svg'
 import radioSelectedIcon from '../assets/icons/register/radio-selected.svg'
 import radioUnselectedIcon from '../assets/icons/register/radio-unselected.svg'
 import uploadIcon from '../assets/icons/register/upload.svg'
 import { AuthCardLayout, AuthFormActions } from '../components/auth'
+import { ErrorMessage } from '../components/error/ErrorMessage'
+import { FormInput } from '../components/form'
 import { useFindAccountFlowStore } from '../stores/findAccountFlowStore'
 import { useRegisterFlowStore } from '../stores/registerFlowStore'
 import { formatDate } from '../utils/date'
@@ -42,6 +44,7 @@ export function RegisterOrganizationPage() {
   const identityVerificationCode = useRegisterFlowStore((s) => s.identityVerificationCode)
   const termsAgreement = useRegisterFlowStore((s) => s.termsAgreement)
   const registerEmail = useRegisterFlowStore((s) => s.registerEmail)
+  const registerEmailCode = useRegisterFlowStore((s) => s.registerEmailCode)
   const registerPassword = useRegisterFlowStore((s) => s.registerPassword)
   const invitedOrgs = useRegisterFlowStore((s) => s.invitedOrgs)
   const businessRegistrationReview = useRegisterFlowStore((s) => s.businessRegistrationReview)
@@ -62,6 +65,10 @@ export function RegisterOrganizationPage() {
   const [error, setError] = useState<string | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  // 사업자등록증 분석으로 자동 채워지는 조직명 — 랩매니저에 표시될 이름이므로 제출 전 수정할 수
+  // 있도록 별도 로컬 state로 둔다(businessRegistrationReview.corporateName은 분석 원본 그대로라
+  // 수정 불가). 업로드 성공 시 onSuccess에서, 파일 제거 시 handleRemove에서 동기화한다.
+  const [orgName, setOrgName] = useState('')
 
   // invitedOrgs가 null(조회 실패 포함)이거나 빈 배열이면 "초대 없음"으로 간주해 새 조직 만들기
   // 화면으로 안내한다. 초대 조직이 있으면 첫 번째 항목을 기본 선택 상태로 보여준다(Figma 디자인 기준).
@@ -86,6 +93,7 @@ export function RegisterOrganizationPage() {
       setBusinessRegistrationFile(file)
       setBusinessRegistrationReview(review)
       setBusinessRegistrationS3Key(s3Key)
+      setOrgName(review.corporateName ?? '')
     },
   })
   const uploadError = uploadMutation.error instanceof Error ? uploadMutation.error.message : null
@@ -98,10 +106,14 @@ export function RegisterOrganizationPage() {
     email: registerEmail ?? undefined,
     password: registerPassword ?? undefined,
     verificationCode: identityVerificationCode ?? undefined,
+    code: registerEmailCode ?? undefined,
+    joinType: hasInvitedOrgs ? 1 : 0,
+    termsYn: 'Y',
+    marketingYn: termsAgreement?.marketingOptIn ? 'Y' : 'N',
     orgIdx: hasInvitedOrgs && selectedInvite ? Number(selectedInvite.orgIdx) : undefined,
     invitedIdx: hasInvitedOrgs && selectedInvite ? Number(selectedInvite.invitedIdx) : undefined,
     regFile: hasInvitedOrgs ? undefined : (businessRegistrationS3Key ?? undefined),
-    orgName: hasInvitedOrgs ? undefined : (businessRegistrationReview?.corporateName ?? undefined),
+    orgName: hasInvitedOrgs ? undefined : orgName || undefined,
     regNo: hasInvitedOrgs
       ? undefined
       : (businessRegistrationReview?.registrationNumber ?? undefined),
@@ -118,9 +130,15 @@ export function RegisterOrganizationPage() {
       const email = registerEmail ?? undefined
       const password = registerPassword ?? undefined
       const verificationCode = identityVerificationCode ?? undefined
-      if (!email || !password || !verificationCode) {
+      const code = registerEmailCode ?? undefined
+      if (!email || !password || !verificationCode || !code) {
         throw new Error('회원가입에 필요한 정보가 누락되었습니다. 처음부터 다시 진행해 주세요.')
       }
+      // termsYn은 4단계(이용약관 동의)에서 필수 약관에 모두 동의해야만 이 페이지까지 올 수 있어
+      // 항상 'Y'다(라우트 가드가 termsAgreement 존재 여부를 확인한다). marketingYn(선택)만
+      // termsAgreement.marketingOptIn 값을 따른다.
+      const termsYn = 'Y'
+      const marketingYn = termsAgreement?.marketingOptIn ? 'Y' : 'N'
       if (hasInvitedOrgs) {
         if (!selectedInvite) {
           throw new Error('가입할 조직을 선택해 주세요.')
@@ -129,6 +147,10 @@ export function RegisterOrganizationPage() {
           email,
           password,
           verificationCode,
+          code,
+          joinType: 1,
+          termsYn,
+          marketingYn,
           orgIdx: Number(selectedInvite.orgIdx),
           invitedIdx: Number(selectedInvite.invitedIdx),
         })
@@ -137,12 +159,19 @@ export function RegisterOrganizationPage() {
       if (!regFile) {
         throw new Error('사업자등록증을 먼저 업로드해 주세요.')
       }
+      if (!orgName.trim()) {
+        throw new Error('조직명을 입력해 주세요.')
+      }
       return signUp({
         email,
         password,
         verificationCode,
+        code,
+        joinType: 0,
+        termsYn,
+        marketingYn,
         regFile,
-        orgName: businessRegistrationReview?.corporateName ?? undefined,
+        orgName: orgName.trim(),
         regNo: businessRegistrationReview?.registrationNumber ?? undefined,
         ceoName: businessRegistrationReview?.ceoName ?? undefined,
         address: businessRegistrationReview?.businessAddress ?? undefined,
@@ -193,11 +222,12 @@ export function RegisterOrganizationPage() {
     clearBusinessRegistrationFile()
     clearBusinessRegistrationReview()
     clearBusinessRegistrationS3Key()
+    setOrgName('')
   }
 
   const canSubmit = hasInvitedOrgs
     ? !!selectedInvite && !signUpMutation.isPending
-    : uploadMutation.isSuccess && !signUpMutation.isPending
+    : uploadMutation.isSuccess && !!orgName.trim() && !signUpMutation.isPending
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -259,13 +289,15 @@ export function RegisterOrganizationPage() {
           <div className="flex w-full flex-col items-start gap-1 text-[#1a1a17]">
             <p className="text-xl font-bold leading-7">새 조직을 등록해 주세요.</p>
             <p className="text-xs leading-[18px]">
-              회사 정보를 등록하면 새 조직이 생성되고, 최초 가입자는 시스템 관리자로 지정됩니다.
+              {uploadMutation.isSuccess
+                ? '사업자등록증에서 조직 정보를 확인합니다. 가입 후 시스템 관리자 권한이 부여됩니다.'
+                : '회사 정보를 등록하면 새 조직이 생성되고, 최초 가입자는 시스템 관리자로 지정됩니다.'}
             </p>
           </div>
 
           <div className="flex w-full flex-col items-start gap-1">
             {uploadMutation.isSuccess && uploadMutation.data ? (
-              <div className="flex h-20 w-full items-center gap-2 rounded-xl border border-dashed border-[#c9c9c4] bg-[#fec741]/20 px-5 py-4">
+              <div className="flex h-20 w-full items-center gap-2 rounded-xl border border-dashed border-[#c9c9c4] bg-[#001e43]/5 px-5 py-4">
                 <div className="flex flex-1 items-center gap-3">
                   <img src={checkMarkIcon} alt="" aria-hidden className="size-7 shrink-0" />
                   <div className="flex flex-1 flex-col items-start gap-1 text-[#1a1a17]">
@@ -284,7 +316,7 @@ export function RegisterOrganizationPage() {
                   onClick={handleRemove}
                   className="flex size-4 shrink-0 items-center justify-center"
                 >
-                  <img src={clearCircleIcon} alt="" aria-hidden className="size-3" />
+                  <img src={closeIcon} alt="" aria-hidden className="size-3" />
                 </button>
               </div>
             ) : (
@@ -333,10 +365,21 @@ export function RegisterOrganizationPage() {
               className="hidden"
               onChange={(e) => applyFile(e.target.files?.[0])}
             />
-            {(error ?? uploadError) && (
-              <p className="text-[10px] text-red-600">{error ?? uploadError}</p>
-            )}
+            <ErrorMessage message={error ?? uploadError} />
           </div>
+
+          {uploadMutation.isSuccess && (
+            <FormInput
+              id="register-org-name"
+              label="조직명 *"
+              required
+              hideRequiredMark
+              value={orgName}
+              onChange={(e) => setOrgName(e.target.value)}
+              message="조직명은 랩매니저에서 표시되는 이름이며 필요한 경우 수정할 수 있습니다."
+              messageColor="gray"
+            />
+          )}
         </div>
       )}
 
@@ -347,6 +390,7 @@ export function RegisterOrganizationPage() {
         <p className="font-bold">[임시] 회원가입 진행 데이터 확인</p>
         <p>가입 방법(registerMethod): {registerMethod ?? '-'}</p>
         <p>이메일(registerEmail): {registerEmail ?? '-'}</p>
+        <p>이메일 인증코드(registerEmailCode): {registerEmailCode ?? '-'}</p>
         <p>비밀번호(registerPassword): {registerPassword ?? '-'}</p>
         <p>초대 조직(invitedOrgs): {invitedOrgs ? JSON.stringify(invitedOrgs) : '-'}</p>
         <p>본인인증 키(identityVerificationCode): {identityVerificationCode ?? '-'}</p>
@@ -378,7 +422,7 @@ export function RegisterOrganizationPage() {
       <AuthFormActions
         primaryLabel={primaryLabel}
         primaryDisabled={!canSubmit}
-        belowPrimary={signUpError && <p className="text-[10px] text-red-600">{signUpError}</p>}
+        belowPrimary={<ErrorMessage message={signUpError} />}
         secondaryLeft={
           <button
             type="button"

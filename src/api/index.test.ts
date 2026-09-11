@@ -1,8 +1,8 @@
 import { delay, http, HttpResponse } from 'msw'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { server } from '../test/mocks/server'
-import { api } from './index'
+import { ApiError, api } from './index'
 
 describe('api client', () => {
   beforeEach(() => {
@@ -115,6 +115,43 @@ describe('api client', () => {
     await expect(api.get('/test')).rejects.toThrow('알 수 없는 오류가 발생했습니다.')
   })
 
+  it('CommonResponsePayload 포맷을 거치지 않은 원본 예외(message가 순수 문자열)는 그대로 던진다', async () => {
+    // Nest 기본 예외 필터가 그대로 내려주는 형태 — result/data 필드 자체가 없고 message도
+    // 배열/객체가 아닌 순수 문자열이다. Object.values(문자열)로 잘못 처리하면 첫 글자만
+    // 남는 버그가 있었다(예: "등록되지 않은 메세지 코드입니다: E_001" → "등").
+    server.use(
+      http.post('*/test', () =>
+        HttpResponse.json(
+          {
+            statusCode: 500,
+            error: 'Internal Server Error',
+            message: '등록되지 않은 메세지 코드입니다: E_001',
+          },
+          { status: 500 }
+        )
+      )
+    )
+
+    await expect(api.post('/test', {})).rejects.toThrow('등록되지 않은 메세지 코드입니다: E_001')
+  })
+
+  it('message가 순수 문자열이면 ApiError.fieldErrors는 undefined다', async () => {
+    server.use(
+      http.post('*/test', () =>
+        HttpResponse.json(
+          { statusCode: 500, error: 'Internal Server Error', message: '알 수 없는 오류' },
+          { status: 500 }
+        )
+      )
+    )
+
+    await expect(api.post('/test', {})).rejects.toSatisfy((err: unknown) => {
+      expect(err).toBeInstanceOf(ApiError)
+      expect((err as ApiError).fieldErrors).toBeUndefined()
+      return true
+    })
+  })
+
   it('DTO 검증 실패 응답(message가 { 필드명: [메시지] } 객체)이면 첫 번째 필드의 첫 메시지를 던진다', async () => {
     server.use(
       http.post('*/test', () =>
@@ -131,6 +168,51 @@ describe('api client', () => {
     )
 
     await expect(api.post('/test', {})).rejects.toThrow('올바른 이메일 형식이 아닙니다')
+  })
+
+  it('DTO 검증 실패 응답은 ApiError.fieldErrors에 필드별 메시지 원본을 보존한다', async () => {
+    server.use(
+      http.post('*/test', () =>
+        HttpResponse.json(
+          {
+            result: false,
+            statusCode: 400,
+            data: null,
+            message: {
+              email: ['올바른 이메일 형식이 아닙니다'],
+              password: ['비밀번호는 8자 이상이어야 합니다'],
+            },
+          },
+          { status: 400 }
+        )
+      )
+    )
+
+    await expect(api.post('/test', {})).rejects.toSatisfy((err: unknown) => {
+      expect(err).toBeInstanceOf(ApiError)
+      expect((err as ApiError).fieldErrors).toEqual({
+        email: ['올바른 이메일 형식이 아닙니다'],
+        password: ['비밀번호는 8자 이상이어야 합니다'],
+      })
+      return true
+    })
+  })
+
+  it('서비스 로직 에러(message가 배열)는 ApiError.fieldErrors가 undefined다', async () => {
+    server.use(
+      http.post('*/test', () =>
+        HttpResponse.json(
+          { result: false, statusCode: 400, data: null, message: ['발송 횟수를 초과했습니다.'] },
+          { status: 400 }
+        )
+      )
+    )
+
+    await expect(api.post('/test', {})).rejects.toSatisfy((err: unknown) => {
+      expect(err).toBeInstanceOf(ApiError)
+      expect((err as ApiError).fieldErrors).toBeUndefined()
+      return true
+    })
   })
 
   it('message가 null이어도(정상 흐름에서는 성공 응답에만 오지만) 안전하게 기본 에러 메시지로 대체한다', async () => {
@@ -179,5 +261,63 @@ describe('api client', () => {
 
     const res = await api.get<{ ok: boolean }>('/test')
     expect(res.data?.ok).toBe(true)
+  })
+
+  describe('401 자동 로그아웃', () => {
+    // jsdom의 window.location.replace는 non-configurable이라 vi.spyOn으로 직접 모킹할 수 없다 —
+    // location 객체 자체를 테스트용 모킹 객체로 교체한다.
+    const originalLocation = window.location
+
+    afterEach(() => {
+      Object.defineProperty(window, 'location', { value: originalLocation, writable: true })
+      vi.restoreAllMocks()
+    })
+
+    it('토큰이 있고 메시지에 "만료"가 포함되면 토큰을 지우고 /login으로 리다이렉트한다', async () => {
+      sessionStorage.setItem('accessToken', 'expired-token')
+      const replaceSpy = vi.fn()
+      Object.defineProperty(window, 'location', {
+        value: { ...originalLocation, replace: replaceSpy },
+        writable: true,
+      })
+      server.use(
+        http.get('*/test', () =>
+          HttpResponse.json(
+            { result: false, statusCode: 401, data: null, message: ['토큰이 만료되었습니다.'] },
+            { status: 401 }
+          )
+        )
+      )
+
+      await expect(api.get('/test')).rejects.toThrow('토큰이 만료되었습니다.')
+
+      expect(sessionStorage.getItem('accessToken')).toBeNull()
+      expect(replaceSpy).toHaveBeenCalledWith('/login')
+    })
+
+    it('토큰이 없는데 메시지에 "만료"가 포함돼도(예: 로그인 2차 인증 코드 만료) 리다이렉트하지 않는다', async () => {
+      const replaceSpy = vi.fn()
+      Object.defineProperty(window, 'location', {
+        value: { ...originalLocation, replace: replaceSpy },
+        writable: true,
+      })
+      server.use(
+        http.post('*/test', () =>
+          HttpResponse.json(
+            {
+              result: false,
+              statusCode: 401,
+              data: null,
+              message: ['인증코드가 만료되었습니다. 인증코드를 다시 요청해주세요'],
+            },
+            { status: 401 }
+          )
+        )
+      )
+
+      await expect(api.post('/test', {})).rejects.toThrow('인증코드가 만료되었습니다')
+
+      expect(replaceSpy).not.toHaveBeenCalled()
+    })
   })
 })

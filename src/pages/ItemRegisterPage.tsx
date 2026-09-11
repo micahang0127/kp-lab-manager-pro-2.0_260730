@@ -4,6 +4,7 @@ import { useState } from 'react'
 
 import type { Item } from '../api/item'
 import { getItems } from '../api/item'
+import { ErrorMessage } from '../components/error/ErrorMessage'
 import { Layout } from '../components/layout/Layout'
 import { PAGE_TITLES } from '../components/layout/sidebarMenu'
 import { DataTable } from '../components/table/DataTable'
@@ -80,9 +81,7 @@ export function ItemRegisterPage() {
 
         {isLoading && <p className="mt-2 text-sm text-gray-600">불러오는 중...</p>}
         {isError && (
-          <p role="alert" className="mt-2 text-sm text-red-600">
-            물품 목록을 불러오지 못했습니다.
-          </p>
+          <ErrorMessage message="물품 목록을 불러오지 못했습니다." size="sm" className="mt-2" />
         )}
 
         <div className="mt-4">

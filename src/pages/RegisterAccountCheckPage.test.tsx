@@ -68,19 +68,19 @@ describe('RegisterAccountCheckPage', () => {
     expect(mockNavigate).toHaveBeenCalledWith({ to: '/register-terms' })
   })
 
-  it('"← 이전" 버튼을 클릭하면 본인인증 페이지로 이동한다', async () => {
+  it('"← 로그인으로 돌아가기" 버튼을 클릭하면 /login으로 이동하고 registerFlowStore를 초기화한다', async () => {
+    useRegisterFlowStore.setState({ identityVerifyResult: IDENTITY_VERIFY_RESULT })
     render(<RegisterAccountCheckPage />)
 
-    await userEvent.click(screen.getByRole('button', { name: /이전/ }))
-
-    expect(mockNavigate).toHaveBeenCalledWith({ to: '/register-identity-verification' })
-  })
-
-  it('"로그인" 버튼을 클릭하면 /login으로 이동한다', async () => {
-    render(<RegisterAccountCheckPage />)
-
-    await userEvent.click(screen.getByRole('button', { name: '로그인' }))
+    await userEvent.click(screen.getByRole('button', { name: /로그인으로 돌아가기/ }))
 
     expect(mockNavigate).toHaveBeenCalledWith({ to: '/login' })
+    expect(useRegisterFlowStore.getState().identityVerifyResult).toBeNull()
+  })
+
+  it('"로그인" 버튼을 렌더링하지 않는다', () => {
+    render(<RegisterAccountCheckPage />)
+
+    expect(screen.queryByRole('button', { name: '로그인' })).not.toBeInTheDocument()
   })
 })

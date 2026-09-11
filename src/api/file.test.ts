@@ -21,7 +21,14 @@ describe('createPresignedUploadUrl API', () => {
               urls: [
                 {
                   originFileName: '사업자등록증.pdf',
-                  presignedUrl: 'https://s3.example.com/bucket/key.pdf?X-Amz-Signature=abc',
+                  presignedUrl: 'https://s3.example.com/bucket/',
+                  presignedFields: {
+                    'Content-Type': 'application/pdf',
+                    bucket: 'test-bucket',
+                    key: 'PRODUCTION/BusinessRegistration/260901/xxxxxxxx.pdf',
+                    Policy: 'encoded-policy',
+                    'X-Amz-Signature': 'signature',
+                  },
                   s3Key: 'PRODUCTION/BusinessRegistration/260901/xxxxxxxx.pdf',
                 },
               ],
@@ -40,6 +47,9 @@ describe('createPresignedUploadUrl API', () => {
 
     expect(result.data?.urls[0]?.s3Key).toBe('PRODUCTION/BusinessRegistration/260901/xxxxxxxx.pdf')
     expect(result.data?.urls[0]?.presignedUrl).toContain('https://')
+    expect(result.data?.urls[0]?.presignedFields.key).toBe(
+      'PRODUCTION/BusinessRegistration/260901/xxxxxxxx.pdf'
+    )
   })
 
   it('DTO 검증 실패 시 필드별 에러 메시지로 ApiError를 던진다', async () => {

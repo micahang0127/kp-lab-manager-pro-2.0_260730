@@ -15,10 +15,14 @@
       - Permissions-Policy
 
       개발 환경에서는 메타 태그로 설정, 프로덕션에서는 서버 헤더 권장
+
+      주의: X-Frame-Options는 스펙상 HTTP 응답 헤더로만 동작하며 <meta http-equiv>로는
+      브라우저가 인식하지 않는다(클릭재킹 방지 효과 없음, DevTools에서 무효 지시자로 표시됨).
+      따라서 meta 태그로는 추가하지 않으며, 실제 방지는 FUTURE-WORK.md에 따라
+      CloudFront 등 서버 응답 헤더로 설정되어야 한다.
     -->
     <meta http-equiv="X-Content-Type-Options" content="nosniff" />
     <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin" />
-    <meta http-equiv="X-Frame-Options" content="DENY" />
 
     <!--
       Content-Security-Policy (CSP)

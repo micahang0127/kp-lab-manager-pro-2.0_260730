@@ -3,28 +3,6 @@ import { http, HttpResponse } from 'msw'
 const BASE_URL = 'http://localhost:3000'
 
 export const handlers = [
-  // 로그인 성공 핸들러
-  http.post(`${BASE_URL}/auth/login`, ({ request }) => {
-    const body = request.headers.get('authorization')
-    if (!body) {
-      return HttpResponse.json(
-        {
-          result: false,
-          statusCode: 400,
-          data: null,
-          message: ['이메일 또는 비밀번호가 틀렸습니다.'],
-        },
-        { status: 400 }
-      )
-    }
-    return HttpResponse.json({
-      result: true,
-      statusCode: 200,
-      data: { accessToken: 'mock-token-success' },
-      message: [],
-    })
-  }),
-
   // 테스트 GET 요청 (API 클라이언트 테스트용)
   http.get(`${BASE_URL}/test`, ({ request }) => {
     const authHeader = request.headers.get('authorization')

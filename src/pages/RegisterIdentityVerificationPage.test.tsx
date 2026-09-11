@@ -50,7 +50,11 @@ describe('RegisterIdentityVerificationPage', () => {
   beforeEach(() => {
     vi.mocked(useNavigate).mockReturnValue(mockNavigate)
     vi.clearAllMocks()
-    useRegisterFlowStore.setState({ identityVerifyResult: null, identityVerificationCode: null })
+    useRegisterFlowStore.setState({
+      identityVerifyResult: null,
+      identityVerifySource: null,
+      identityVerificationCode: null,
+    })
   })
 
   it('페이지 제목과 안내 문구를 렌더링한다', () => {
@@ -82,6 +86,7 @@ describe('RegisterIdentityVerificationPage', () => {
       hasExistingAccount: false,
     })
     expect(useRegisterFlowStore.getState().identityVerificationCode).toBe('iv-no-account-id')
+    expect(useRegisterFlowStore.getState().identityVerifySource).toBe('register')
     expect(mockNavigate).toHaveBeenCalledWith({ to: '/register-account-check' })
   })
 

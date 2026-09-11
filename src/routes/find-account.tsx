@@ -1,12 +1,9 @@
-import { createFileRoute, redirect } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 
 import { FindAccountPage } from '../pages/FindAccountPage'
+import { redirectIfAuthenticated } from '../utils/requireAuth'
 
 export const Route = createFileRoute('/find-account')({
-  beforeLoad: () => {
-    if (sessionStorage.getItem('accessToken')) {
-      return redirect({ to: '/main' })
-    }
-  },
+  beforeLoad: redirectIfAuthenticated,
   component: FindAccountPage,
 })

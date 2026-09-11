@@ -15,7 +15,7 @@ vi.mock('@tanstack/react-router', () => ({
   useNavigate: vi.fn(),
 }))
 
-const VALID_PASSWORD = 'abcd1234'
+const VALID_PASSWORD = 'abcd1234!'
 
 describe('RegisterPasswordPage', () => {
   beforeEach(() => {
@@ -82,17 +82,15 @@ describe('RegisterPasswordPage', () => {
     expect(screen.getByLabelText('신규 비밀번호 *')).toHaveValue('abcd1234')
   })
 
-  it('비밀번호는 기본적으로 마스킹되고, 표시 아이콘을 클릭하면 평문으로 전환된다', async () => {
+  it('비밀번호는 항상 마스킹되고, 표시/숨기기 토글 버튼을 렌더링하지 않는다', async () => {
     render(<RegisterPasswordPage />)
 
     const input = screen.getByLabelText('신규 비밀번호 *')
     await userEvent.type(input, VALID_PASSWORD)
 
     expect(input).toHaveAttribute('type', 'password')
-
-    await userEvent.click(screen.getAllByRole('button', { name: '비밀번호 표시' })[0])
-
-    expect(input).toHaveAttribute('type', 'text')
+    expect(screen.queryByRole('button', { name: '비밀번호 표시' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '비밀번호 숨기기' })).not.toBeInTheDocument()
   })
 
   it('지우기 아이콘을 클릭하면 입력값이 비워진다', async () => {

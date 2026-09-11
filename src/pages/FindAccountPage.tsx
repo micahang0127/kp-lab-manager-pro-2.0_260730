@@ -1,7 +1,5 @@
 import { useNavigate } from '@tanstack/react-router'
-import { useState } from 'react'
 
-import moreVerticalIcon from '../assets/icons/register/more-vertical.svg'
 import {
   AuthCardLayout,
   AuthFormActions,
@@ -26,7 +24,7 @@ export function FindAccountPage() {
   const navigate = useNavigate()
   const verifiedIdentity = useFindAccountFlowStore((s) => s.verifiedIdentity)
   const setVerifiedIdentity = useFindAccountFlowStore((s) => s.setVerifiedIdentity)
-  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false)
+  const clearVerifiedIdentity = useFindAccountFlowStore((s) => s.clearVerifiedIdentity)
 
   const identityVerifyResult = verifiedIdentity?.result ?? null
   const maskedIdentity = identityVerifyResult ? formatMaskedIdentity(identityVerifyResult) : ''
@@ -59,66 +57,59 @@ export function FindAccountPage() {
         <div className="flex w-full flex-col items-start gap-[60px]">
           <CompletedStepBadge label="본인인증 완료" />
 
-          <div className="flex w-full flex-col items-start gap-3">
-            <div className="flex w-full flex-col items-start gap-1 text-[#1a1a17]">
+          <div className="flex w-full flex-col items-start gap-3 text-[#1a1a17]">
+            <div className="flex w-full flex-col items-start gap-1">
               <p className="text-xl font-bold leading-7">가입된 계정이 있습니다.</p>
               <p className="text-xs leading-[18px]">
-                랩매니저는 한 사람당 하나의 계정만 사용할 수 있습니다.
+                아래 계정으로 로그인하거나 비밀번호를 재설정할 수 있습니다.
               </p>
             </div>
 
-            <div className="flex w-full items-start justify-end gap-2 rounded-xl bg-[rgba(254,199,65,0.2)] py-4 pl-5 pr-2.5">
-              <div className="flex flex-1 flex-col items-start gap-2 text-[#1a1a17]">
-                {maskedIdentity && <p className="whitespace-pre text-[10px]">{maskedIdentity}</p>}
-                {identityVerifyResult.existingEmail && (
-                  <p className="text-base font-bold leading-5">
-                    {identityVerifyResult.existingEmail}
-                  </p>
-                )}
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsMoreMenuOpen((prev) => !prev)}
-                aria-label="더보기"
-                aria-expanded={isMoreMenuOpen}
-                className="shrink-0"
-              >
-                <img src={moreVerticalIcon} alt="" aria-hidden className="size-4" />
-              </button>
+            <div className="flex w-full flex-col items-start gap-2 rounded-xl border border-[rgba(0,30,67,0.3)] bg-[rgba(0,30,67,0.05)] px-5 py-4">
+              {maskedIdentity && <p className="whitespace-pre text-[10px]">{maskedIdentity}</p>}
+              {identityVerifyResult.existingEmail && (
+                <p className="text-base font-bold leading-5">
+                  {identityVerifyResult.existingEmail}
+                </p>
+              )}
             </div>
-
-            {isMoreMenuOpen && (
-              <button
-                type="button"
-                // [TEMP] 26.09.08 로그인 전 상태라 인증된 탈퇴 API(withdraw)를 호출할 수 없어
-                // 동작 없이 UI만 우선 반영. 탈퇴 플로우 연동 시 실제 동작으로 교체
-                onClick={() => {}}
-                className="w-full rounded border border-[#c9c9c4] bg-white py-[13px] text-center text-xs font-medium text-[#2b2b29] hover:bg-gray-50"
-              >
-                계정 탈퇴
-              </button>
-            )}
           </div>
         </div>
 
-        <AuthFormActions
-          primaryLabel="로그인 재시도"
-          primaryType="button"
-          onPrimaryClick={() => {
-            void navigate({ to: '/login' })
-          }}
-          secondaryRight={
+        <div className="flex w-full flex-col items-start gap-5">
+          <div className="flex w-full flex-col items-start gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                void navigate({ to: '/login' })
+              }}
+              className="flex h-11 w-full items-center justify-center rounded bg-[#001e43] text-sm font-medium text-white hover:bg-[#00152f]"
+            >
+              기존 계정으로 로그인
+            </button>
             <button
               type="button"
               onClick={() => {
                 void navigate({ to: '/find-account-reset-password' })
               }}
-              className="opacity-50"
+              className="flex h-11 w-full items-center justify-center rounded border border-[#c9c9c4] bg-white text-sm font-medium text-[#1a1a17] hover:bg-gray-50"
             >
               비밀번호 재설정
             </button>
-          }
-        />
+          </div>
+
+          <div className="flex w-full items-center justify-end">
+            <button
+              type="button"
+              // [TEMP] 26.09.08 로그인 전 상태라 인증된 탈퇴 API(withdraw)를 호출할 수 없어
+              // 동작 없이 UI만 우선 반영. 탈퇴 플로우 연동 시 실제 동작으로 교체
+              onClick={() => {}}
+              className="text-xs font-medium text-[#1a1a17] opacity-50"
+            >
+              계정탈퇴
+            </button>
+          </div>
+        </div>
       </AuthCardLayout>
     )
   }
@@ -149,6 +140,7 @@ export function FindAccountPage() {
             <button
               type="button"
               onClick={() => {
+                clearVerifiedIdentity()
                 void navigate({ to: '/login' })
               }}
               className="opacity-50"

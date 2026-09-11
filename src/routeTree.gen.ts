@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as RegisterTermsRouteImport } from './routes/register-terms'
+import { Route as RegisterResetPasswordCompleteRouteImport } from './routes/register-reset-password-complete'
 import { Route as RegisterPasswordRouteImport } from './routes/register-password'
 import { Route as RegisterOrganizationRouteImport } from './routes/register-organization'
 import { Route as RegisterIdentityVerificationRouteImport } from './routes/register-identity-verification'
@@ -18,7 +19,9 @@ import { Route as RegisterAccountExistsRouteImport } from './routes/register-acc
 import { Route as RegisterAccountCheckRouteImport } from './routes/register-account-check'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as MainRouteImport } from './routes/main'
+import { Route as LoginVerifyRouteImport } from './routes/login-verify'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as FindAccountResetPasswordRouteImport } from './routes/find-account-reset-password'
 import { Route as FindAccountRouteImport } from './routes/find-account'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SettingsStorageLocationRouteImport } from './routes/settings/storage-location'
@@ -32,7 +35,6 @@ import { Route as SafetyMsdsRouteImport } from './routes/safety/msds'
 import { Route as SafetyHazardousQuantityRouteImport } from './routes/safety/hazardous-quantity'
 import { Route as SafetyHazardousChemicalRouteImport } from './routes/safety/hazardous-chemical'
 import { Route as ReservationPreparingRouteImport } from './routes/reservation/preparing'
-import { Route as LoginVerifyRouteImport } from './routes/login/verify'
 import { Route as ItemsRegisterRouteImport } from './routes/items/register'
 import { Route as ItemsPhotoPendingRouteImport } from './routes/items/photo-pending'
 import { Route as ItemsIncomingPendingRouteImport } from './routes/items/incoming-pending'
@@ -43,6 +45,12 @@ const RegisterTermsRoute = RegisterTermsRouteImport.update({
   path: '/register-terms',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RegisterResetPasswordCompleteRoute =
+  RegisterResetPasswordCompleteRouteImport.update({
+    id: '/register-reset-password-complete',
+    path: '/register-reset-password-complete',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const RegisterPasswordRoute = RegisterPasswordRouteImport.update({
   id: '/register-password',
   path: '/register-password',
@@ -85,11 +93,22 @@ const MainRoute = MainRouteImport.update({
   path: '/main',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LoginVerifyRoute = LoginVerifyRouteImport.update({
+  id: '/login-verify',
+  path: '/login-verify',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FindAccountResetPasswordRoute =
+  FindAccountResetPasswordRouteImport.update({
+    id: '/find-account-reset-password',
+    path: '/find-account-reset-password',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const FindAccountRoute = FindAccountRouteImport.update({
   id: '/find-account',
   path: '/find-account',
@@ -155,11 +174,6 @@ const ReservationPreparingRoute = ReservationPreparingRouteImport.update({
   path: '/reservation/preparing',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LoginVerifyRoute = LoginVerifyRouteImport.update({
-  id: '/verify',
-  path: '/verify',
-  getParentRoute: () => LoginRoute,
-} as any)
 const ItemsRegisterRoute = ItemsRegisterRouteImport.update({
   id: '/items/register',
   path: '/items/register',
@@ -184,7 +198,9 @@ const InventoryPreparingRoute = InventoryPreparingRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/find-account': typeof FindAccountRoute
-  '/login': typeof LoginRouteWithChildren
+  '/find-account-reset-password': typeof FindAccountResetPasswordRoute
+  '/login': typeof LoginRoute
+  '/login-verify': typeof LoginVerifyRoute
   '/main': typeof MainRoute
   '/register': typeof RegisterRoute
   '/register-account-check': typeof RegisterAccountCheckRoute
@@ -193,12 +209,12 @@ export interface FileRoutesByFullPath {
   '/register-identity-verification': typeof RegisterIdentityVerificationRoute
   '/register-organization': typeof RegisterOrganizationRoute
   '/register-password': typeof RegisterPasswordRoute
+  '/register-reset-password-complete': typeof RegisterResetPasswordCompleteRoute
   '/register-terms': typeof RegisterTermsRoute
   '/inventory/preparing': typeof InventoryPreparingRoute
   '/items/incoming-pending': typeof ItemsIncomingPendingRoute
   '/items/photo-pending': typeof ItemsPhotoPendingRoute
   '/items/register': typeof ItemsRegisterRoute
-  '/login/verify': typeof LoginVerifyRoute
   '/reservation/preparing': typeof ReservationPreparingRoute
   '/safety/hazardous-chemical': typeof SafetyHazardousChemicalRoute
   '/safety/hazardous-quantity': typeof SafetyHazardousQuantityRoute
@@ -214,7 +230,9 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/find-account': typeof FindAccountRoute
-  '/login': typeof LoginRouteWithChildren
+  '/find-account-reset-password': typeof FindAccountResetPasswordRoute
+  '/login': typeof LoginRoute
+  '/login-verify': typeof LoginVerifyRoute
   '/main': typeof MainRoute
   '/register': typeof RegisterRoute
   '/register-account-check': typeof RegisterAccountCheckRoute
@@ -223,12 +241,12 @@ export interface FileRoutesByTo {
   '/register-identity-verification': typeof RegisterIdentityVerificationRoute
   '/register-organization': typeof RegisterOrganizationRoute
   '/register-password': typeof RegisterPasswordRoute
+  '/register-reset-password-complete': typeof RegisterResetPasswordCompleteRoute
   '/register-terms': typeof RegisterTermsRoute
   '/inventory/preparing': typeof InventoryPreparingRoute
   '/items/incoming-pending': typeof ItemsIncomingPendingRoute
   '/items/photo-pending': typeof ItemsPhotoPendingRoute
   '/items/register': typeof ItemsRegisterRoute
-  '/login/verify': typeof LoginVerifyRoute
   '/reservation/preparing': typeof ReservationPreparingRoute
   '/safety/hazardous-chemical': typeof SafetyHazardousChemicalRoute
   '/safety/hazardous-quantity': typeof SafetyHazardousQuantityRoute
@@ -245,7 +263,9 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/find-account': typeof FindAccountRoute
-  '/login': typeof LoginRouteWithChildren
+  '/find-account-reset-password': typeof FindAccountResetPasswordRoute
+  '/login': typeof LoginRoute
+  '/login-verify': typeof LoginVerifyRoute
   '/main': typeof MainRoute
   '/register': typeof RegisterRoute
   '/register-account-check': typeof RegisterAccountCheckRoute
@@ -254,12 +274,12 @@ export interface FileRoutesById {
   '/register-identity-verification': typeof RegisterIdentityVerificationRoute
   '/register-organization': typeof RegisterOrganizationRoute
   '/register-password': typeof RegisterPasswordRoute
+  '/register-reset-password-complete': typeof RegisterResetPasswordCompleteRoute
   '/register-terms': typeof RegisterTermsRoute
   '/inventory/preparing': typeof InventoryPreparingRoute
   '/items/incoming-pending': typeof ItemsIncomingPendingRoute
   '/items/photo-pending': typeof ItemsPhotoPendingRoute
   '/items/register': typeof ItemsRegisterRoute
-  '/login/verify': typeof LoginVerifyRoute
   '/reservation/preparing': typeof ReservationPreparingRoute
   '/safety/hazardous-chemical': typeof SafetyHazardousChemicalRoute
   '/safety/hazardous-quantity': typeof SafetyHazardousQuantityRoute
@@ -277,7 +297,9 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/find-account'
+    | '/find-account-reset-password'
     | '/login'
+    | '/login-verify'
     | '/main'
     | '/register'
     | '/register-account-check'
@@ -286,12 +308,12 @@ export interface FileRouteTypes {
     | '/register-identity-verification'
     | '/register-organization'
     | '/register-password'
+    | '/register-reset-password-complete'
     | '/register-terms'
     | '/inventory/preparing'
     | '/items/incoming-pending'
     | '/items/photo-pending'
     | '/items/register'
-    | '/login/verify'
     | '/reservation/preparing'
     | '/safety/hazardous-chemical'
     | '/safety/hazardous-quantity'
@@ -307,7 +329,9 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/find-account'
+    | '/find-account-reset-password'
     | '/login'
+    | '/login-verify'
     | '/main'
     | '/register'
     | '/register-account-check'
@@ -316,12 +340,12 @@ export interface FileRouteTypes {
     | '/register-identity-verification'
     | '/register-organization'
     | '/register-password'
+    | '/register-reset-password-complete'
     | '/register-terms'
     | '/inventory/preparing'
     | '/items/incoming-pending'
     | '/items/photo-pending'
     | '/items/register'
-    | '/login/verify'
     | '/reservation/preparing'
     | '/safety/hazardous-chemical'
     | '/safety/hazardous-quantity'
@@ -337,7 +361,9 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/find-account'
+    | '/find-account-reset-password'
     | '/login'
+    | '/login-verify'
     | '/main'
     | '/register'
     | '/register-account-check'
@@ -346,12 +372,12 @@ export interface FileRouteTypes {
     | '/register-identity-verification'
     | '/register-organization'
     | '/register-password'
+    | '/register-reset-password-complete'
     | '/register-terms'
     | '/inventory/preparing'
     | '/items/incoming-pending'
     | '/items/photo-pending'
     | '/items/register'
-    | '/login/verify'
     | '/reservation/preparing'
     | '/safety/hazardous-chemical'
     | '/safety/hazardous-quantity'
@@ -368,7 +394,9 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   FindAccountRoute: typeof FindAccountRoute
-  LoginRoute: typeof LoginRouteWithChildren
+  FindAccountResetPasswordRoute: typeof FindAccountResetPasswordRoute
+  LoginRoute: typeof LoginRoute
+  LoginVerifyRoute: typeof LoginVerifyRoute
   MainRoute: typeof MainRoute
   RegisterRoute: typeof RegisterRoute
   RegisterAccountCheckRoute: typeof RegisterAccountCheckRoute
@@ -377,6 +405,7 @@ export interface RootRouteChildren {
   RegisterIdentityVerificationRoute: typeof RegisterIdentityVerificationRoute
   RegisterOrganizationRoute: typeof RegisterOrganizationRoute
   RegisterPasswordRoute: typeof RegisterPasswordRoute
+  RegisterResetPasswordCompleteRoute: typeof RegisterResetPasswordCompleteRoute
   RegisterTermsRoute: typeof RegisterTermsRoute
   InventoryPreparingRoute: typeof InventoryPreparingRoute
   ItemsIncomingPendingRoute: typeof ItemsIncomingPendingRoute
@@ -402,6 +431,13 @@ declare module '@tanstack/react-router' {
       path: '/register-terms'
       fullPath: '/register-terms'
       preLoaderRoute: typeof RegisterTermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/register-reset-password-complete': {
+      id: '/register-reset-password-complete'
+      path: '/register-reset-password-complete'
+      fullPath: '/register-reset-password-complete'
+      preLoaderRoute: typeof RegisterResetPasswordCompleteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/register-password': {
@@ -460,11 +496,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MainRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/login-verify': {
+      id: '/login-verify'
+      path: '/login-verify'
+      fullPath: '/login-verify'
+      preLoaderRoute: typeof LoginVerifyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/find-account-reset-password': {
+      id: '/find-account-reset-password'
+      path: '/find-account-reset-password'
+      fullPath: '/find-account-reset-password'
+      preLoaderRoute: typeof FindAccountResetPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/find-account': {
@@ -558,13 +608,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReservationPreparingRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/login/verify': {
-      id: '/login/verify'
-      path: '/verify'
-      fullPath: '/login/verify'
-      preLoaderRoute: typeof LoginVerifyRouteImport
-      parentRoute: typeof LoginRoute
-    }
     '/items/register': {
       id: '/items/register'
       path: '/items/register'
@@ -596,20 +639,12 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface LoginRouteChildren {
-  LoginVerifyRoute: typeof LoginVerifyRoute
-}
-
-const LoginRouteChildren: LoginRouteChildren = {
-  LoginVerifyRoute: LoginVerifyRoute,
-}
-
-const LoginRouteWithChildren = LoginRoute._addFileChildren(LoginRouteChildren)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   FindAccountRoute: FindAccountRoute,
-  LoginRoute: LoginRouteWithChildren,
+  FindAccountResetPasswordRoute: FindAccountResetPasswordRoute,
+  LoginRoute: LoginRoute,
+  LoginVerifyRoute: LoginVerifyRoute,
   MainRoute: MainRoute,
   RegisterRoute: RegisterRoute,
   RegisterAccountCheckRoute: RegisterAccountCheckRoute,
@@ -618,6 +653,7 @@ const rootRouteChildren: RootRouteChildren = {
   RegisterIdentityVerificationRoute: RegisterIdentityVerificationRoute,
   RegisterOrganizationRoute: RegisterOrganizationRoute,
   RegisterPasswordRoute: RegisterPasswordRoute,
+  RegisterResetPasswordCompleteRoute: RegisterResetPasswordCompleteRoute,
   RegisterTermsRoute: RegisterTermsRoute,
   InventoryPreparingRoute: InventoryPreparingRoute,
   ItemsIncomingPendingRoute: ItemsIncomingPendingRoute,

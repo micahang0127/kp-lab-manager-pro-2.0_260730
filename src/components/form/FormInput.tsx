@@ -36,8 +36,9 @@ interface FormInputProps {
 
 // ─── Styles ────────────────────────────────────────────────────────────────────
 
+// 프로젝트 전역에서 실제로 쓰이는 디자인 토큰(PasswordField/EmailVerificationField 등)에 맞춘 스타일
 const INPUT_CLASS_NAME =
-  'w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none disabled:cursor-default disabled:bg-gray-100 disabled:text-gray-500'
+  'h-10 w-full rounded border border-[#c9c9c4] bg-white px-3 text-xs text-[#1a1a17] placeholder:text-[#9e9e96] focus:border-[#001e43] focus:outline-none disabled:cursor-default disabled:bg-gray-100 disabled:text-gray-500'
 
 // ─── Component ─────────────────────────────────────────────────────────────────
 
@@ -91,7 +92,7 @@ export const FormInput = forwardRef<HTMLInputElement, FormInputProps>(function F
   return (
     <div>
       <div className="mb-1 flex items-center">
-        <label htmlFor={id} className="text-sm font-medium text-gray-700">
+        <label htmlFor={id} className="text-xs font-medium text-[#6b6b66]">
           {label}
         </label>
         {required && !hideRequiredMark && <RequiredMark />}

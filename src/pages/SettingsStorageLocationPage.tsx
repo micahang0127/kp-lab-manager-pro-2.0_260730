@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 
 import { getStorageLocations } from '../api/storageLocation'
+import { ErrorMessage } from '../components/error/ErrorMessage'
 import { Layout } from '../components/layout/Layout'
 import { PAGE_TITLES } from '../components/layout/sidebarMenu'
 import { StorageLocationTree } from '../components/storageLocation/StorageLocationTree'
@@ -25,9 +26,7 @@ export function SettingsStorageLocationPage() {
 
         {isLoading && <p className="mt-4 text-sm text-gray-600">불러오는 중...</p>}
         {isError && (
-          <p role="alert" className="mt-4 text-sm text-red-600">
-            보관위치 목록을 불러오지 못했습니다.
-          </p>
+          <ErrorMessage message="보관위치 목록을 불러오지 못했습니다." size="sm" className="mt-4" />
         )}
 
         {data && (

@@ -69,7 +69,11 @@ describe('RegisterEmailVerificationPage', () => {
       data: { invites: [] },
       message: [],
     })
-    useRegisterFlowStore.setState({ registerEmail: null, invitedOrgs: null })
+    useRegisterFlowStore.setState({
+      registerEmail: null,
+      registerEmailCode: null,
+      invitedOrgs: null,
+    })
   })
 
   afterEach(() => {
@@ -154,6 +158,7 @@ describe('RegisterEmailVerificationPage', () => {
     await waitFor(() => {
       expect(verifyRegisterEmailCode).toHaveBeenCalledWith({ email: VALID_EMAIL, code: '123456' })
       expect(useRegisterFlowStore.getState().registerEmail).toBe(VALID_EMAIL)
+      expect(useRegisterFlowStore.getState().registerEmailCode).toBe('123456')
       expect(mockNavigate).toHaveBeenCalledWith({ to: '/register-password' })
     })
   })
@@ -330,54 +335,7 @@ describe('RegisterEmailVerificationPage', () => {
 
       expect(await screen.findByText('잘못된 인증번호입니다.')).toBeInTheDocument()
       expect(useRegisterFlowStore.getState().registerEmail).toBeNull()
-    })
-
-    it('네트워크 오류 등(ApiError가 아닌 오류)은 인증 실패 횟수에 반영되지 않는다', async () => {
-      const networkErrorMessage = '일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'
-      vi.mocked(verifyRegisterEmailCode).mockRejectedValue(new Error(networkErrorMessage))
-
-      render(<RegisterEmailVerificationPage />)
-
-      await userEvent.type(screen.getByLabelText('이메일 *'), VALID_EMAIL)
-      await userEvent.click(screen.getByRole('button', { name: '인증번호 전송' }))
-      await waitFor(() => {
-        expect(screen.getByText(/남은 시간 \d{2}:\d{2}/)).toBeInTheDocument()
-      })
-
-      // 서버가 인증번호를 거부한 게 아니라 매번 네트워크 오류가 나는 상황을 5회(잠금 한도만큼)
-      // 반복해도, ApiError가 아니므로 실패 횟수에 반영되지 않아 잠금 안내가 뜨지 않아야 한다
-      for (let attempt = 1; attempt <= 5; attempt++) {
-        await userEvent.type(screen.getByLabelText('인증번호 1번째 자리'), '1')
-        await userEvent.type(screen.getByLabelText('인증번호 2번째 자리'), '2')
-        await userEvent.type(screen.getByLabelText('인증번호 3번째 자리'), '3')
-        await userEvent.type(screen.getByLabelText('인증번호 4번째 자리'), '4')
-        await userEvent.type(screen.getByLabelText('인증번호 5번째 자리'), '5')
-        await userEvent.type(screen.getByLabelText('인증번호 6번째 자리'), '6')
-        await userEvent.click(screen.getByRole('button', { name: '인증번호 확인' }))
-
-        await waitFor(() => expect(verifyRegisterEmailCode).toHaveBeenCalledTimes(attempt))
-        await screen.findByText(networkErrorMessage)
-
-        for (const label of [
-          '인증번호 6번째 자리',
-          '인증번호 5번째 자리',
-          '인증번호 4번째 자리',
-          '인증번호 3번째 자리',
-          '인증번호 2번째 자리',
-          '인증번호 1번째 자리',
-        ]) {
-          await userEvent.type(screen.getByLabelText(label), '{backspace}')
-        }
-      }
-
-      expect(
-        screen.queryByText(
-          '이메일 인증 실패 횟수(5회)를 초과했습니다. 24시간이 지나면 다시 시도할 수 있습니다.'
-        )
-      ).not.toBeInTheDocument()
-      screen.getAllByLabelText(/인증번호 \d번째 자리/).forEach((box) => {
-        expect(box).not.toBeDisabled()
-      })
+      expect(useRegisterFlowStore.getState().registerEmailCode).toBeNull()
     })
 
     it('인증번호 확인 실패 후 재전송 없이 인증번호를 다시 입력하면 이전 에러 메시지와 빨간 강조가 사라진다', async () => {
@@ -408,9 +366,6 @@ describe('RegisterEmailVerificationPage', () => {
 
       await waitFor(() => {
         expect(screen.queryByText('잘못된 인증번호입니다.')).not.toBeInTheDocument()
-        expect(
-          screen.queryByText('5회 실패 시 24시간 동안 인증이 제한됩니다.')
-        ).not.toBeInTheDocument()
         screen.getAllByLabelText(/인증번호 \d번째 자리/).forEach((box) => {
           expect(box).not.toHaveClass('border-[#d44038]')
         })
@@ -448,273 +403,8 @@ describe('RegisterEmailVerificationPage', () => {
 
       await waitFor(() => {
         expect(screen.queryByText('잘못된 인증번호입니다.')).not.toBeInTheDocument()
-        expect(
-          screen.queryByText('5회 실패 시 24시간 동안 인증이 제한됩니다.')
-        ).not.toBeInTheDocument()
         screen.getAllByLabelText(/인증번호 \d번째 자리/).forEach((box) => {
           expect(box).not.toHaveClass('border-[#d44038]')
-        })
-      })
-    })
-
-    it('인증번호 확인 실패가 5회에 도달하면(마지막 시도 포함) 한도 초과 안내로 바뀌고 입력칸/확인 버튼이 disabled된다', async () => {
-      vi.mocked(verifyRegisterEmailCode).mockRejectedValue(
-        new ApiError('잘못된 인증번호입니다.', 400)
-      )
-
-      render(<RegisterEmailVerificationPage />)
-
-      await userEvent.type(screen.getByLabelText('이메일 *'), VALID_EMAIL)
-      await userEvent.click(screen.getByRole('button', { name: '인증번호 전송' }))
-      await waitFor(() => {
-        expect(screen.getByText(/남은 시간 \d{2}:\d{2}/)).toBeInTheDocument()
-      })
-
-      // 1~4번째 실패까지는 서버 메시지("잘못된 인증번호입니다.")가 그대로 표시된다
-      for (let attempt = 1; attempt <= 4; attempt++) {
-        await userEvent.type(screen.getByLabelText('인증번호 1번째 자리'), '1')
-        await userEvent.type(screen.getByLabelText('인증번호 2번째 자리'), '2')
-        await userEvent.type(screen.getByLabelText('인증번호 3번째 자리'), '3')
-        await userEvent.type(screen.getByLabelText('인증번호 4번째 자리'), '4')
-        await userEvent.type(screen.getByLabelText('인증번호 5번째 자리'), '5')
-        await userEvent.type(screen.getByLabelText('인증번호 6번째 자리'), '6')
-        await userEvent.click(screen.getByRole('button', { name: '인증번호 확인' }))
-
-        await waitFor(() => expect(verifyRegisterEmailCode).toHaveBeenCalledTimes(attempt))
-        await screen.findByText('잘못된 인증번호입니다.')
-
-        // 다음 시도를 위해 입력칸을 비운다
-        for (const label of [
-          '인증번호 6번째 자리',
-          '인증번호 5번째 자리',
-          '인증번호 4번째 자리',
-          '인증번호 3번째 자리',
-          '인증번호 2번째 자리',
-          '인증번호 1번째 자리',
-        ]) {
-          await userEvent.type(screen.getByLabelText(label), '{backspace}')
-        }
-      }
-
-      // 5번째(마지막) 시도 — 이 시도가 실패로 기록되는 순간 한도(5회)에 도달하므로, 서버 메시지
-      // 대신 한도 초과 안내가 표시되고 입력칸/확인 버튼이 모두 disabled된다
-      await userEvent.type(screen.getByLabelText('인증번호 1번째 자리'), '1')
-      await userEvent.type(screen.getByLabelText('인증번호 2번째 자리'), '2')
-      await userEvent.type(screen.getByLabelText('인증번호 3번째 자리'), '3')
-      await userEvent.type(screen.getByLabelText('인증번호 4번째 자리'), '4')
-      await userEvent.type(screen.getByLabelText('인증번호 5번째 자리'), '5')
-      await userEvent.type(screen.getByLabelText('인증번호 6번째 자리'), '6')
-      await userEvent.click(screen.getByRole('button', { name: '인증번호 확인' }))
-
-      await waitFor(() => expect(verifyRegisterEmailCode).toHaveBeenCalledTimes(5))
-      await waitFor(() => {
-        expect(
-          screen.getByText(
-            '이메일 인증 실패 횟수(5회)를 초과했습니다. 24시간이 지나면 다시 시도할 수 있습니다.'
-          )
-        ).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: '인증번호 확인' })).toBeDisabled()
-        screen.getAllByLabelText(/인증번호 \d번째 자리/).forEach((box) => {
-          expect(box).toBeDisabled()
-        })
-        // 잠긴 상태에서는 한도 초과 안내와 모순되는 "남은 시간"/"인증 시간이 만료되었습니다"
-        // 안내를 함께 보여주지 않는다
-        expect(screen.queryByText(/남은 시간 \d{2}:\d{2}/)).not.toBeInTheDocument()
-        expect(screen.queryByText(/인증 시간이 만료되었습니다/)).not.toBeInTheDocument()
-      })
-
-      // 확인 버튼과 입력칸이 모두 disabled이므로 추가 시도가 API를 호출하지 않는다
-      expect(verifyRegisterEmailCode).toHaveBeenCalledTimes(5)
-    })
-
-    it('한도(5회) 미만일 때 재전송하면 실패 카운트가 초기화되어 새 인증번호로 다시 5회를 시도할 수 있다', async () => {
-      vi.mocked(verifyRegisterEmailCode).mockRejectedValue(
-        new ApiError('잘못된 인증번호입니다.', 400)
-      )
-
-      render(<RegisterEmailVerificationPage />)
-
-      await userEvent.type(screen.getByLabelText('이메일 *'), VALID_EMAIL)
-      await userEvent.click(screen.getByRole('button', { name: '인증번호 전송' }))
-      await waitFor(() => {
-        expect(screen.getByText(/남은 시간 \d{2}:\d{2}/)).toBeInTheDocument()
-      })
-
-      const typeAndSubmit = async () => {
-        await userEvent.type(screen.getByLabelText('인증번호 1번째 자리'), '1')
-        await userEvent.type(screen.getByLabelText('인증번호 2번째 자리'), '2')
-        await userEvent.type(screen.getByLabelText('인증번호 3번째 자리'), '3')
-        await userEvent.type(screen.getByLabelText('인증번호 4번째 자리'), '4')
-        await userEvent.type(screen.getByLabelText('인증번호 5번째 자리'), '5')
-        await userEvent.type(screen.getByLabelText('인증번호 6번째 자리'), '6')
-        await userEvent.click(screen.getByRole('button', { name: '인증번호 확인' }))
-      }
-      const clearDigits = async () => {
-        for (const label of [
-          '인증번호 6번째 자리',
-          '인증번호 5번째 자리',
-          '인증번호 4번째 자리',
-          '인증번호 3번째 자리',
-          '인증번호 2번째 자리',
-          '인증번호 1번째 자리',
-        ]) {
-          await userEvent.type(screen.getByLabelText(label), '{backspace}')
-        }
-      }
-
-      // 첫 번째 인증번호로 3회 실패 (한도 5회 미만)
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        await typeAndSubmit()
-        await waitFor(() => expect(verifyRegisterEmailCode).toHaveBeenCalledTimes(attempt))
-        await screen.findByText('잘못된 인증번호입니다.')
-        await clearDigits()
-      }
-
-      // 재전송으로 새 인증번호를 발급받으면 이전 실패 카운트(3회)는 이어지지 않는다
-      await userEvent.click(screen.getByRole('button', { name: '재전송' }))
-      await waitFor(() => expect(sendEmailVerificationCode).toHaveBeenCalledTimes(2))
-
-      // 새 인증번호로 3회를 더 틀려도(누적하면 6회지만 새 인증번호 기준으로는 3회) 아직 잠기지 않는다
-      for (let attempt = 4; attempt <= 6; attempt++) {
-        await typeAndSubmit()
-        await waitFor(() => expect(verifyRegisterEmailCode).toHaveBeenCalledTimes(attempt))
-        await screen.findByText('잘못된 인증번호입니다.')
-        expect(
-          screen.queryByText(
-            '이메일 인증 실패 횟수(5회)를 초과했습니다. 24시간이 지나면 다시 시도할 수 있습니다.'
-          )
-        ).not.toBeInTheDocument()
-        await clearDigits()
-      }
-
-      // 새 인증번호 기준 4, 5번째 실패(전체 누적 7, 8번째)에서 비로소 잠긴다
-      await typeAndSubmit()
-      await waitFor(() => expect(verifyRegisterEmailCode).toHaveBeenCalledTimes(7))
-      await screen.findByText('잘못된 인증번호입니다.')
-      await clearDigits()
-
-      await typeAndSubmit()
-      await waitFor(() => expect(verifyRegisterEmailCode).toHaveBeenCalledTimes(8))
-      await waitFor(() => {
-        expect(
-          screen.getByText(
-            '이메일 인증 실패 횟수(5회)를 초과했습니다. 24시간이 지나면 다시 시도할 수 있습니다.'
-          )
-        ).toBeInTheDocument()
-      })
-    })
-
-    it('이미 5회 실패해 잠긴 상태여도 재전송으로 새 인증번호를 받으면 잠금이 풀려 다시 시도할 수 있다', async () => {
-      vi.mocked(verifyRegisterEmailCode).mockRejectedValue(
-        new ApiError('잘못된 인증번호입니다.', 400)
-      )
-
-      render(<RegisterEmailVerificationPage />)
-
-      await userEvent.type(screen.getByLabelText('이메일 *'), VALID_EMAIL)
-      await userEvent.click(screen.getByRole('button', { name: '인증번호 전송' }))
-      await waitFor(() => {
-        expect(screen.getByText(/남은 시간 \d{2}:\d{2}/)).toBeInTheDocument()
-      })
-
-      for (let attempt = 1; attempt <= 5; attempt++) {
-        await userEvent.type(screen.getByLabelText('인증번호 1번째 자리'), '1')
-        await userEvent.type(screen.getByLabelText('인증번호 2번째 자리'), '2')
-        await userEvent.type(screen.getByLabelText('인증번호 3번째 자리'), '3')
-        await userEvent.type(screen.getByLabelText('인증번호 4번째 자리'), '4')
-        await userEvent.type(screen.getByLabelText('인증번호 5번째 자리'), '5')
-        await userEvent.type(screen.getByLabelText('인증번호 6번째 자리'), '6')
-        await userEvent.click(screen.getByRole('button', { name: '인증번호 확인' }))
-        await waitFor(() => expect(verifyRegisterEmailCode).toHaveBeenCalledTimes(attempt))
-
-        if (attempt < 5) {
-          await screen.findByText('잘못된 인증번호입니다.')
-          for (const label of [
-            '인증번호 6번째 자리',
-            '인증번호 5번째 자리',
-            '인증번호 4번째 자리',
-            '인증번호 3번째 자리',
-            '인증번호 2번째 자리',
-            '인증번호 1번째 자리',
-          ]) {
-            await userEvent.type(screen.getByLabelText(label), '{backspace}')
-          }
-        }
-      }
-
-      await waitFor(() => {
-        expect(
-          screen.getByText(
-            '이메일 인증 실패 횟수(5회)를 초과했습니다. 24시간이 지나면 다시 시도할 수 있습니다.'
-          )
-        ).toBeInTheDocument()
-        expect(screen.getByRole('button', { name: '인증번호 확인' })).toBeDisabled()
-      })
-
-      // 재전송(새 인증번호 발급)하면 실패 카운트는 "해당 인증번호" 단위이므로 잠금이 풀린다
-      await userEvent.click(screen.getByRole('button', { name: '재전송' }))
-      await waitFor(() => expect(sendEmailVerificationCode).toHaveBeenCalledTimes(2))
-
-      await waitFor(() => {
-        expect(
-          screen.queryByText(
-            '이메일 인증 실패 횟수(5회)를 초과했습니다. 24시간이 지나면 다시 시도할 수 있습니다.'
-          )
-        ).not.toBeInTheDocument()
-        screen.getAllByLabelText(/인증번호 \d번째 자리/).forEach((box) => {
-          expect(box).not.toBeDisabled()
-        })
-      })
-
-      // 새 인증번호로 다시 검증을 시도할 수 있다(6번째 API 호출이 실제로 일어남)
-      await userEvent.type(screen.getByLabelText('인증번호 1번째 자리'), '1')
-      await userEvent.type(screen.getByLabelText('인증번호 2번째 자리'), '2')
-      await userEvent.type(screen.getByLabelText('인증번호 3번째 자리'), '3')
-      await userEvent.type(screen.getByLabelText('인증번호 4번째 자리'), '4')
-      await userEvent.type(screen.getByLabelText('인증번호 5번째 자리'), '5')
-      await userEvent.type(screen.getByLabelText('인증번호 6번째 자리'), '6')
-      await userEvent.click(screen.getByRole('button', { name: '인증번호 확인' }))
-
-      await waitFor(() => expect(verifyRegisterEmailCode).toHaveBeenCalledTimes(6))
-    })
-
-    it('이전 세션에서 이미 잠긴 이메일이라도, 아직 인증번호를 보내지 않은 새 화면에서는 이메일만 입력했다고 초과 안내가 뜨지 않는다', async () => {
-      // 쿠키에 이미 5회 초과(잠김) 기록이 남아있는 상황을 재현한다 — 예: 이전 세션에서
-      // 5회 실패 후 페이지를 새로고침/재방문한 경우
-      useEmailVerificationLimitStore.setState({
-        records: {
-          [`register-verify-fail:${VALID_EMAIL.toLowerCase()}`]: {
-            count: 5,
-            firstAttemptAt: Date.now(),
-          },
-        },
-      })
-
-      render(<RegisterEmailVerificationPage />)
-
-      // 아직 "인증번호 전송"을 누르지 않았으므로(=현재 활성화된 인증번호가 없으므로) 이메일만
-      // 입력한 상태에서는 초과 안내가 뜨면 안 된다
-      await userEvent.type(screen.getByLabelText('이메일 *'), VALID_EMAIL)
-
-      expect(
-        screen.queryByText(
-          '이메일 인증 실패 횟수(5회)를 초과했습니다. 24시간이 지나면 다시 시도할 수 있습니다.'
-        )
-      ).not.toBeInTheDocument()
-
-      // 인증번호를 실제로 보내면(새 인증번호 발급) 이전 잠금 기록이 정리되어 정상적으로
-      // 인증번호 입력칸이 활성화된다
-      await userEvent.click(screen.getByRole('button', { name: '인증번호 전송' }))
-
-      await waitFor(() => {
-        expect(screen.getByText(/남은 시간 \d{2}:\d{2}/)).toBeInTheDocument()
-        expect(
-          screen.queryByText(
-            '이메일 인증 실패 횟수(5회)를 초과했습니다. 24시간이 지나면 다시 시도할 수 있습니다.'
-          )
-        ).not.toBeInTheDocument()
-        screen.getAllByLabelText(/인증번호 \d번째 자리/).forEach((box) => {
-          expect(box).not.toBeDisabled()
         })
       })
     })

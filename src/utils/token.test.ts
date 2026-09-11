@@ -6,6 +6,7 @@ import {
   isTokenExpired,
   isValidTokenFormat,
   removeStoredAccessToken,
+  setStoredAccessToken,
 } from './token'
 
 // 만료되지 않은 유효한 JWT 토큰 (exp: 9999999999 = 2286년)
@@ -60,6 +61,21 @@ describe('token', () => {
       })
 
       expect(() => removeStoredAccessToken()).not.toThrow()
+      expect(consoleErrorSpy).toHaveBeenCalled()
+    })
+
+    it('setStoredAccessToken은 sessionStorage에 토큰을 저장한다', () => {
+      setStoredAccessToken(VALID_JWT_TOKEN)
+      expect(sessionStorage.getItem('accessToken')).toBe(VALID_JWT_TOKEN)
+    })
+
+    it('setStoredAccessToken은 sessionStorage 접근이 예외를 던져도 앱을 죽이지 않는다', () => {
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw new Error('접근 차단됨')
+      })
+
+      expect(() => setStoredAccessToken(VALID_JWT_TOKEN)).not.toThrow()
       expect(consoleErrorSpy).toHaveBeenCalled()
     })
   })

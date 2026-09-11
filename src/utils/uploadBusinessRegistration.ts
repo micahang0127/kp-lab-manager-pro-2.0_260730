@@ -27,9 +27,14 @@ function needsReupload(data: BusinessRegistrationReviewData): boolean {
 
 /**
  * 사업자등록증 PDF를 S3에 업로드하고 분석 결과와 s3Key를 반환한다.
- * 1) presigned URL 발급 (s3Key도 함께 응답으로 옴)
- * 2) S3에 직접 PUT — 백엔드 API가 아니므로 api 클라이언트를 쓰지 않고 fetch를 직접 사용한다.
- *    Content-Type은 PDF로 고정하고, AbortController로 60초 타임아웃을 둔다
+ * 1) presigned URL 발급 (s3Key, presignedFields도 함께 응답으로 옴)
+ * 2) S3에 presigned POST로 업로드 — 백엔드 API가 아니므로 api 클라이언트를 쓰지 않고 fetch를
+ *    직접 사용한다. presignedUrl은 버킷 루트라 presignedFields(Policy, 서명 등) 없이 단독으로
+ *    쓰면 익명 요청으로 간주돼 S3가 AccessDenied를 반환하므로, 반드시 FormData에 presignedFields를
+ *    먼저 담고 파일은 S3 POST 정책 규칙상 마지막에 담아 전송해야 한다.
+ *    Content-Type 헤더는 지정하지 않는다(FormData가 자동으로 multipart 경계를 설정해야 하며,
+ *    업로드될 객체의 Content-Type은 이미 presignedFields.Content-Type으로 서명에 포함돼 있음).
+ *    AbortController로 60초 타임아웃을 둔다
  * 3) 분석 API 호출
  * 법인명/사업자등록번호를 인식하지 못했으면 재업로드를 요구하는 에러를 던진다.
  */
@@ -43,14 +48,20 @@ export async function uploadBusinessRegistration(
   const uploadTarget = presignedRes.data?.urls[0]
   if (!uploadTarget) throw new Error('업로드 URL 발급에 실패했습니다.')
 
+  const formData = new FormData()
+  for (const [key, value] of Object.entries(uploadTarget.presignedFields)) {
+    formData.append(key, value)
+  }
+  // S3 presigned POST 정책상 파일 필드는 반드시 다른 필드보다 뒤에 추가해야 한다
+  formData.append('file', file)
+
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), S3_UPLOAD_TIMEOUT_MS)
   let uploadRes: Response
   try {
     uploadRes = await fetch(uploadTarget.presignedUrl, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/pdf' },
-      body: file,
+      method: 'POST',
+      body: formData,
       signal: controller.signal,
     })
   } catch (err) {

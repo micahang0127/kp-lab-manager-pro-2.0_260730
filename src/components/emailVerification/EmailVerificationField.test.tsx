@@ -2,7 +2,7 @@ import { fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import type { ApiResponse } from '../../api'
+import { ApiError, type ApiResponse } from '../../api'
 import {
   type EmailVerificationLimitPurpose,
   useEmailVerificationLimitStore,
@@ -21,18 +21,28 @@ function TestHost({
   codeError,
   expiresInSeconds,
   sendLimit,
+  initialEmail,
+  emailDisabled,
 }: {
   sendCode: (email: string) => Promise<ApiResponse<SendEmailCodeResult>>
   codeError?: string | null
   expiresInSeconds?: number
   sendLimit?: { purpose: EmailVerificationLimitPurpose; maxAttempts: number; windowMs: number }
+  initialEmail?: string
+  emailDisabled?: boolean
 }) {
-  const verification = useEmailVerification({ sendCode, expiresInSeconds, sendLimit })
+  const verification = useEmailVerification({
+    sendCode,
+    expiresInSeconds,
+    sendLimit,
+    initialEmail,
+  })
   return (
     <EmailVerificationField
       emailId="test-email"
       verification={verification}
       codeError={codeError}
+      emailDisabled={emailDisabled}
     />
   )
 }
@@ -166,12 +176,6 @@ describe('EmailVerificationField', () => {
     expect(screen.getByText('잘못된 인증번호입니다.')).toBeInTheDocument()
   })
 
-  it('codeError prop이 전달되면 백엔드 메시지 밑에 인증 제한 안내 문구를 함께 표시한다', () => {
-    render(<TestHost sendCode={mockSendCode} codeError="잘못된 인증번호입니다." />)
-
-    expect(screen.getByText('5회 실패 시 24시간 동안 인증이 제한됩니다.')).toBeInTheDocument()
-  })
-
   it('인증번호 전송 후 codeError가 전달되면 인증번호 입력칸이 빨간색 테두리로 강조된다', async () => {
     const sendCode = vi.fn().mockResolvedValue({
       result: true,
@@ -190,12 +194,6 @@ describe('EmailVerificationField', () => {
         expect(box).toHaveClass('border-[#d44038]')
       })
     })
-  })
-
-  it('codeError prop이 없으면 인증 제한 안내 문구를 표시하지 않는다', () => {
-    render(<TestHost sendCode={mockSendCode} />)
-
-    expect(screen.queryByText('5회 실패 시 24시간 동안 인증이 제한됩니다.')).not.toBeInTheDocument()
   })
 
   it('한글을 입력하면 한글 입력 불가 안내를 표시하고 입력값에서는 한글이 제거된다', async () => {
@@ -317,7 +315,7 @@ describe('EmailVerificationField', () => {
       })
       expect(
         screen.queryByText(
-          '인증코드 발송 횟수(5회)를 초과했습니다. 마지막 발송 후 24시간이 지나면 다시 요청할 수 있습니다.'
+          '인증코드 발송 횟수(5회)를 초과했습니다. 마지막 발송 후 24시간이 지나면 다시 요청할 수 있습니다'
         )
       ).not.toBeInTheDocument()
     })
@@ -353,12 +351,29 @@ describe('EmailVerificationField', () => {
       })
       expect(
         screen.getByText(
-          '인증코드 발송 횟수(5회)를 초과했습니다. 마지막 발송 후 24시간이 지나면 다시 요청할 수 있습니다.'
+          '인증코드 발송 횟수(5회)를 초과했습니다. 마지막 발송 후 24시간이 지나면 다시 요청할 수 있습니다'
         )
       ).toBeInTheDocument()
 
       // 6번째 시도는 API를 호출하지 않는다(프론트에서 막힘)
       expect(sendCode).toHaveBeenCalledTimes(5)
+    })
+
+    it('로컬 기록이 없어도(예: 다른 기기에서 이미 초과) 서버가 409로 거절하면 즉시 초과 안내가 뜨고 버튼이 disabled된다', async () => {
+      const LIMIT_EXCEEDED_MESSAGE =
+        '인증코드 발송 횟수(5회)를 초과했습니다. 마지막 발송 후 24시간이 지나면 다시 요청할 수 있습니다'
+      const sendCode = vi.fn().mockRejectedValue(new ApiError(LIMIT_EXCEEDED_MESSAGE, 409))
+      render(<TestHost sendCode={sendCode} sendLimit={SEND_LIMIT} />)
+
+      await userEvent.type(screen.getByLabelText('이메일 *'), VALID_EMAIL)
+      await userEvent.click(screen.getByRole('button', { name: '인증번호 전송' }))
+
+      expect(await screen.findByText(LIMIT_EXCEEDED_MESSAGE)).toBeInTheDocument()
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: '인증번호 전송' })).toBeDisabled()
+      })
+      // 로컬 가드가 아니라 서버 응답으로 감지된 것이므로 실제로는 1번만 호출된다
+      expect(sendCode).toHaveBeenCalledTimes(1)
     })
 
     it('sendLimit을 지정하지 않으면 한도 없이 계속 재전송할 수 있다', async () => {
@@ -395,5 +410,65 @@ describe('EmailVerificationField', () => {
     await screen.findByText('이미 가입된 이메일입니다.')
 
     expect(screen.getByLabelText('이메일 *').parentElement).toHaveClass('border-[#bf3329]')
+  })
+
+  describe('emailDisabled', () => {
+    it('true면 이메일 입력칸이 비활성화되어 입력해도 값이 바뀌지 않는다', async () => {
+      render(<TestHost sendCode={mockSendCode} initialEmail={VALID_EMAIL} emailDisabled />)
+
+      const emailInput = screen.getByLabelText('이메일 *')
+      expect(emailInput).toHaveValue(VALID_EMAIL)
+      expect(emailInput).toBeDisabled()
+
+      await userEvent.type(emailInput, 'x')
+
+      expect(emailInput).toHaveValue(VALID_EMAIL)
+    })
+
+    it('true면 한글을 입력해도(값이 바뀌지 않으므로) 한글 안내 문구를 표시하지 않는다', () => {
+      render(<TestHost sendCode={mockSendCode} initialEmail={VALID_EMAIL} emailDisabled />)
+
+      fireEvent.change(screen.getByLabelText('이메일 *'), { target: { value: '한글' } })
+
+      expect(screen.queryByText(HANGUL_INPUT_MESSAGE)).not.toBeInTheDocument()
+    })
+
+    it('기본값(false)일 때는 이메일 입력칸을 수정할 수 있다', async () => {
+      render(<TestHost sendCode={mockSendCode} />)
+
+      const emailInput = screen.getByLabelText('이메일 *')
+      expect(emailInput).not.toBeDisabled()
+
+      await userEvent.type(emailInput, VALID_EMAIL)
+
+      expect(emailInput).toHaveValue(VALID_EMAIL)
+    })
+  })
+
+  describe('이메일 지우기 버튼', () => {
+    it('이메일 입력칸이 비어 있으면 지우기 버튼을 표시하지 않는다', () => {
+      render(<TestHost sendCode={mockSendCode} />)
+
+      expect(screen.queryByLabelText('이메일 입력값 지우기')).not.toBeInTheDocument()
+    })
+
+    it('이메일을 입력하면 지우기 버튼이 나타나고, 클릭하면 입력값이 지워진다', async () => {
+      render(<TestHost sendCode={mockSendCode} />)
+
+      const emailInput = screen.getByLabelText('이메일 *')
+      await userEvent.type(emailInput, VALID_EMAIL)
+
+      const clearButton = screen.getByLabelText('이메일 입력값 지우기')
+      await userEvent.click(clearButton)
+
+      expect(emailInput).toHaveValue('')
+      expect(screen.queryByLabelText('이메일 입력값 지우기')).not.toBeInTheDocument()
+    })
+
+    it('emailDisabled가 true면 값이 있어도 지우기 버튼을 표시하지 않는다', () => {
+      render(<TestHost sendCode={mockSendCode} initialEmail={VALID_EMAIL} emailDisabled />)
+
+      expect(screen.queryByLabelText('이메일 입력값 지우기')).not.toBeInTheDocument()
+    })
   })
 })

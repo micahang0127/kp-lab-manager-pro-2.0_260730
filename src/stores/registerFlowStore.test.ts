@@ -19,9 +19,11 @@ describe('registerFlowStore', () => {
     useRegisterFlowStore.setState({
       registerMethod: null,
       identityVerifyResult: null,
+      identityVerifySource: null,
       identityVerificationCode: null,
       termsAgreement: null,
       registerEmail: null,
+      registerEmailCode: null,
       invitedOrgs: null,
       registerPassword: null,
       businessRegistrationFile: null,
@@ -59,18 +61,30 @@ describe('registerFlowStore', () => {
     expect(useRegisterFlowStore.getState().identityVerifyResult).toBeNull()
   })
 
-  it('setIdentityVerifyResult()로 본인인증 결과를 저장한다', () => {
-    useRegisterFlowStore.getState().setIdentityVerifyResult(IDENTITY_VERIFY_RESULT)
-
-    expect(useRegisterFlowStore.getState().identityVerifyResult).toEqual(IDENTITY_VERIFY_RESULT)
+  it('초기 상태는 identityVerifySource가 null이다', () => {
+    expect(useRegisterFlowStore.getState().identityVerifySource).toBeNull()
   })
 
-  it('clearIdentityVerifyResult()로 상태를 초기화한다', () => {
-    useRegisterFlowStore.getState().setIdentityVerifyResult(IDENTITY_VERIFY_RESULT)
+  it('setIdentityVerifyResult()로 본인인증 결과와 인증 출처를 함께 저장한다', () => {
+    useRegisterFlowStore.getState().setIdentityVerifyResult(IDENTITY_VERIFY_RESULT, 'register')
+
+    expect(useRegisterFlowStore.getState().identityVerifyResult).toEqual(IDENTITY_VERIFY_RESULT)
+    expect(useRegisterFlowStore.getState().identityVerifySource).toBe('register')
+  })
+
+  it("setIdentityVerifyResult()로 아이디·비밀번호 찾기에서 이관받은 결과는 출처가 'find-account'로 저장된다", () => {
+    useRegisterFlowStore.getState().setIdentityVerifyResult(IDENTITY_VERIFY_RESULT, 'find-account')
+
+    expect(useRegisterFlowStore.getState().identityVerifySource).toBe('find-account')
+  })
+
+  it('clearIdentityVerifyResult()로 본인인증 결과와 인증 출처를 함께 초기화한다', () => {
+    useRegisterFlowStore.getState().setIdentityVerifyResult(IDENTITY_VERIFY_RESULT, 'find-account')
 
     useRegisterFlowStore.getState().clearIdentityVerifyResult()
 
     expect(useRegisterFlowStore.getState().identityVerifyResult).toBeNull()
+    expect(useRegisterFlowStore.getState().identityVerifySource).toBeNull()
   })
 
   it('초기 상태는 identityVerificationCode가 null이다', () => {
@@ -127,6 +141,24 @@ describe('registerFlowStore', () => {
     useRegisterFlowStore.getState().clearRegisterEmail()
 
     expect(useRegisterFlowStore.getState().registerEmail).toBeNull()
+  })
+
+  it('초기 상태는 registerEmailCode가 null이다', () => {
+    expect(useRegisterFlowStore.getState().registerEmailCode).toBeNull()
+  })
+
+  it('setRegisterEmailCode()로 인증에 성공한 인증코드를 저장한다', () => {
+    useRegisterFlowStore.getState().setRegisterEmailCode('123456')
+
+    expect(useRegisterFlowStore.getState().registerEmailCode).toBe('123456')
+  })
+
+  it('clearRegisterEmailCode()로 상태를 초기화한다', () => {
+    useRegisterFlowStore.getState().setRegisterEmailCode('123456')
+
+    useRegisterFlowStore.getState().clearRegisterEmailCode()
+
+    expect(useRegisterFlowStore.getState().registerEmailCode).toBeNull()
   })
 
   const INVITED_ORGS: InvitedOrg[] = [
@@ -255,5 +287,37 @@ describe('registerFlowStore', () => {
     useRegisterFlowStore.getState().clearBusinessRegistrationS3Key()
 
     expect(useRegisterFlowStore.getState().businessRegistrationS3Key).toBeNull()
+  })
+
+  it('resetRegisterFlow()로 모든 단계 값을 한 번에 초기화한다', () => {
+    const store = useRegisterFlowStore.getState()
+    store.setRegisterMethod('new')
+    store.setIdentityVerifyResult(IDENTITY_VERIFY_RESULT, 'find-account')
+    store.setIdentityVerificationCode('iv-id')
+    store.setTermsAgreement({ marketingOptIn: true })
+    store.setRegisterEmail('user@test.com')
+    store.setRegisterEmailCode('123456')
+    store.setInvitedOrgs(INVITED_ORGS)
+    store.setRegisterPassword('password1!')
+    store.setBusinessRegistrationFile(new File(['pdf'], 'biz.pdf', { type: 'application/pdf' }))
+    store.setBusinessRegistrationReview(BUSINESS_REGISTRATION_REVIEW)
+    store.setBusinessRegistrationS3Key('PRODUCTION/BusinessRegistration/260901/xxxxxxxx.pdf')
+
+    store.resetRegisterFlow()
+
+    expect(useRegisterFlowStore.getState()).toMatchObject({
+      registerMethod: null,
+      identityVerifyResult: null,
+      identityVerifySource: null,
+      identityVerificationCode: null,
+      termsAgreement: null,
+      registerEmail: null,
+      registerEmailCode: null,
+      invitedOrgs: null,
+      registerPassword: null,
+      businessRegistrationFile: null,
+      businessRegistrationReview: null,
+      businessRegistrationS3Key: null,
+    })
   })
 })

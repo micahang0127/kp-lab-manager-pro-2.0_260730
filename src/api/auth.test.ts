@@ -2,7 +2,228 @@ import { http, HttpResponse } from 'msw'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { server } from '../test/mocks/server'
-import { sendEmailVerificationCode, verifyIdentity, verifyRegisterEmailCode } from './auth'
+import {
+  login,
+  loginVerifyDevice,
+  sendEmailVerificationCode,
+  verifyIdentity,
+  verifyRegisterEmailCode,
+  verifyTurnstile,
+} from './auth'
+
+describe('login', () => {
+  beforeEach(() => {
+    sessionStorage.clear()
+    server.resetHandlers()
+  })
+
+  it('신뢰된 브라우저면 isNewDevice: false와 함께 토큰을 바로 반환한다', async () => {
+    let receivedAuth: string | null = null
+    server.use(
+      http.post('*/v1/user/login', ({ request }) => {
+        receivedAuth = request.headers.get('Authorization')
+        return HttpResponse.json({
+          result: true,
+          statusCode: 201,
+          data: {
+            isNewDevice: false,
+            accessToken: 'access-token-abc',
+            userIdx: '1',
+            userName: '홍길동',
+            orgIdx: '1',
+            orgName: '테스트 회사',
+            userGrade: 0,
+          },
+          message: [],
+        })
+      })
+    )
+
+    const res = await login({
+      email: 'user@koreapetroleum.com',
+      password: 'password1',
+      fingerprintCode: 'fp-1234',
+      device: 'W',
+    })
+
+    expect(res.data?.isNewDevice).toBe(false)
+    expect(res.data?.accessToken).toBe('access-token-abc')
+    expect(receivedAuth).toBeNull()
+  })
+
+  it('신규 브라우저면 isNewDevice: true만 반환하고 accessToken은 내려오지 않는다', async () => {
+    server.use(
+      http.post('*/v1/user/login', () =>
+        HttpResponse.json({
+          result: true,
+          statusCode: 201,
+          data: { isNewDevice: true },
+          message: [],
+        })
+      )
+    )
+
+    const res = await login({
+      email: 'user@koreapetroleum.com',
+      password: 'password1',
+      fingerprintCode: 'fp-1234',
+      device: 'W',
+    })
+
+    expect(res.data?.isNewDevice).toBe(true)
+    expect(res.data?.accessToken).toBeUndefined()
+  })
+
+  it('이메일 또는 비밀번호가 올바르지 않으면 401과 함께 에러를 던진다', async () => {
+    server.use(
+      http.post('*/v1/user/login', () =>
+        HttpResponse.json(
+          {
+            result: false,
+            statusCode: 401,
+            data: null,
+            message: [
+              '이메일 또는 비밀번호가 올바르지 않습니다. 5회 연속 틀리면 계정이 15분 잠깁니다 (남은 시도 4회). 비밀번호가 기억나지 않으면 비밀번호 찾기를 이용해주세요',
+            ],
+          },
+          { status: 401 }
+        )
+      )
+    )
+
+    await expect(
+      login({
+        email: 'user@koreapetroleum.com',
+        password: 'wrong-password',
+        fingerprintCode: 'fp-1234',
+        device: 'W',
+      })
+    ).rejects.toThrow('남은 시도 4회')
+  })
+})
+
+describe('loginVerifyDevice', () => {
+  beforeEach(() => {
+    server.resetHandlers()
+  })
+
+  it('비밀번호+인증코드가 모두 일치하면 토큰을 반환한다', async () => {
+    server.use(
+      http.post('*/v1/user/login/verify-device', () =>
+        HttpResponse.json({
+          result: true,
+          statusCode: 201,
+          data: {
+            accessToken: 'access-token-abc',
+            userIdx: '1',
+            userName: '홍길동',
+            orgIdx: '1',
+            orgName: '테스트 회사',
+            userGrade: 0,
+          },
+          message: [],
+        })
+      )
+    )
+
+    const res = await loginVerifyDevice({
+      email: 'user@koreapetroleum.com',
+      password: 'password1',
+      code: '123456',
+      fingerprintCode: 'fp-1234',
+      device: 'W',
+    })
+
+    expect(res.data?.accessToken).toBe('access-token-abc')
+  })
+
+  it('인증코드가 일치하지 않으면 401과 함께 에러를 던진다', async () => {
+    server.use(
+      http.post('*/v1/user/login/verify-device', () =>
+        HttpResponse.json(
+          {
+            result: false,
+            statusCode: 401,
+            data: null,
+            message: ['인증코드가 올바르지 않습니다 (남은 시도 4회)'],
+          },
+          { status: 401 }
+        )
+      )
+    )
+
+    await expect(
+      loginVerifyDevice({
+        email: 'user@koreapetroleum.com',
+        password: 'password1',
+        code: '000000',
+        fingerprintCode: 'fp-1234',
+        device: 'W',
+      })
+    ).rejects.toThrow('인증코드가 올바르지 않습니다')
+  })
+})
+
+describe('verifyTurnstile', () => {
+  beforeEach(() => {
+    server.resetHandlers()
+  })
+
+  it('검증에 성공하면 isVerified: true를 반환한다', async () => {
+    server.use(
+      http.post('*/v1/user/turnstile/verify', () =>
+        HttpResponse.json({
+          result: true,
+          statusCode: 201,
+          data: { isVerified: true },
+          message: [],
+        })
+      )
+    )
+
+    const res = await verifyTurnstile({ token: 'turnstile-token' })
+
+    expect(res.data?.isVerified).toBe(true)
+  })
+
+  it('토큰이 만료/재사용되면 isVerified: false와 errorCodes를 반환한다', async () => {
+    server.use(
+      http.post('*/v1/user/turnstile/verify', () =>
+        HttpResponse.json({
+          result: true,
+          statusCode: 201,
+          data: { isVerified: false, errorCodes: ['timeout-or-duplicate'] },
+          message: [],
+        })
+      )
+    )
+
+    const res = await verifyTurnstile({ token: 'expired-token' })
+
+    expect(res.data?.isVerified).toBe(false)
+    expect(res.data?.errorCodes).toEqual(['timeout-or-duplicate'])
+  })
+
+  it('Cloudflare와 통신 실패 시 502와 함께 에러를 던진다', async () => {
+    server.use(
+      http.post('*/v1/user/turnstile/verify', () =>
+        HttpResponse.json(
+          {
+            result: false,
+            statusCode: 502,
+            data: null,
+            message: ['Cloudflare 서버와 통신에 실패했습니다.'],
+          },
+          { status: 502 }
+        )
+      )
+    )
+
+    await expect(verifyTurnstile({ token: 'any-token' })).rejects.toThrow(
+      'Cloudflare 서버와 통신에 실패했습니다.'
+    )
+  })
+})
 
 describe('verifyIdentity', () => {
   beforeEach(() => {
@@ -191,7 +412,7 @@ describe('sendEmailVerificationCode', () => {
     ).rejects.toThrow('브라우저 지문 코드를 입력해주세요')
   })
 
-  it('회원가입은 같은 이메일+fingerprintCode 기준 24시간 안에 5회를 초과하면 409와 함께 에러를 던진다', async () => {
+  it('회원가입은 같은 이메일 계정 기준 24시간 안에 5회를 초과하면 409와 함께 에러를 던진다', async () => {
     server.use(
       http.post('*/v1/user/email/sendCode', () =>
         HttpResponse.json(
@@ -219,7 +440,7 @@ describe('sendEmailVerificationCode', () => {
     )
   })
 
-  it('로그인 2차 인증은 같은 이메일 기준 1시간 안에 5회를 초과하면 409와 함께 에러를 던진다', async () => {
+  it('로그인 2차 인증은 같은 이메일 계정 기준 24시간 안에 5회를 초과하면 409와 함께 에러를 던진다', async () => {
     server.use(
       http.post('*/v1/user/email/sendCode', () =>
         HttpResponse.json(
@@ -228,7 +449,7 @@ describe('sendEmailVerificationCode', () => {
             statusCode: 409,
             data: null,
             message: [
-              '인증코드 발송 횟수(5회)를 초과했습니다. 마지막 발송 후 1시간이 지나면 다시 요청할 수 있습니다',
+              '인증코드 발송 횟수(5회)를 초과했습니다. 마지막 발송 후 24시간이 지나면 다시 요청할 수 있습니다',
             ],
           },
           { status: 409 }
@@ -239,7 +460,7 @@ describe('sendEmailVerificationCode', () => {
     await expect(
       sendEmailVerificationCode({ email: 'user@koreapetroleum.com', authType: '1' })
     ).rejects.toThrow(
-      '인증코드 발송 횟수(5회)를 초과했습니다. 마지막 발송 후 1시간이 지나면 다시 요청할 수 있습니다'
+      '인증코드 발송 횟수(5회)를 초과했습니다. 마지막 발송 후 24시간이 지나면 다시 요청할 수 있습니다'
     )
   })
 

@@ -9,6 +9,7 @@ import { useState } from 'react'
 
 import type { IncomingItem } from '../api/itemIncoming'
 import { getIncomingItems } from '../api/itemIncoming'
+import { ErrorMessage } from '../components/error/ErrorMessage'
 import { Layout } from '../components/layout/Layout'
 import { PAGE_TITLES } from '../components/layout/sidebarMenu'
 import { DataTable } from '../components/table/DataTable'
@@ -99,9 +100,11 @@ export function ItemIncomingPendingPage() {
 
         {isLoading && <p className="mt-2 text-sm text-gray-600">불러오는 중...</p>}
         {isError && (
-          <p role="alert" className="mt-2 text-sm text-red-600">
-            입고등록대기 목록을 불러오지 못했습니다.
-          </p>
+          <ErrorMessage
+            message="입고등록대기 목록을 불러오지 못했습니다."
+            size="sm"
+            className="mt-2"
+          />
         )}
 
         <div className="mt-4">

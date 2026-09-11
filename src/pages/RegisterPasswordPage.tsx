@@ -10,8 +10,8 @@ import { isNewPasswordFieldsValid } from '../utils/rules/validationRules'
 
 /**
  * 회원가입 6단계 — 비밀번호 설정.
- * 5단계(이메일 인증) 완료 후 진입한다. 신규 비밀번호와 확인 비밀번호를 입력받아 형식(영문+숫자
- * 조합 8자리 이상)과 일치 여부를 검증하고, 통과하면 registerFlowStore에 비밀번호를 저장한 뒤
+ * 5단계(이메일 인증) 완료 후 진입한다. 신규 비밀번호와 확인 비밀번호를 입력받아 형식(영문+숫자+특수기호
+ * 조합 8자 이상)과 일치 여부를 검증하고, 통과하면 registerFlowStore에 비밀번호를 저장한 뒤
  * 7단계(새 조직 등록)로 이동한다.
  */
 export function RegisterPasswordPage() {

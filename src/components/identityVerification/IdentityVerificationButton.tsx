@@ -1,4 +1,5 @@
 import type { VerifyIdentityResult } from '../../api/auth'
+import { ErrorMessage } from '../error/ErrorMessage'
 import { useIdentityVerification } from './useIdentityVerification'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -43,14 +44,7 @@ export function IdentityVerificationButton({
       >
         {isPending ? `${label} 중...` : label}
       </button>
-      {error && (
-        <ul
-          role="alert"
-          className="mt-2 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-600"
-        >
-          <li>{error}</li>
-        </ul>
-      )}
+      <ErrorMessage message={error} className="mt-2" />
       {status === 'success' && (
         <p className="mt-2 rounded border border-green-200 bg-green-50 p-3 text-sm text-green-600">
           {label}이 완료되었습니다.

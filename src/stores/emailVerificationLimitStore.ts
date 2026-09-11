@@ -9,7 +9,7 @@ import { getCookie, setCookie } from '../utils/cookie'
  *  보조 가드일 뿐이다. 서버가 잔여 횟수/초기화 시각을 응답에 내려주지 않아 프론트가 자체
  *  추정하는 것이므로, 서버의 실제 판단 기준과 100% 일치하지 않을 수 있다(서버 에러 메시지가
  *  오면 항상 그것을 우선 표시할 것). */
-export type EmailVerificationLimitPurpose = 'register-send' | 'register-verify-fail'
+export type EmailVerificationLimitPurpose = 'register-send' | 'login-send'
 
 interface AttemptRecord {
   count: number

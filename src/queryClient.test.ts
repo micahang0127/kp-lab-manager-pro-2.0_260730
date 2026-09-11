@@ -37,4 +37,20 @@ describe('queryClient', () => {
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('test-mutation'), error)
   })
+
+  it('meta.suppressConsoleLog가 true인 mutation은 실패해도 콘솔에 로깅하지 않는다', async () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const error = new Error('로그인 실패')
+
+    const mutation = queryClient.getMutationCache().build(queryClient, {
+      mutationKey: ['test-mutation-silent'],
+      mutationFn: () => Promise.reject(error),
+      meta: { suppressConsoleLog: true },
+      retry: false,
+    })
+
+    await mutation.execute(undefined).catch(() => {})
+
+    expect(consoleErrorSpy).not.toHaveBeenCalled()
+  })
 })

@@ -16,6 +16,15 @@ export function getStoredAccessToken(): string | null {
   }
 }
 
+/** sessionStorage에 accessToken을 안전하게 저장한다. 접근 자체가 실패하면 콘솔에만 남긴다 */
+export function setStoredAccessToken(token: string): void {
+  try {
+    sessionStorage.setItem(ACCESS_TOKEN_KEY, token)
+  } catch (err) {
+    console.error('[token] sessionStorage 저장 실패:', err)
+  }
+}
+
 /** sessionStorage에서 accessToken을 안전하게 제거한다 */
 export function removeStoredAccessToken(): void {
   try {

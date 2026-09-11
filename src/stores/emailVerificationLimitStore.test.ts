@@ -69,11 +69,11 @@ describe('emailVerificationLimitStore', () => {
     const store = useEmailVerificationLimitStore.getState()
     store.recordAttempt('register-send', 'user@test.com', WINDOW_MS)
     store.recordAttempt('register-send', 'user@test.com', WINDOW_MS)
-    store.recordAttempt('register-verify-fail', 'user@test.com', WINDOW_MS)
+    store.recordAttempt('login-send', 'user@test.com', WINDOW_MS)
 
     const { records } = useEmailVerificationLimitStore.getState()
     expect(records['register-send:user@test.com'].count).toBe(2)
-    expect(records['register-verify-fail:user@test.com'].count).toBe(1)
+    expect(records['login-send:user@test.com'].count).toBe(1)
   })
 
   it('이메일 대소문자/공백 차이는 같은 계정으로 취급된다', () => {
@@ -100,41 +100,40 @@ describe('emailVerificationLimitStore', () => {
   describe('resetAttemptsForNewCode', () => {
     it('한도 미만일 때 새 인증번호가 발급되면 실패 기록을 지워 다시 처음부터 셀 수 있게 한다', () => {
       const store = setup()
-      store.recordAttempt('register-verify-fail', 'user@test.com', WINDOW_MS)
-      store.recordAttempt('register-verify-fail', 'user@test.com', WINDOW_MS)
+      store.recordAttempt('register-send', 'user@test.com', WINDOW_MS)
+      store.recordAttempt('register-send', 'user@test.com', WINDOW_MS)
       expect(
-        useEmailVerificationLimitStore.getState().records['register-verify-fail:user@test.com']
-          .count
+        useEmailVerificationLimitStore.getState().records['register-send:user@test.com'].count
       ).toBe(2)
 
-      store.resetAttemptsForNewCode('register-verify-fail', 'user@test.com')
+      store.resetAttemptsForNewCode('register-send', 'user@test.com')
 
       expect(
-        useEmailVerificationLimitStore.getState().records['register-verify-fail:user@test.com']
+        useEmailVerificationLimitStore.getState().records['register-send:user@test.com']
       ).toBeUndefined()
     })
 
     it('이미 한도(5회)를 초과해 잠긴 상태라도 새 인증번호가 발급되면 잠금 기록을 지운다(코드 단위로만 카운트되므로)', () => {
       const store = setup()
       for (let i = 0; i < MAX_ATTEMPTS; i++) {
-        store.recordAttempt('register-verify-fail', 'user@test.com', WINDOW_MS)
+        store.recordAttempt('register-send', 'user@test.com', WINDOW_MS)
       }
       expect(
         isAttemptLimitExceeded(
           useEmailVerificationLimitStore.getState().records,
-          'register-verify-fail',
+          'register-send',
           'user@test.com',
           MAX_ATTEMPTS,
           WINDOW_MS
         )
       ).toBe(true)
 
-      store.resetAttemptsForNewCode('register-verify-fail', 'user@test.com')
+      store.resetAttemptsForNewCode('register-send', 'user@test.com')
 
       expect(
         isAttemptLimitExceeded(
           useEmailVerificationLimitStore.getState().records,
-          'register-verify-fail',
+          'register-send',
           'user@test.com',
           MAX_ATTEMPTS,
           WINDOW_MS
@@ -144,7 +143,7 @@ describe('emailVerificationLimitStore', () => {
 
     it('기록이 없으면 아무 동작도 하지 않는다', () => {
       const store = setup()
-      store.resetAttemptsForNewCode('register-verify-fail', 'nobody@test.com')
+      store.resetAttemptsForNewCode('register-send', 'nobody@test.com')
 
       expect(useEmailVerificationLimitStore.getState().records).toEqual({})
     })

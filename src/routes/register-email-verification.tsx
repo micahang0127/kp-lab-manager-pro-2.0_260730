@@ -2,12 +2,13 @@ import { createFileRoute, redirect } from '@tanstack/react-router'
 
 import { RegisterEmailVerificationPage } from '../pages/RegisterEmailVerificationPage'
 import { useRegisterFlowStore } from '../stores/registerFlowStore'
+import { redirectIfAuthenticated } from '../utils/requireAuth'
 
 export const Route = createFileRoute('/register-email-verification')({
   beforeLoad: () => {
-    if (sessionStorage.getItem('accessToken')) {
-      return redirect({ to: '/main' })
-    }
+    const authRedirect = redirectIfAuthenticated()
+    if (authRedirect) return authRedirect
+
     // 1단계(가입 방법 선택)를 거치지 않은 경우 1단계로 돌려보낸다.
     if (!useRegisterFlowStore.getState().registerMethod) {
       return redirect({ to: '/register' })

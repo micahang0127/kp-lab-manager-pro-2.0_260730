@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BusinessRegistrationReviewData } from '../api/file'
 import type { InvitedOrg } from '../api/user'
 import { signUp } from '../api/user'
+import { useFindAccountFlowStore } from '../stores/findAccountFlowStore'
 import { useRegisterFlowStore } from '../stores/registerFlowStore'
 import { render, screen } from '../test/test-utils'
 import type { UploadedBusinessRegistration } from '../utils/uploadBusinessRegistration'
@@ -50,10 +51,25 @@ const UPLOADED: UploadedBusinessRegistration = {
 const PRIOR_STEPS_STATE = {
   registerMethod: 'new' as const,
   registerEmail: 'user@koreapetroleum.com',
+  registerEmailCode: '123456',
   registerPassword: 'abcd1234',
   identityVerificationCode: 'identity-verification-abc123',
   identityVerifyResult: { isVerified: true, hasExistingAccount: false, maskedName: '홍길*' },
   termsAgreement: { marketingOptIn: true },
+}
+
+/** signUp 성공(201) 응답 데이터 — API 문서(UserSignUpPayload)의 예시를 그대로 사용 */
+const SIGN_UP_SUCCESS_DATA = {
+  userIdx: '1',
+  email: PRIOR_STEPS_STATE.registerEmail,
+  marketingYn: 'Y' as const,
+  createdAt: '2026-09-11T00:00:00.000Z',
+  orgIdx: '1',
+  orgName: '회사명',
+  orgGrade: 'SYSTEM',
+  groupIdx: '1',
+  acceptedInvitedIdx: null,
+  rejectedInviteCount: 0,
 }
 
 /** 아직 resolve/reject하지 않은 Promise를 만들어 로딩 상태를 검증할 수 있게 한다 */
@@ -74,6 +90,7 @@ describe('RegisterOrganizationPage', () => {
     useRegisterFlowStore.setState({
       registerMethod: null,
       registerEmail: null,
+      registerEmailCode: null,
       registerPassword: null,
       invitedOrgs: null,
       identityVerificationCode: null,
@@ -83,6 +100,7 @@ describe('RegisterOrganizationPage', () => {
       businessRegistrationReview: null,
       businessRegistrationS3Key: null,
     })
+    useFindAccountFlowStore.setState({ verifiedIdentity: null })
   })
 
   it('페이지 제목과 안내 문구, 업로드 영역을 렌더링한다', () => {
@@ -152,6 +170,9 @@ describe('RegisterOrganizationPage', () => {
     expect(useRegisterFlowStore.getState().businessRegistrationFile).toBe(file)
     expect(useRegisterFlowStore.getState().businessRegistrationReview).toEqual(REVIEW)
     expect(useRegisterFlowStore.getState().businessRegistrationS3Key).toBe(UPLOADED.s3Key)
+
+    // 업로드 완료 시에만 나타나는 조직명 입력 필드 — 인식된 법인명이 기본값으로 채워진다
+    expect(screen.getByLabelText('조직명 *')).toHaveValue(REVIEW.corporateName)
   })
 
   it('업로드/분석이 실패하면 에러 문구를 표시하고 빈 업로드 박스로 되돌린다', async () => {
@@ -195,6 +216,8 @@ describe('RegisterOrganizationPage', () => {
     expect(useRegisterFlowStore.getState().businessRegistrationFile).toBeNull()
     expect(useRegisterFlowStore.getState().businessRegistrationReview).toBeNull()
     expect(useRegisterFlowStore.getState().businessRegistrationS3Key).toBeNull()
+    // 조직명 입력 필드는 업로드 완료 상태에서만 보이므로 삭제 후에는 함께 사라진다
+    expect(screen.queryByLabelText('조직명 *')).not.toBeInTheDocument()
   })
 
   it('"← 이전" 버튼을 클릭하면 6단계(비밀번호 설정)로 이동한다', async () => {
@@ -241,7 +264,7 @@ describe('RegisterOrganizationPage', () => {
       vi.mocked(signUp).mockResolvedValue({
         result: true,
         statusCode: 201,
-        data: { userIdx: '1', email: PRIOR_STEPS_STATE.registerEmail },
+        data: SIGN_UP_SUCCESS_DATA,
         message: [],
       })
 
@@ -255,6 +278,10 @@ describe('RegisterOrganizationPage', () => {
           email: PRIOR_STEPS_STATE.registerEmail,
           password: PRIOR_STEPS_STATE.registerPassword,
           verificationCode: PRIOR_STEPS_STATE.identityVerificationCode,
+          code: PRIOR_STEPS_STATE.registerEmailCode,
+          joinType: 1,
+          termsYn: 'Y',
+          marketingYn: 'Y',
           orgIdx: 4,
           invitedIdx: 13,
         })
@@ -265,7 +292,7 @@ describe('RegisterOrganizationPage', () => {
       vi.mocked(signUp).mockResolvedValue({
         result: true,
         statusCode: 201,
-        data: { userIdx: '1', email: PRIOR_STEPS_STATE.registerEmail },
+        data: SIGN_UP_SUCCESS_DATA,
         message: [],
       })
 
@@ -278,6 +305,10 @@ describe('RegisterOrganizationPage', () => {
           email: PRIOR_STEPS_STATE.registerEmail,
           password: PRIOR_STEPS_STATE.registerPassword,
           verificationCode: PRIOR_STEPS_STATE.identityVerificationCode,
+          code: PRIOR_STEPS_STATE.registerEmailCode,
+          joinType: 1,
+          termsYn: 'Y',
+          marketingYn: 'Y',
           orgIdx: 3,
           invitedIdx: 12,
         })
@@ -288,7 +319,7 @@ describe('RegisterOrganizationPage', () => {
       vi.mocked(signUp).mockResolvedValue({
         result: true,
         statusCode: 201,
-        data: { userIdx: '1', email: PRIOR_STEPS_STATE.registerEmail },
+        data: SIGN_UP_SUCCESS_DATA,
         message: [],
       })
 
@@ -301,6 +332,7 @@ describe('RegisterOrganizationPage', () => {
       })
       expect(useRegisterFlowStore.getState().invitedOrgs).toBeNull()
       expect(useRegisterFlowStore.getState().registerEmail).toBeNull()
+      expect(useRegisterFlowStore.getState().registerEmailCode).toBeNull()
     })
 
     it('signUp 실패 시 에러 문구를 표시하고 다시 제출할 수 있다', async () => {
@@ -359,7 +391,7 @@ describe('RegisterOrganizationPage', () => {
       vi.mocked(signUp).mockResolvedValue({
         result: true,
         statusCode: 201,
-        data: { userIdx: '1', email: PRIOR_STEPS_STATE.registerEmail },
+        data: SIGN_UP_SUCCESS_DATA,
         message: [],
       })
 
@@ -378,6 +410,10 @@ describe('RegisterOrganizationPage', () => {
           email: PRIOR_STEPS_STATE.registerEmail,
           password: PRIOR_STEPS_STATE.registerPassword,
           verificationCode: PRIOR_STEPS_STATE.identityVerificationCode,
+          code: PRIOR_STEPS_STATE.registerEmailCode,
+          joinType: 0,
+          termsYn: 'Y',
+          marketingYn: 'Y',
           regFile: UPLOADED.s3Key,
           orgName: REVIEW.corporateName,
           regNo: REVIEW.registrationNumber,
@@ -389,12 +425,62 @@ describe('RegisterOrganizationPage', () => {
       })
     })
 
-    it('signUp 성공 시 회원가입 플로우 store를 초기화하고 로그인 페이지로 이동한다', async () => {
+    it('조직명을 수정하고 제출하면 수정한 값으로 signUp을 호출한다', async () => {
       vi.mocked(uploadBusinessRegistration).mockResolvedValue(UPLOADED)
       vi.mocked(signUp).mockResolvedValue({
         result: true,
         statusCode: 201,
-        data: { userIdx: '1', email: PRIOR_STEPS_STATE.registerEmail },
+        data: SIGN_UP_SUCCESS_DATA,
+        message: [],
+      })
+
+      render(<RegisterOrganizationPage />)
+
+      const input = screen.getByLabelText('사업자등록증 파일 선택')
+      await userEvent.upload(input, createPdfFile())
+
+      const orgNameInput = await screen.findByLabelText('조직명 *')
+      await userEvent.clear(orgNameInput)
+      await userEvent.type(orgNameInput, 'KP한석화학(수정)')
+
+      await userEvent.click(screen.getByRole('button', { name: '새 조직으로 가입 완료 →' }))
+
+      await waitFor(() => {
+        expect(signUp).toHaveBeenCalledWith(
+          expect.objectContaining({ orgName: 'KP한석화학(수정)' })
+        )
+      })
+    })
+
+    it('조직명을 비우면 제출 버튼이 disabled되고, signUp을 호출하지 않는다', async () => {
+      vi.mocked(uploadBusinessRegistration).mockResolvedValue(UPLOADED)
+
+      render(<RegisterOrganizationPage />)
+
+      const input = screen.getByLabelText('사업자등록증 파일 선택')
+      await userEvent.upload(input, createPdfFile())
+
+      const orgNameInput = await screen.findByLabelText('조직명 *')
+      await userEvent.clear(orgNameInput)
+
+      expect(screen.getByRole('button', { name: '새 조직으로 가입 완료 →' })).toBeDisabled()
+      expect(signUp).not.toHaveBeenCalled()
+    })
+
+    it('signUp 성공 시 회원가입 플로우 store를 초기화하고 로그인 페이지로 이동한다', async () => {
+      // 아이디·비밀번호 찾기를 거쳐 회원가입까지 온 경우를 가정 — 가입이 끝나면 이 값도 함께
+      // 비워져야 이후 /find-account에서 사실과 다른 "가입된 계정 없음" 안내가 뜨지 않는다
+      useFindAccountFlowStore.setState({
+        verifiedIdentity: {
+          result: PRIOR_STEPS_STATE.identityVerifyResult,
+          identityVerificationCode: PRIOR_STEPS_STATE.identityVerificationCode,
+        },
+      })
+      vi.mocked(uploadBusinessRegistration).mockResolvedValue(UPLOADED)
+      vi.mocked(signUp).mockResolvedValue({
+        result: true,
+        statusCode: 201,
+        data: SIGN_UP_SUCCESS_DATA,
         message: [],
       })
 
@@ -413,6 +499,7 @@ describe('RegisterOrganizationPage', () => {
       })
       expect(useRegisterFlowStore.getState().registerMethod).toBeNull()
       expect(useRegisterFlowStore.getState().registerEmail).toBeNull()
+      expect(useRegisterFlowStore.getState().registerEmailCode).toBeNull()
       expect(useRegisterFlowStore.getState().registerPassword).toBeNull()
       expect(useRegisterFlowStore.getState().identityVerificationCode).toBeNull()
       expect(useRegisterFlowStore.getState().identityVerifyResult).toBeNull()
@@ -420,6 +507,7 @@ describe('RegisterOrganizationPage', () => {
       expect(useRegisterFlowStore.getState().businessRegistrationFile).toBeNull()
       expect(useRegisterFlowStore.getState().businessRegistrationReview).toBeNull()
       expect(useRegisterFlowStore.getState().businessRegistrationS3Key).toBeNull()
+      expect(useFindAccountFlowStore.getState().verifiedIdentity).toBeNull()
     })
 
     it('signUp 실패 시 에러 문구를 표시하고 다시 제출할 수 있다', async () => {
