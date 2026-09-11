@@ -3,3 +3,4 @@ dist
 dist-ssr
 pnpm-lock.yaml
 *.min.js
+src/routeTree.gen.ts
